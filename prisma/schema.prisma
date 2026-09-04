@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum MovieStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SeatType {
+  STANDARD
+  VIP
+  COUPLE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum TicketStatus {
+  ACTIVE
+  USED
+  CANCELLED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  role         UserRole  @default(CUSTOMER)
+  bookings     Booking[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Movie {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  duration    Int
+  status      MovieStatus  @default(DRAFT)
+  showtimes   Showtime[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Cinema {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  rooms     Room[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Room {
+  id        String     @id @default(cuid())
+  name      String
+  cinemaId String
+  cinema   Cinema      @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
+  seats     Seat[]
+  showtimes Showtime[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([cinemaId, name])
+}
+
+model Seat {
+  id            String         @id @default(cuid())
+  row           String
+  number        Int
+  type          SeatType       @default(STANDARD)
+  roomId        String
+  room          Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  showtimeSeats ShowtimeSeat[]
+
+  @@unique([roomId, row, number])
+}
+
+model Showtime {
+  id            String         @id @default(cuid())
+  startsAt      DateTime
+  endsAt        DateTime
+  movieId       String
+  movie         Movie          @relation(fields: [movieId], references: [id], onDelete: Restrict)
+  roomId        String
+  room          Room           @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  showtimeSeats ShowtimeSeat[]
+  bookings      Booking[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([movieId, startsAt])
+  @@index([roomId, startsAt, endsAt])
+}
+
+model ShowtimeSeat {
+  id         String        @id @default(cuid())
+  price      Decimal       @db.Decimal(10, 2)
+  showtimeId String
+  showtime   Showtime      @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+  seatId     String
+  seat       Seat          @relation(fields: [seatId], references: [id], onDelete: Restrict)
+  bookingItem BookingItem?
+
+  @@unique([showtimeId, seatId])
+}
+
+model Booking {
+  id         String        @id @default(cuid())
+  status     BookingStatus @default(PENDING)
+  totalAmount Decimal      @db.Decimal(10, 2)
+  expiresAt  DateTime
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  showtimeId String
+  showtime   Showtime      @relation(fields: [showtimeId], references: [id], onDelete: Restrict)
+  items      BookingItem[]
+  payment    Payment?
+  tickets    Ticket[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, expiresAt])
+}
+
+model BookingItem {
+  id             String       @id @default(cuid())
+  price          Decimal      @db.Decimal(10, 2)
+  bookingId      String
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  showtimeSeatId String       @unique
+  showtimeSeat   ShowtimeSeat @relation(fields: [showtimeSeatId], references: [id], onDelete: Restrict)
+  ticket         Ticket?
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  provider    String
+  reference   String?       @unique
+  status      PaymentStatus @default(PENDING)
+  amount      Decimal       @db.Decimal(10, 2)
+  bookingId   String        @unique
+  booking     Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Ticket {
+  id            String       @id @default(cuid())
+  code          String       @unique
+  status        TicketStatus @default(ACTIVE)
+  bookingId     String
+  booking       Booking      @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  bookingItemId String       @unique
+  bookingItem   BookingItem  @relation(fields: [bookingItemId], references: [id], onDelete: Restrict)
+  createdAt     DateTime     @default(now())
+  usedAt        DateTime?
+}
