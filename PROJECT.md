@@ -63,9 +63,12 @@ cp .env.example .env
 docker compose up -d
 npm install
 npm run prisma:generate
-npm run prisma:migrate -- --name init
+npm run prisma:deploy
+npm run prisma:seed
 npm run start:dev
 ```
+
+Thiết lập `SEED_ADMIN_EMAIL` và `SEED_ADMIN_PASSWORD` trong `.env` trước khi chạy seed. Mock payment chỉ hoạt động ở `development` và `test`.
 
 Swagger dự kiến được cung cấp tại `http://localhost:3000/api/docs` và API sử dụng prefix `/api/v1`.
 
@@ -85,3 +88,18 @@ Swagger dự kiến được cung cấp tại `http://localhost:3000/api/docs` v
 - Giá booking luôn được tính tại server.
 - Retry payment/webhook không tạo giao dịch hoặc ticket trùng.
 - API có validation, tài liệu Swagger và kiểm thử luồng chính.
+
+## Kiểm tra hiện tại
+
+```bash
+npm run prisma:generate
+npx prisma validate
+npm run format
+npm run lint
+npm run typecheck
+npm run build
+npm test
+npm run test:e2e
+```
+
+Scheduler expire booking chạy mỗi phút. Test unit hiện bao phủ password, JWT và scheduler; E2E bao phủ prefix API, health liveness và validation auth. Integration/concurrency test với PostgreSQL và Redis thật cần chạy khi Docker Desktop hoạt động.

@@ -24,6 +24,12 @@ enum SeatType {
   COUPLE
 }
 
+enum ShowtimeSeatStatus {
+  AVAILABLE
+  HELD
+  SOLD
+}
+
 enum BookingStatus {
   PENDING
   CONFIRMED
@@ -45,25 +51,26 @@ enum TicketStatus {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  fullName     String
-  role         UserRole  @default(CUSTOMER)
-  bookings     Booking[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  fullName      String
+  role          UserRole       @default(CUSTOMER)
+  bookings      Booking[]
+  refreshTokens RefreshToken[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Movie {
-  id          String       @id @default(cuid())
+  id          String      @id @default(cuid())
   title       String
   description String?
   duration    Int
-  status      MovieStatus  @default(DRAFT)
+  status      MovieStatus @default(DRAFT)
   showtimes   Showtime[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
 
 model Cinema {
@@ -78,8 +85,8 @@ model Cinema {
 model Room {
   id        String     @id @default(cuid())
   name      String
-  cinemaId String
-  cinema   Cinema      @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
+  cinemaId  String
+  cinema    Cinema     @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
   seats     Seat[]
   showtimes Showtime[]
   createdAt DateTime   @default(now())
@@ -118,32 +125,58 @@ model Showtime {
 }
 
 model ShowtimeSeat {
-  id         String        @id @default(cuid())
-  price      Decimal       @db.Decimal(10, 2)
-  showtimeId String
-  showtime   Showtime      @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
-  seatId     String
-  seat       Seat          @relation(fields: [seatId], references: [id], onDelete: Restrict)
-  bookingItem BookingItem?
+  id              String             @id @default(cuid())
+  price           Decimal            @db.Decimal(10, 2)
+  status          ShowtimeSeatStatus @default(AVAILABLE)
+  heldUntil       DateTime?
+  showtimeId      String
+  showtime        Showtime           @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+  seatId          String
+  seat            Seat               @relation(fields: [seatId], references: [id], onDelete: Restrict)
+  bookingItems    BookingItem[]
+  heldByBookingId String?
+  heldByBooking   Booking?           @relation("BookingSeatHolds", fields: [heldByBookingId], references: [id], onDelete: SetNull)
 
   @@unique([showtimeId, seatId])
+  @@index([showtimeId, status])
+  @@index([heldByBookingId])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  jti       String    @unique
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
 }
 
 model Booking {
-  id         String        @id @default(cuid())
-  status     BookingStatus @default(PENDING)
-  totalAmount Decimal      @db.Decimal(10, 2)
-  expiresAt  DateTime
-  userId     String
-  user       User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  showtimeId String
-  showtime   Showtime      @relation(fields: [showtimeId], references: [id], onDelete: Restrict)
-  items      BookingItem[]
-  payment    Payment?
-  tickets    Ticket[]
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id             String         @id @default(cuid())
+  status         BookingStatus  @default(PENDING)
+  totalAmount    Decimal        @db.Decimal(10, 2)
+  expiresAt      DateTime
+  holdToken      String
+  idempotencyKey String?
+  requestHash    String?
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  showtimeId     String
+  showtime       Showtime       @relation(fields: [showtimeId], references: [id], onDelete: Restrict)
+  items          BookingItem[]
+  heldSeats      ShowtimeSeat[] @relation("BookingSeatHolds")
+  payment        Payment?
+  tickets        Ticket[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
+  @@unique([userId, idempotencyKey])
+  @@index([holdToken])
   @@index([userId, createdAt])
   @@index([status, expiresAt])
 }
@@ -153,21 +186,24 @@ model BookingItem {
   price          Decimal      @db.Decimal(10, 2)
   bookingId      String
   booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  showtimeSeatId String       @unique
+  showtimeSeatId String
   showtimeSeat   ShowtimeSeat @relation(fields: [showtimeSeatId], references: [id], onDelete: Restrict)
   ticket         Ticket?
+
+  @@unique([bookingId, showtimeSeatId])
 }
 
 model Payment {
-  id          String        @id @default(cuid())
-  provider    String
-  reference   String?       @unique
-  status      PaymentStatus @default(PENDING)
-  amount      Decimal       @db.Decimal(10, 2)
-  bookingId   String        @unique
-  booking     Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  provider       String
+  reference      String?       @unique
+  idempotencyKey String?       @unique
+  status         PaymentStatus @default(PENDING)
+  amount         Decimal       @db.Decimal(10, 2)
+  bookingId      String        @unique
+  booking        Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Ticket {
