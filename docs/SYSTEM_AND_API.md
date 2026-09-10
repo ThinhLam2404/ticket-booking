@@ -51,20 +51,20 @@ Một ghế theo một suất chiếu chỉ được bán một lần. Hệ th�
 
 ### 2.1. Application stack
 
-| Thành phần | Phiên bản/công nghệ | Vai trò |
-|---|---|---|
-| Framework | NestJS 12 | Module, dependency injection, controller, service |
-| HTTP adapter | Express (`@nestjs/platform-express`) | Xử lý HTTP |
-| Language | TypeScript | Type safety |
-| ORM | Prisma 6.19.3 | Schema, migration và Prisma Client |
-| Database | PostgreSQL 17 | Lưu dữ liệu và transaction |
-| Cache/lock | Redis 7 + ioredis 6 | Lock ghế có TTL |
-| Authentication | JWT + `jsonwebtoken` | Access token/refresh token |
-| Password | Node `crypto.scrypt` | Hash password |
-| Validation | `class-validator`, `class-transformer` | Validate body/query |
-| Documentation | `@nestjs/swagger` | OpenAPI/Swagger UI |
-| Scheduler | `@nestjs/schedule` | Expire booking mỗi phút |
-| Unit/E2E test | Vitest, Supertest | Kiểm thử |
+| Thành phần     | Phiên bản/công nghệ                    | Vai trò                                           |
+| -------------- | -------------------------------------- | ------------------------------------------------- |
+| Framework      | NestJS 12                              | Module, dependency injection, controller, service |
+| HTTP adapter   | Express (`@nestjs/platform-express`)   | Xử lý HTTP                                        |
+| Language       | TypeScript                             | Type safety                                       |
+| ORM            | Prisma 6.19.3                          | Schema, migration và Prisma Client                |
+| Database       | PostgreSQL 17                          | Lưu dữ liệu và transaction                        |
+| Cache/lock     | Redis 7 + ioredis 6                    | Lock ghế có TTL                                   |
+| Authentication | JWT + `jsonwebtoken`                   | Access token/refresh token                        |
+| Password       | Node `crypto.scrypt`                   | Hash password                                     |
+| Validation     | `class-validator`, `class-transformer` | Validate body/query                               |
+| Documentation  | `@nestjs/swagger`                      | OpenAPI/Swagger UI                                |
+| Scheduler      | `@nestjs/schedule`                     | Expire booking mỗi phút                           |
+| Unit/E2E test  | Vitest, Supertest                      | Kiểm thử                                          |
 
 Dependencies được khai báo tại `package.json`.
 
@@ -72,11 +72,11 @@ Dependencies được khai báo tại `package.json`.
 
 File: `docker-compose.yml`.
 
-| Service | Port | Thông tin |
-|---|---:|---|
+| Service    |   Port | Thông tin                                                                   |
+| ---------- | -----: | --------------------------------------------------------------------------- |
 | PostgreSQL | `5432` | DB `ticket_booking`, user `ticket_booking`, password local `ticket_booking` |
-| Redis | `6379` | Seat lock |
-| pgAdmin | `5050` | `http://localhost:5050`, email `admin@admin.com`, password `adminpassword` |
+| Redis      | `6379` | Seat lock                                                                   |
+| pgAdmin    | `5050` | `http://localhost:5050`, email `admin@admin.com`, password `adminpassword`  |
 
 Application hiện chạy trực tiếp bằng Node/NestJS; chưa có Dockerfile cho API.
 
@@ -166,20 +166,20 @@ src/
 
 ### 3.1. Domain modules
 
-| Module | Trách nhiệm |
-|---|---|
-| `auth` | Register, login, refresh, logout, JWT token service |
-| `users` | Lấy thông tin user hiện tại |
-| `movies` | Movie catalog và movie lifecycle |
-| `cinemas` | Cụm rạp |
-| `rooms` | Phòng chiếu |
-| `seats` | Ghế vật lý trong phòng |
-| `showtimes` | Lịch chiếu và snapshot ghế theo lịch chiếu |
-| `bookings` | Hold, checkout, cancel, expire booking |
-| `payments` | Mock payment |
-| `tickets` | Ticket đã phát hành |
-| `health` | Liveness/readiness |
-| `redis` | Redis client và lock operations |
+| Module      | Trách nhiệm                                         |
+| ----------- | --------------------------------------------------- |
+| `auth`      | Register, login, refresh, logout, JWT token service |
+| `users`     | Lấy thông tin user hiện tại                         |
+| `movies`    | Movie catalog và movie lifecycle                    |
+| `cinemas`   | Cụm rạp                                             |
+| `rooms`     | Phòng chiếu                                         |
+| `seats`     | Ghế vật lý trong phòng                              |
+| `showtimes` | Lịch chiếu và snapshot ghế theo lịch chiếu          |
+| `bookings`  | Hold, checkout, cancel, expire booking              |
+| `payments`  | Mock payment                                        |
+| `tickets`   | Ticket đã phát hành                                 |
+| `health`    | Liveness/readiness                                  |
+| `redis`     | Redis client và lock operations                     |
 
 ### 3.2. Shared infrastructure
 
@@ -205,18 +205,18 @@ SEED_ADMIN_EMAIL=admin@example.com
 SEED_ADMIN_PASSWORD=change-this-seed-password
 ```
 
-| Biến | Bắt buộc | Mô tả |
-|---|---|---|
-| `NODE_ENV` | Không | `development`, `test` hoặc `production`; default `development` |
-| `PORT` | Không | Port HTTP; `main.ts` fallback về `3000` nếu không hợp lệ |
-| `DATABASE_URL` | Có | PostgreSQL connection string dùng bởi Prisma |
-| `REDIS_URL` | Có | Redis URL, phải dùng protocol `redis` |
-| `JWT_ACCESS_SECRET` | Có | Secret ký access token |
-| `JWT_REFRESH_SECRET` | Có | Secret ký refresh token; phải khác access secret |
-| `JWT_ACCESS_EXPIRES_IN` | Không | TTL access token, default `15m` |
-| `JWT_REFRESH_EXPIRES_IN` | Không | TTL refresh token, default `7d` |
-| `SEED_ADMIN_EMAIL` | Seed | Email admin bootstrap, default `admin@example.com` |
-| `SEED_ADMIN_PASSWORD` | Seed | Password admin bootstrap, bắt buộc khi seed |
+| Biến                     | Bắt buộc | Mô tả                                                          |
+| ------------------------ | -------- | -------------------------------------------------------------- |
+| `NODE_ENV`               | Không    | `development`, `test` hoặc `production`; default `development` |
+| `PORT`                   | Không    | Port HTTP; `main.ts` fallback về `3000` nếu không hợp lệ       |
+| `DATABASE_URL`           | Có       | PostgreSQL connection string dùng bởi Prisma                   |
+| `REDIS_URL`              | Có       | Redis URL, phải dùng protocol `redis`                          |
+| `JWT_ACCESS_SECRET`      | Có       | Secret ký access token                                         |
+| `JWT_REFRESH_SECRET`     | Có       | Secret ký refresh token; phải khác access secret               |
+| `JWT_ACCESS_EXPIRES_IN`  | Không    | TTL access token, default `15m`                                |
+| `JWT_REFRESH_EXPIRES_IN` | Không    | TTL refresh token, default `7d`                                |
+| `SEED_ADMIN_EMAIL`       | Seed     | Email admin bootstrap, default `admin@example.com`             |
+| `SEED_ADMIN_PASSWORD`    | Seed     | Password admin bootstrap, bắt buộc khi seed                    |
 
 ### Security rules
 
@@ -245,129 +245,129 @@ Nguồn chính: `prisma/schema.prisma`.
 
 #### `UserRole`
 
-| Giá trị | Ý nghĩa |
-|---|---|
+| Giá trị    | Ý nghĩa           |
+| ---------- | ----------------- |
 | `CUSTOMER` | Người dùng đặt vé |
-| `ADMIN` | Quản lý catalog |
+| `ADMIN`    | Quản lý catalog   |
 
 #### `MovieStatus`
 
-| Giá trị | Ý nghĩa |
-|---|---|
-| `DRAFT` | Chưa public |
+| Giá trị     | Ý nghĩa                          |
+| ----------- | -------------------------------- |
+| `DRAFT`     | Chưa public                      |
 | `PUBLISHED` | Được hiển thị và dùng để booking |
-| `ARCHIVED` | Đã archive, không public |
+| `ARCHIVED`  | Đã archive, không public         |
 
 #### `SeatType`
 
-| Giá trị | Ý nghĩa |
-|---|---|
+| Giá trị    | Ý nghĩa    |
+| ---------- | ---------- |
 | `STANDARD` | Ghế thường |
-| `VIP` | Ghế VIP |
-| `COUPLE` | Ghế đôi |
+| `VIP`      | Ghế VIP    |
+| `COUPLE`   | Ghế đôi    |
 
 #### `ShowtimeSeatStatus`
 
-| Giá trị | Ý nghĩa |
-|---|---|
-| `AVAILABLE` | Có thể hold |
-| `HELD` | Đang được booking giữ |
-| `SOLD` | Đã bán |
+| Giá trị     | Ý nghĩa               |
+| ----------- | --------------------- |
+| `AVAILABLE` | Có thể hold           |
+| `HELD`      | Đang được booking giữ |
+| `SOLD`      | Đã bán                |
 
 #### `BookingStatus`
 
-| Giá trị | Ý nghĩa |
-|---|---|
-| `PENDING` | Đang giữ ghế/chờ thanh toán |
-| `CONFIRMED` | Thanh toán thành công |
-| `CANCELLED` | Bị hủy |
-| `EXPIRED` | Hết thời gian giữ |
+| Giá trị     | Ý nghĩa                     |
+| ----------- | --------------------------- |
+| `PENDING`   | Đang giữ ghế/chờ thanh toán |
+| `CONFIRMED` | Thanh toán thành công       |
+| `CANCELLED` | Bị hủy                      |
+| `EXPIRED`   | Hết thời gian giữ           |
 
 #### `PaymentStatus`
 
-| Giá trị | Ý nghĩa |
-|---|---|
-| `PENDING` | Checkout tạo payment nhưng chưa có kết quả |
-| `SUCCEEDED` | Thanh toán thành công |
-| `FAILED` | Thanh toán thất bại |
-| `REFUNDED` | Dành cho refund tương lai |
+| Giá trị     | Ý nghĩa                                    |
+| ----------- | ------------------------------------------ |
+| `PENDING`   | Checkout tạo payment nhưng chưa có kết quả |
+| `SUCCEEDED` | Thanh toán thành công                      |
+| `FAILED`    | Thanh toán thất bại                        |
+| `REFUNDED`  | Dành cho refund tương lai                  |
 
 #### `TicketStatus`
 
-| Giá trị | Ý nghĩa |
-|---|---|
-| `ACTIVE` | Vé có thể sử dụng |
-| `USED` | Đã sử dụng |
-| `CANCELLED` | Vé đã hủy |
+| Giá trị     | Ý nghĩa           |
+| ----------- | ----------------- |
+| `ACTIVE`    | Vé có thể sử dụng |
+| `USED`      | Đã sử dụng        |
+| `CANCELLED` | Vé đã hủy         |
 
 ### 5.3. Bảng `User`
 
 Nguồn: `prisma/schema.prisma`, model `User`.
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID nội bộ |
-| `email` | `String` | REQ | UQ | Email đăng nhập, normalize lowercase |
-| `passwordHash` | `String` | REQ | — | Hash bằng scrypt |
-| `fullName` | `String` | REQ | — | Tên hiển thị |
-| `role` | `UserRole` | REQ | `CUSTOMER` | Quyền user |
-| `bookings` | `Booking[]` | Relation | — | Các booking của user |
-| `refreshTokens` | `RefreshToken[]` | Relation | — | Các session refresh token |
-| `createdAt` | `DateTime` | REQ | `now()` | Thời điểm tạo |
-| `updatedAt` | `DateTime` | REQ | `@updatedAt` | Thời điểm cập nhật |
+| Field           | Type             | Nullability | Default/constraint | Mô tả                                |
+| --------------- | ---------------- | ----------- | ------------------ | ------------------------------------ |
+| `id`            | `String`         | REQ         | PK, `cuid()`       | ID nội bộ                            |
+| `email`         | `String`         | REQ         | UQ                 | Email đăng nhập, normalize lowercase |
+| `passwordHash`  | `String`         | REQ         | —                  | Hash bằng scrypt                     |
+| `fullName`      | `String`         | REQ         | —                  | Tên hiển thị                         |
+| `role`          | `UserRole`       | REQ         | `CUSTOMER`         | Quyền user                           |
+| `bookings`      | `Booking[]`      | Relation    | —                  | Các booking của user                 |
+| `refreshTokens` | `RefreshToken[]` | Relation    | —                  | Các session refresh token            |
+| `createdAt`     | `DateTime`       | REQ         | `now()`            | Thời điểm tạo                        |
+| `updatedAt`     | `DateTime`       | REQ         | `@updatedAt`       | Thời điểm cập nhật                   |
 
 ### 5.4. Bảng `Movie`
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID phim |
-| `title` | `String` | REQ | — | Tên phim |
-| `description` | `String?` | OPT | — | Mô tả phim |
-| `duration` | `Int` | REQ | — | Thời lượng, đơn vị phút |
-| `status` | `MovieStatus` | REQ | `DRAFT` | Lifecycle phim |
-| `showtimes` | `Showtime[]` | Relation | — | Các suất chiếu |
-| `createdAt` | `DateTime` | REQ | `now()` | Thời điểm tạo |
-| `updatedAt` | `DateTime` | REQ | `@updatedAt` | Thời điểm cập nhật |
+| Field         | Type          | Nullability | Default/constraint | Mô tả                   |
+| ------------- | ------------- | ----------- | ------------------ | ----------------------- |
+| `id`          | `String`      | REQ         | PK, `cuid()`       | ID phim                 |
+| `title`       | `String`      | REQ         | —                  | Tên phim                |
+| `description` | `String?`     | OPT         | —                  | Mô tả phim              |
+| `duration`    | `Int`         | REQ         | —                  | Thời lượng, đơn vị phút |
+| `status`      | `MovieStatus` | REQ         | `DRAFT`            | Lifecycle phim          |
+| `showtimes`   | `Showtime[]`  | Relation    | —                  | Các suất chiếu          |
+| `createdAt`   | `DateTime`    | REQ         | `now()`            | Thời điểm tạo           |
+| `updatedAt`   | `DateTime`    | REQ         | `@updatedAt`       | Thời điểm cập nhật      |
 
 ### 5.5. Bảng `Cinema`
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID rạp |
-| `name` | `String` | REQ | — | Tên rạp |
-| `address` | `String` | REQ | — | Địa chỉ |
-| `rooms` | `Room[]` | Relation | — | Các phòng chiếu |
-| `createdAt` | `DateTime` | REQ | `now()` | Thời điểm tạo |
-| `updatedAt` | `DateTime` | REQ | `@updatedAt` | Thời điểm cập nhật |
+| Field       | Type       | Nullability | Default/constraint | Mô tả              |
+| ----------- | ---------- | ----------- | ------------------ | ------------------ |
+| `id`        | `String`   | REQ         | PK, `cuid()`       | ID rạp             |
+| `name`      | `String`   | REQ         | —                  | Tên rạp            |
+| `address`   | `String`   | REQ         | —                  | Địa chỉ            |
+| `rooms`     | `Room[]`   | Relation    | —                  | Các phòng chiếu    |
+| `createdAt` | `DateTime` | REQ         | `now()`            | Thời điểm tạo      |
+| `updatedAt` | `DateTime` | REQ         | `@updatedAt`       | Thời điểm cập nhật |
 
 Cinema hiện không có unique constraint trên `name` hoặc `address`.
 
 ### 5.6. Bảng `Room`
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID phòng |
-| `name` | `String` | REQ | Kết hợp unique với `cinemaId` | Tên phòng trong rạp |
-| `cinemaId` | `String` | REQ | FK → `Cinema.id` | Rạp sở hữu phòng |
-| `cinema` | `Cinema` | Relation | `onDelete: Cascade` | Rạp cha |
-| `seats` | `Seat[]` | Relation | — | Ghế trong phòng |
-| `showtimes` | `Showtime[]` | Relation | — | Lịch chiếu trong phòng |
-| `createdAt` | `DateTime` | REQ | `now()` | Thời điểm tạo |
-| `updatedAt` | `DateTime` | REQ | `@updatedAt` | Thời điểm cập nhật |
+| Field       | Type         | Nullability | Default/constraint            | Mô tả                  |
+| ----------- | ------------ | ----------- | ----------------------------- | ---------------------- |
+| `id`        | `String`     | REQ         | PK, `cuid()`                  | ID phòng               |
+| `name`      | `String`     | REQ         | Kết hợp unique với `cinemaId` | Tên phòng trong rạp    |
+| `cinemaId`  | `String`     | REQ         | FK → `Cinema.id`              | Rạp sở hữu phòng       |
+| `cinema`    | `Cinema`     | Relation    | `onDelete: Cascade`           | Rạp cha                |
+| `seats`     | `Seat[]`     | Relation    | —                             | Ghế trong phòng        |
+| `showtimes` | `Showtime[]` | Relation    | —                             | Lịch chiếu trong phòng |
+| `createdAt` | `DateTime`   | REQ         | `now()`                       | Thời điểm tạo          |
+| `updatedAt` | `DateTime`   | REQ         | `@updatedAt`                  | Thời điểm cập nhật     |
 
 Constraint: `@@unique([cinemaId, name])`.
 
 ### 5.7. Bảng `Seat`
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID ghế vật lý |
-| `row` | `String` | REQ | — | Hàng ghế, ví dụ `A` |
-| `number` | `Int` | REQ | — | Số ghế trong hàng |
-| `type` | `SeatType` | REQ | `STANDARD` | Loại ghế |
-| `roomId` | `String` | REQ | FK → `Room.id` | Phòng chứa ghế |
-| `room` | `Room` | Relation | `onDelete: Cascade` | Phòng cha |
-| `showtimeSeats` | `ShowtimeSeat[]` | Relation | — | Snapshot ghế theo showtime |
+| Field           | Type             | Nullability | Default/constraint  | Mô tả                      |
+| --------------- | ---------------- | ----------- | ------------------- | -------------------------- |
+| `id`            | `String`         | REQ         | PK, `cuid()`        | ID ghế vật lý              |
+| `row`           | `String`         | REQ         | —                   | Hàng ghế, ví dụ `A`        |
+| `number`        | `Int`            | REQ         | —                   | Số ghế trong hàng          |
+| `type`          | `SeatType`       | REQ         | `STANDARD`          | Loại ghế                   |
+| `roomId`        | `String`         | REQ         | FK → `Room.id`      | Phòng chứa ghế             |
+| `room`          | `Room`           | Relation    | `onDelete: Cascade` | Phòng cha                  |
+| `showtimeSeats` | `ShowtimeSeat[]` | Relation    | —                   | Snapshot ghế theo showtime |
 
 Constraint: `@@unique([roomId, row, number])`.
 
@@ -375,19 +375,19 @@ Seat không có `createdAt`/`updatedAt`.
 
 ### 5.8. Bảng `Showtime`
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID suất chiếu |
-| `startsAt` | `DateTime` | REQ | — | Thời điểm bắt đầu |
-| `endsAt` | `DateTime` | REQ | — | Thời điểm kết thúc |
-| `movieId` | `String` | REQ | FK → `Movie.id` | Phim được chiếu |
-| `movie` | `Movie` | Relation | `onDelete: Restrict` | Phim cha |
-| `roomId` | `String` | REQ | FK → `Room.id` | Phòng chiếu |
-| `room` | `Room` | Relation | `onDelete: Restrict` | Phòng cha |
-| `showtimeSeats` | `ShowtimeSeat[]` | Relation | — | Ghế snapshot |
-| `bookings` | `Booking[]` | Relation | — | Booking của suất |
-| `createdAt` | `DateTime` | REQ | `now()` | Thời điểm tạo |
-| `updatedAt` | `DateTime` | REQ | `@updatedAt` | Thời điểm cập nhật |
+| Field           | Type             | Nullability | Default/constraint   | Mô tả              |
+| --------------- | ---------------- | ----------- | -------------------- | ------------------ |
+| `id`            | `String`         | REQ         | PK, `cuid()`         | ID suất chiếu      |
+| `startsAt`      | `DateTime`       | REQ         | —                    | Thời điểm bắt đầu  |
+| `endsAt`        | `DateTime`       | REQ         | —                    | Thời điểm kết thúc |
+| `movieId`       | `String`         | REQ         | FK → `Movie.id`      | Phim được chiếu    |
+| `movie`         | `Movie`          | Relation    | `onDelete: Restrict` | Phim cha           |
+| `roomId`        | `String`         | REQ         | FK → `Room.id`       | Phòng chiếu        |
+| `room`          | `Room`           | Relation    | `onDelete: Restrict` | Phòng cha          |
+| `showtimeSeats` | `ShowtimeSeat[]` | Relation    | —                    | Ghế snapshot       |
+| `bookings`      | `Booking[]`      | Relation    | —                    | Booking của suất   |
+| `createdAt`     | `DateTime`       | REQ         | `now()`              | Thời điểm tạo      |
+| `updatedAt`     | `DateTime`       | REQ         | `@updatedAt`         | Thời điểm cập nhật |
 
 Indexes:
 
@@ -403,19 +403,19 @@ Database constraints trong migration:
 
 Đây là snapshot của một ghế vật lý trong một suất chiếu. Booking luôn thao tác trên bảng này, không thao tác trực tiếp trên `Seat`.
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID ghế theo suất |
-| `price` | `Decimal(10,2)` | REQ | `>= 0` | Giá ghế tại showtime |
-| `status` | `ShowtimeSeatStatus` | REQ | `AVAILABLE` | Trạng thái bán |
-| `heldUntil` | `DateTime?` | OPT | — | Thời điểm hold hết hạn |
-| `showtimeId` | `String` | REQ | FK → `Showtime.id` | Suất chiếu |
-| `showtime` | `Showtime` | Relation | `onDelete: Cascade` | Suất cha |
-| `seatId` | `String` | REQ | FK → `Seat.id` | Ghế vật lý |
-| `seat` | `Seat` | Relation | `onDelete: Restrict` | Ghế cha |
-| `bookingItems` | `BookingItem[]` | Relation | — | Lịch sử item |
-| `heldByBookingId` | `String?` | OPT | FK → `Booking.id` | Booking đang sở hữu hold |
-| `heldByBooking` | `Booking?` | Relation | `SetNull` | Booking owner của hold |
+| Field             | Type                 | Nullability | Default/constraint   | Mô tả                    |
+| ----------------- | -------------------- | ----------- | -------------------- | ------------------------ |
+| `id`              | `String`             | REQ         | PK, `cuid()`         | ID ghế theo suất         |
+| `price`           | `Decimal(10,2)`      | REQ         | `>= 0`               | Giá ghế tại showtime     |
+| `status`          | `ShowtimeSeatStatus` | REQ         | `AVAILABLE`          | Trạng thái bán           |
+| `heldUntil`       | `DateTime?`          | OPT         | —                    | Thời điểm hold hết hạn   |
+| `showtimeId`      | `String`             | REQ         | FK → `Showtime.id`   | Suất chiếu               |
+| `showtime`        | `Showtime`           | Relation    | `onDelete: Cascade`  | Suất cha                 |
+| `seatId`          | `String`             | REQ         | FK → `Seat.id`       | Ghế vật lý               |
+| `seat`            | `Seat`               | Relation    | `onDelete: Restrict` | Ghế cha                  |
+| `bookingItems`    | `BookingItem[]`      | Relation    | —                    | Lịch sử item             |
+| `heldByBookingId` | `String?`            | OPT         | FK → `Booking.id`    | Booking đang sở hữu hold |
+| `heldByBooking`   | `Booking?`           | Relation    | `SetNull`            | Booking owner của hold   |
 
 Constraints/indexes:
 
@@ -427,16 +427,16 @@ Constraints/indexes:
 
 ### 5.10. Bảng `RefreshToken`
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID record database |
-| `jti` | `String` | REQ | UQ | JWT ID nằm trong token |
-| `tokenHash` | `String` | REQ | — | Hash refresh token |
-| `expiresAt` | `DateTime` | REQ | — | Hạn token |
-| `revokedAt` | `DateTime?` | OPT | — | Thời điểm revoke |
-| `userId` | `String` | REQ | FK → `User.id` | User sở hữu token |
-| `user` | `User` | Relation | `onDelete: Cascade` | User cha |
-| `createdAt` | `DateTime` | REQ | `now()` | Thời điểm tạo |
+| Field       | Type        | Nullability | Default/constraint  | Mô tả                  |
+| ----------- | ----------- | ----------- | ------------------- | ---------------------- |
+| `id`        | `String`    | REQ         | PK, `cuid()`        | ID record database     |
+| `jti`       | `String`    | REQ         | UQ                  | JWT ID nằm trong token |
+| `tokenHash` | `String`    | REQ         | —                   | Hash refresh token     |
+| `expiresAt` | `DateTime`  | REQ         | —                   | Hạn token              |
+| `revokedAt` | `DateTime?` | OPT         | —                   | Thời điểm revoke       |
+| `userId`    | `String`    | REQ         | FK → `User.id`      | User sở hữu token      |
+| `user`      | `User`      | Relation    | `onDelete: Cascade` | User cha               |
+| `createdAt` | `DateTime`  | REQ         | `now()`             | Thời điểm tạo          |
 
 Indexes:
 
@@ -448,25 +448,25 @@ Indexes:
 
 ### 5.11. Bảng `Booking`
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID booking |
-| `status` | `BookingStatus` | REQ | `PENDING` | Lifecycle booking |
-| `totalAmount` | `Decimal(10,2)` | REQ | `>= 0` | Tổng tiền server tính |
-| `expiresAt` | `DateTime` | REQ | — | Hạn giữ ghế |
-| `holdToken` | `String` | REQ | — | Token nội bộ release Redis |
-| `idempotencyKey` | `String?` | OPT | Nullable UQ theo user | Key retry hold |
-| `requestHash` | `String?` | OPT | — | Fingerprint showtime + seats |
-| `userId` | `String` | REQ | FK → `User.id` | User tạo booking |
-| `user` | `User` | Relation | `onDelete: Restrict` | User cha |
-| `showtimeId` | `String` | REQ | FK → `Showtime.id` | Suất chiếu |
-| `showtime` | `Showtime` | Relation | `onDelete: Restrict` | Suất cha |
-| `items` | `BookingItem[]` | Relation | — | Các ghế đã chọn |
-| `heldSeats` | `ShowtimeSeat[]` | Relation | `BookingSeatHolds` | Ghế booking đang hold |
-| `payment` | `Payment?` | Relation | Tối đa một payment |
-| `tickets` | `Ticket[]` | Relation | — | Vé phát hành |
-| `createdAt` | `DateTime` | REQ | `now()` | Thời điểm tạo |
-| `updatedAt` | `DateTime` | REQ | `@updatedAt` | Thời điểm cập nhật |
+| Field            | Type             | Nullability | Default/constraint    | Mô tả                        |
+| ---------------- | ---------------- | ----------- | --------------------- | ---------------------------- |
+| `id`             | `String`         | REQ         | PK, `cuid()`          | ID booking                   |
+| `status`         | `BookingStatus`  | REQ         | `PENDING`             | Lifecycle booking            |
+| `totalAmount`    | `Decimal(10,2)`  | REQ         | `>= 0`                | Tổng tiền server tính        |
+| `expiresAt`      | `DateTime`       | REQ         | —                     | Hạn giữ ghế                  |
+| `holdToken`      | `String`         | REQ         | —                     | Token nội bộ release Redis   |
+| `idempotencyKey` | `String?`        | OPT         | Nullable UQ theo user | Key retry hold               |
+| `requestHash`    | `String?`        | OPT         | —                     | Fingerprint showtime + seats |
+| `userId`         | `String`         | REQ         | FK → `User.id`        | User tạo booking             |
+| `user`           | `User`           | Relation    | `onDelete: Restrict`  | User cha                     |
+| `showtimeId`     | `String`         | REQ         | FK → `Showtime.id`    | Suất chiếu                   |
+| `showtime`       | `Showtime`       | Relation    | `onDelete: Restrict`  | Suất cha                     |
+| `items`          | `BookingItem[]`  | Relation    | —                     | Các ghế đã chọn              |
+| `heldSeats`      | `ShowtimeSeat[]` | Relation    | `BookingSeatHolds`    | Ghế booking đang hold        |
+| `payment`        | `Payment?`       | Relation    | Tối đa một payment    |
+| `tickets`        | `Ticket[]`       | Relation    | —                     | Vé phát hành                 |
+| `createdAt`      | `DateTime`       | REQ         | `now()`               | Thời điểm tạo                |
+| `updatedAt`      | `DateTime`       | REQ         | `@updatedAt`          | Thời điểm cập nhật           |
 
 Constraints/indexes:
 
@@ -478,15 +478,15 @@ Constraints/indexes:
 
 ### 5.12. Bảng `BookingItem`
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID item |
-| `price` | `Decimal(10,2)` | REQ | `>= 0` | Giá snapshot tại booking |
-| `bookingId` | `String` | REQ | FK → `Booking.id` | Booking cha |
-| `booking` | `Booking` | Relation | `onDelete: Cascade` | Booking |
-| `showtimeSeatId` | `String` | REQ | FK → `ShowtimeSeat.id` | Ghế theo suất |
-| `showtimeSeat` | `ShowtimeSeat` | Relation | `onDelete: Restrict` | Showtime seat |
-| `ticket` | `Ticket?` | Relation | Tối đa một ticket |
+| Field            | Type            | Nullability | Default/constraint     | Mô tả                    |
+| ---------------- | --------------- | ----------- | ---------------------- | ------------------------ |
+| `id`             | `String`        | REQ         | PK, `cuid()`           | ID item                  |
+| `price`          | `Decimal(10,2)` | REQ         | `>= 0`                 | Giá snapshot tại booking |
+| `bookingId`      | `String`        | REQ         | FK → `Booking.id`      | Booking cha              |
+| `booking`        | `Booking`       | Relation    | `onDelete: Cascade`    | Booking                  |
+| `showtimeSeatId` | `String`        | REQ         | FK → `ShowtimeSeat.id` | Ghế theo suất            |
+| `showtimeSeat`   | `ShowtimeSeat`  | Relation    | `onDelete: Restrict`   | Showtime seat            |
+| `ticket`         | `Ticket?`       | Relation    | Tối đa một ticket      |
 
 Constraint: `@@unique([bookingId, showtimeSeatId])`.
 
@@ -494,34 +494,34 @@ Unique này không cấm ghế xuất hiện trong booking lịch sử khác; n�
 
 ### 5.13. Bảng `Payment`
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID payment |
-| `provider` | `String` | REQ | — | Hiện tại `MOCK` |
-| `reference` | `String?` | OPT | UQ | Reference phía provider |
-| `idempotencyKey` | `String?` | OPT | UQ | Key retry payment |
-| `status` | `PaymentStatus` | REQ | `PENDING` | Trạng thái giao dịch |
-| `amount` | `Decimal(10,2)` | REQ | `>= 0` | Số tiền thanh toán |
-| `bookingId` | `String` | REQ | UQ, FK → `Booking.id` | Booking được thanh toán |
-| `booking` | `Booking` | Relation | `onDelete: Restrict` | Booking |
-| `createdAt` | `DateTime` | REQ | `now()` | Thời điểm tạo |
-| `updatedAt` | `DateTime` | REQ | `@updatedAt` | Thời điểm cập nhật |
+| Field            | Type            | Nullability | Default/constraint    | Mô tả                   |
+| ---------------- | --------------- | ----------- | --------------------- | ----------------------- |
+| `id`             | `String`        | REQ         | PK, `cuid()`          | ID payment              |
+| `provider`       | `String`        | REQ         | —                     | Hiện tại `MOCK`         |
+| `reference`      | `String?`       | OPT         | UQ                    | Reference phía provider |
+| `idempotencyKey` | `String?`       | OPT         | UQ                    | Key retry payment       |
+| `status`         | `PaymentStatus` | REQ         | `PENDING`             | Trạng thái giao dịch    |
+| `amount`         | `Decimal(10,2)` | REQ         | `>= 0`                | Số tiền thanh toán      |
+| `bookingId`      | `String`        | REQ         | UQ, FK → `Booking.id` | Booking được thanh toán |
+| `booking`        | `Booking`       | Relation    | `onDelete: Restrict`  | Booking                 |
+| `createdAt`      | `DateTime`      | REQ         | `now()`               | Thời điểm tạo           |
+| `updatedAt`      | `DateTime`      | REQ         | `@updatedAt`          | Thời điểm cập nhật      |
 
 Một booking tối đa có một Payment. Một payment idempotency key chỉ dùng một lần.
 
 ### 5.14. Bảng `Ticket`
 
-| Field | Type | Nullability | Default/constraint | Mô tả |
-|---|---|---|---|---|
-| `id` | `String` | REQ | PK, `cuid()` | ID ticket |
-| `code` | `String` | REQ | UQ | Mã vé public |
-| `status` | `TicketStatus` | REQ | `ACTIVE` | Trạng thái vé |
-| `bookingId` | `String` | REQ | FK → `Booking.id` | Booking cha |
-| `booking` | `Booking` | Relation | `onDelete: Restrict` | Booking |
-| `bookingItemId` | `String` | REQ | UQ, FK → `BookingItem.id` | Item tạo ticket |
-| `bookingItem` | `BookingItem` | Relation | `onDelete: Restrict` | Item |
-| `createdAt` | `DateTime` | REQ | `now()` | Thời điểm tạo |
-| `usedAt` | `DateTime?` | OPT | — | Thời điểm sử dụng |
+| Field           | Type           | Nullability | Default/constraint        | Mô tả             |
+| --------------- | -------------- | ----------- | ------------------------- | ----------------- |
+| `id`            | `String`       | REQ         | PK, `cuid()`              | ID ticket         |
+| `code`          | `String`       | REQ         | UQ                        | Mã vé public      |
+| `status`        | `TicketStatus` | REQ         | `ACTIVE`                  | Trạng thái vé     |
+| `bookingId`     | `String`       | REQ         | FK → `Booking.id`         | Booking cha       |
+| `booking`       | `Booking`      | Relation    | `onDelete: Restrict`      | Booking           |
+| `bookingItemId` | `String`       | REQ         | UQ, FK → `BookingItem.id` | Item tạo ticket   |
+| `bookingItem`   | `BookingItem`  | Relation    | `onDelete: Restrict`      | Item              |
+| `createdAt`     | `DateTime`     | REQ         | `now()`                   | Thời điểm tạo     |
+| `usedAt`        | `DateTime?`    | OPT         | —                         | Thời điểm sử dụng |
 
 Hiện schema có `USED`/`CANCELLED`, nhưng chưa có API consume/cancel ticket.
 
@@ -538,7 +538,8 @@ erDiagram
     Showtime ||--o{ ShowtimeSeat : materializes
     Seat ||--o{ ShowtimeSeat : maps
     Booking ||--o{ BookingItem : contains
-    ShowtimeSeat ||--o{ BookingItem : selected_in
+    Booking ||--o{ ShowtimeSeat : holds
+    ShowtimeSeat ||--o{ BookingItem : booking_history
     Booking ||--o| Payment : has
     Booking ||--o{ Ticket : issues
     BookingItem ||--o| Ticket : produces
@@ -635,7 +636,7 @@ erDiagram
         String idempotencyKey UK
         PaymentStatus status
         Decimal amount
-        String bookingId FK UK
+        String bookingId FK, UK
         DateTime createdAt
         DateTime updatedAt
     }
@@ -644,11 +645,27 @@ erDiagram
         String code UK
         TicketStatus status
         String bookingId FK
-        String bookingItemId FK UK
+        String bookingItemId FK, UK
         DateTime createdAt
         DateTime usedAt
     }
 ```
+
+#### Hai quan hệ giữa `Booking` và `ShowtimeSeat`
+
+`ShowtimeSeat` liên quan tới `Booking` theo hai đường khác nhau:
+
+1. **Active hold:** `Booking.heldSeats` ↔ `ShowtimeSeat.heldByBookingId`.
+   - Đại diện booking đang giữ ghế ở thời điểm hiện tại.
+   - Một `ShowtimeSeat` chỉ có tối đa một `heldByBookingId`.
+   - Khi booking bị cancel/expire hoặc payment thành công, hold được xóa bằng cách set `heldByBookingId = null`.
+   - Foreign key dùng `onDelete: SetNull`, nên xóa booking không làm xóa ghế theo suất.
+2. **Booking history:** `Booking.items` → `BookingItem.showtimeSeat`.
+   - Lưu lịch sử ghế đã được chọn trong booking.
+   - Một `ShowtimeSeat` có thể xuất hiện trong nhiều `BookingItem` thuộc các booking khác nhau theo thời gian.
+   - Cùng một booking không thể chứa cùng `ShowtimeSeat` hai lần nhờ unique `(bookingId, showtimeSeatId)`.
+
+Vì vậy ERD có cả hai đường `Booking -> ShowtimeSeat` và `Booking -> BookingItem -> ShowtimeSeat`; chúng không trùng ý nghĩa.
 
 ### 5.16. State diagrams
 
@@ -690,23 +707,23 @@ stateDiagram-v2
 
 ### 5.17. Quan hệ và onDelete
 
-| Quan hệ | Cardinality | onDelete |
-|---|---|---|
-| `User -> Booking` | 1-N | Restrict |
-| `User -> RefreshToken` | 1-N | Cascade |
-| `Movie -> Showtime` | 1-N | Restrict |
-| `Cinema -> Room` | 1-N | Cascade |
-| `Room -> Seat` | 1-N | Cascade |
-| `Room -> Showtime` | 1-N | Restrict |
-| `Showtime -> ShowtimeSeat` | 1-N | Cascade |
-| `Seat -> ShowtimeSeat` | 1-N | Restrict |
-| `Showtime -> Booking` | 1-N | Restrict |
-| `Booking -> BookingItem` | 1-N | Cascade |
-| `ShowtimeSeat -> BookingItem` | 1-N | Restrict |
-| `Booking -> Payment` | 1-0/1 | Restrict |
-| `Booking -> Ticket` | 1-N | Restrict |
-| `BookingItem -> Ticket` | 1-0/1 | Restrict |
-| `Booking -> ShowtimeSeat.heldByBooking` | 1-N optional | SetNull |
+| Quan hệ                                 | Cardinality  | onDelete |
+| --------------------------------------- | ------------ | -------- |
+| `User -> Booking`                       | 1-N          | Restrict |
+| `User -> RefreshToken`                  | 1-N          | Cascade  |
+| `Movie -> Showtime`                     | 1-N          | Restrict |
+| `Cinema -> Room`                        | 1-N          | Cascade  |
+| `Room -> Seat`                          | 1-N          | Cascade  |
+| `Room -> Showtime`                      | 1-N          | Restrict |
+| `Showtime -> ShowtimeSeat`              | 1-N          | Cascade  |
+| `Seat -> ShowtimeSeat`                  | 1-N          | Restrict |
+| `Showtime -> Booking`                   | 1-N          | Restrict |
+| `Booking -> BookingItem`                | 1-N          | Cascade  |
+| `ShowtimeSeat -> BookingItem`           | 1-N          | Restrict |
+| `Booking -> Payment`                    | 1-0/1        | Restrict |
+| `Booking -> Ticket`                     | 1-N          | Restrict |
+| `BookingItem -> Ticket`                 | 1-0/1        | Restrict |
+| `Booking -> ShowtimeSeat.heldByBooking` | 1-N optional | SetNull  |
 
 ## 6. Migration và seed
 
@@ -1054,11 +1071,11 @@ sequenceDiagram
 - Chỉ trả movie `PUBLISHED`.
 - Query:
 
-| Param | Required | Ví dụ | Mô tả |
-|---|---|---|---|
-| `search` | Không | `interstellar` | Tìm title, case-insensitive |
-| `page` | Không | `1` | Default `1` |
-| `pageSize` | Không | `20` | Default `20`, max `100` |
+| Param      | Required | Ví dụ          | Mô tả                       |
+| ---------- | -------- | -------------- | --------------------------- |
+| `search`   | Không    | `interstellar` | Tìm title, case-insensitive |
+| `page`     | Không    | `1`            | Default `1`                 |
+| `pageSize` | Không    | `20`           | Default `20`, max `100`     |
 
 - Success: `200`.
 
@@ -1280,14 +1297,14 @@ sequenceDiagram
 - Chỉ trả showtime tương lai của movie `PUBLISHED`.
 - Query:
 
-| Param | Required | Ví dụ | Mô tả |
-|---|---|---|---|
-| `movieId` | Không | `clx-movie-id` | Lọc theo movie |
-| `cinemaId` | Không | `clx-cinema-id` | Lọc theo cinema |
-| `from` | Không | `2026-10-01T00:00:00.000Z` | Mốc bắt đầu |
-| `to` | Không | `2026-10-02T00:00:00.000Z` | Mốc kết thúc |
-| `page` | Không | `1` | Default `1` |
-| `pageSize` | Không | `20` | Default `20`, max `100` |
+| Param      | Required | Ví dụ                      | Mô tả                   |
+| ---------- | -------- | -------------------------- | ----------------------- |
+| `movieId`  | Không    | `clx-movie-id`             | Lọc theo movie          |
+| `cinemaId` | Không    | `clx-cinema-id`            | Lọc theo cinema         |
+| `from`     | Không    | `2026-10-01T00:00:00.000Z` | Mốc bắt đầu             |
+| `to`       | Không    | `2026-10-02T00:00:00.000Z` | Mốc kết thúc            |
+| `page`     | Không    | `1`                        | Default `1`             |
+| `pageSize` | Không    | `20`                       | Default `20`, max `100` |
 
 - Success: `200`, response `{data, meta}`.
 - Nếu `to <= from`: `400`.
@@ -1388,10 +1405,7 @@ Idempotency-Key: hold-request-001
 ```json
 {
   "showtimeId": "clx-showtime-id",
-  "showtimeSeatIds": [
-    "clx-showtime-seat-a1",
-    "clx-showtime-seat-a2"
-  ]
+  "showtimeSeatIds": ["clx-showtime-seat-a1", "clx-showtime-seat-a2"]
 }
 ```
 
@@ -1486,11 +1500,11 @@ Body:
 
 Field:
 
-| Field | Required | Mô tả |
-|---|---|---|
-| `reference` | Không | Reference provider, max 100 |
-| `success` | Không | Default behavior là success nếu khác `false` |
-| `idempotencyKey` | Header hoặc body | Key retry, 8-100 ký tự khi validate body |
+| Field            | Required         | Mô tả                                        |
+| ---------------- | ---------------- | -------------------------------------------- |
+| `reference`      | Không            | Reference provider, max 100                  |
+| `success`        | Không            | Default behavior là success nếu khác `false` |
+| `idempotencyKey` | Header hoặc body | Key retry, 8-100 ký tự khi validate body     |
 
 Success flow:
 
@@ -1783,17 +1797,17 @@ Tác dụng:
 
 ### 12.2. HTTP status
 
-| Status | Ý nghĩa |
-|---:|---|
-| `200` | GET/PATCH/DELETE hoặc action khai báo OK |
-| `201` | POST mặc định của NestJS |
-| `204` | Logout thành công, không body |
-| `400` | Validation hoặc business input sai |
-| `401` | Thiếu/sai/expired JWT hoặc refresh token |
-| `403` | Không đủ role hoặc mock payment bị disable |
-| `404` | Resource không tồn tại hoặc không thuộc user |
-| `409` | Duplicate, seat conflict, overlap, state conflict, idempotency conflict |
-| `503` | Database/Redis readiness không sẵn sàng |
+| Status | Ý nghĩa                                                                 |
+| -----: | ----------------------------------------------------------------------- |
+|  `200` | GET/PATCH/DELETE hoặc action khai báo OK                                |
+|  `201` | POST mặc định của NestJS                                                |
+|  `204` | Logout thành công, không body                                           |
+|  `400` | Validation hoặc business input sai                                      |
+|  `401` | Thiếu/sai/expired JWT hoặc refresh token                                |
+|  `403` | Không đủ role hoặc mock payment bị disable                              |
+|  `404` | Resource không tồn tại hoặc không thuộc user                            |
+|  `409` | Duplicate, seat conflict, overlap, state conflict, idempotency conflict |
+|  `503` | Database/Redis readiness không sẵn sàng                                 |
 
 ### 12.3. Error response
 
