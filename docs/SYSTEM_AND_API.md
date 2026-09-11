@@ -1,6 +1,6 @@
-# Movie Ticket Booking Backend
+# Movie Ticket Booking System and API
 
-Tài liệu này mô tả hệ thống hiện tại theo đúng source code, Prisma schema, migration và controller trong repository.
+Tài liệu dùng chung cho toàn bộ repository `ticket-booking`, mô tả frontend, backend, API contract, database, infrastructure, runtime flow và cách chạy hệ thống theo đúng source code hiện tại.
 
 ## Mục lục
 
@@ -22,7 +22,7 @@ Tài liệu này mô tả hệ thống hiện tại theo đúng source code, Pri
 
 ## 1. Tổng quan
 
-Đây là backend đặt vé xem phim được xây dựng theo kiến trúc **modular monolith**. Mỗi domain nằm trong một NestJS module riêng, tất cả cùng chạy trong một ứng dụng Express.
+Đây là hệ thống đặt vé xem phim dạng monorepo gồm React/Vite frontend và NestJS modular monolith backend. Mỗi domain backend nằm trong một NestJS module riêng, tất cả cùng chạy trong một ứng dụng Express; frontend gọi API qua HTTP và quản lý phiên customer trong browser session.
 
 MVP hiện tại hỗ trợ:
 
@@ -64,21 +64,22 @@ Một ghế theo một suất chiếu chỉ được bán một lần. Hệ th�
 | Validation     | `class-validator`, `class-transformer` | Validate body/query                               |
 | Documentation  | `@nestjs/swagger`                      | OpenAPI/Swagger UI                                |
 | Scheduler      | `@nestjs/schedule`                     | Expire booking mỗi phút                           |
-| Unit/E2E test  | Vitest, Supertest                      | Kiểm thử                                          |
+| Frontend      | React 19, Vite 8, TypeScript             | Customer UI và API client                         |
+| Frontend data  | Fetch API, sessionStorage                | HTTP request, token session và refresh            |
+| Unit/E2E test  | Vitest, Supertest                      | Kiểm thử backend                                  |
 
-Dependencies được khai báo tại `package.json`.
+Dependencies được khai báo tại `be/package.json`, `fe/package.json` và root `package.json` dùng để điều phối repository.
 
 ### 2.2. Docker services
 
-File: `docker-compose.yml`.
+File: `be/docker-compose.yml`; root scripts gọi file này từ repository root.
 
 | Service    |   Port | Thông tin                                                                   |
 | ---------- | -----: | --------------------------------------------------------------------------- |
 | PostgreSQL | `5432` | DB `ticket_booking`, user `ticket_booking`, password local `ticket_booking` |
 | Redis      | `6379` | Seat lock                                                                   |
-| pgAdmin    | `5050` | `http://localhost:5050`, email `admin@admin.com`, password `adminpassword`  |
 
-Application hiện chạy trực tiếp bằng Node/NestJS; chưa có Dockerfile cho API.
+Application hiện chạy trực tiếp bằng Node/NestJS và Vite; PostgreSQL/Redis chạy bằng Docker Compose. Chưa có Dockerfile cho API hoặc frontend.
 
 ### 2.3. URL API
 
@@ -87,7 +88,7 @@ Application hiện chạy trực tiếp bằng Node/NestJS; chưa có Dockerfile
 - API root: `http://localhost:3000/api/v1`
 - Swagger UI: `http://localhost:3000/api/docs`
 
-Global prefix, CORS, validation pipe và Swagger được cấu hình tại `src/config/app.config.ts`.
+Global prefix, CORS, validation pipe và Swagger được cấu hình tại `be/src/config/app.config.ts`. Frontend đọc API URL từ `fe/.env` qua biến `VITE_API_URL`.
 
 ### 2.4. Kiến trúc hệ thống
 
@@ -129,24 +130,16 @@ flowchart LR
 
 ## 3. Kiến trúc source code
 
+Backend nằm trong `be/`:
+
 ```text
-src/
+be/src/
 ├── common/
 │   ├── auth/
-│   │   ├── auth-user.ts
-│   │   ├── current-user.decorator.ts
-│   │   ├── jwt-auth.guard.ts
-│   │   ├── password.ts
-│   │   ├── roles.decorator.ts
-│   │   └── roles.guard.ts
-│   └── database/
-│       └── prisma-errors.ts
+│   ├── database/
+│   └── http/
 ├── config/
-│   ├── app.config.ts
-│   └── env.validation.ts
 ├── database/
-│   ├── database.module.ts
-│   └── prisma.service.ts
 ├── modules/
 │   ├── auth/
 │   ├── users/
@@ -163,6 +156,20 @@ src/
 ├── app.module.ts
 └── main.ts
 ```
+
+Frontend nằm trong `fe/`:
+
+```text
+fe/src/
+├── api.ts
+├── types.ts
+├── App.tsx
+├── App.css
+├── index.css
+└── main.tsx
+```
+
+Root điều phối cả hai ứng dụng bằng `package.json`; dependency và lockfile vẫn độc lập tại `be/` và `fe/`.
 
 ### 3.1. Domain modules
 
@@ -188,9 +195,39 @@ src/
 - `ScheduleModule` chạy scheduler của booking.
 - `ConfigModule` là global module, validate environment khi bootstrap.
 
+### 3.3. Frontend runtime
+
+Frontend là React SPA được build và serve bởi Vite. `fe/src/api.ts` là HTTP client dùng Fetch API, tự gắn Bearer access token, thử refresh một lần khi nhận `401`, rồi xóa session nếu refresh thất bại. Access token, refresh token và user hiện tại được giữ trong `sessionStorage`.
+
+Customer UI hiện có:
+
+- Catalog phim và tìm kiếm.
+- Chọn suất chiếu và sơ đồ ghế.
+- Hold tối đa 10 ghế bằng `Idempotency-Key`.
+- Checkout và mock payment success/failure.
+- Booking history và ticket history.
+- Login/register và logout.
+
+### 3.4. Repository layout
+
+```text
+.
+├── package.json
+├── docs/
+│   └── SYSTEM_AND_API.md
+├── be/
+│   ├── package.json
+│   ├── docker-compose.yml
+│   ├── prisma/
+│   └── src/
+└── fe/
+    ├── package.json
+    └── src/
+```
+
 ## 4. Cấu hình môi trường
 
-File mẫu: `.env.example`.
+Backend file mẫu: `be/.env.example`. Frontend file mẫu: `fe/.env.example`.
 
 ```env
 NODE_ENV=development
@@ -228,7 +265,7 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 
 ## 5. Database data dictionary
 
-Nguồn chính: `prisma/schema.prisma`.
+Nguồn chính: `be/prisma/schema.prisma`.
 
 ### 5.1. Quy ước
 
@@ -302,7 +339,7 @@ Nguồn chính: `prisma/schema.prisma`.
 
 ### 5.3. Bảng `User`
 
-Nguồn: `prisma/schema.prisma`, model `User`.
+Nguồn: `be/prisma/schema.prisma`, model `User`.
 
 | Field           | Type             | Nullability | Default/constraint | Mô tả                                |
 | --------------- | ---------------- | ----------- | ------------------ | ------------------------------------ |
@@ -756,7 +793,7 @@ Bổ sung booking flow:
 
 ### 6.2. Seed
 
-File: `prisma/seed.ts`.
+File: `be/prisma/seed.ts`.
 
 Seed chạy idempotent bằng `upsert`:
 
@@ -789,7 +826,7 @@ Seed không tạo customer, booking, payment, ticket hoặc refresh token.
 
 ### 6.3. Prisma commands
 
-Project dùng Prisma `6.19.3` và cấu hình seed trong `package.json`:
+Backend dùng Prisma `6.19.3` và cấu hình seed trong `be/package.json`:
 
 ```json
 "prisma": {
@@ -797,7 +834,7 @@ Project dùng Prisma `6.19.3` và cấu hình seed trong `package.json`:
 }
 ```
 
-Các lệnh:
+Các lệnh từ repository root:
 
 ```bash
 npm run prisma:generate
@@ -806,6 +843,8 @@ npm run prisma:deploy
 npm run prisma:seed
 npm run prisma:studio
 ```
+
+Các lệnh trên được root `package.json` chuyển tiếp tới backend trong `be/`.
 
 ## 7. Authentication và authorization
 
@@ -1750,7 +1789,7 @@ Migration thêm:
 
 ### 11.1. Booking expiry scheduler
 
-File: `src/modules/bookings/booking-expiry.scheduler.ts`.
+File: `be/src/modules/bookings/booking-expiry.scheduler.ts`.
 
 - Cron: mỗi phút.
 - Gọi `BookingsService.expireBookings()`.
@@ -1811,21 +1850,47 @@ Tác dụng:
 
 ### 12.3. Error response
 
-NestJS hiện dùng HTTP exception mặc định. Ví dụ:
+Backend dùng `ApiExceptionFilter` để chuẩn hóa lỗi HTTP và lỗi Prisma:
 
 ```json
 {
   "statusCode": 409,
+  "code": "CONFLICT",
   "message": "One or more seats are being held",
-  "error": "Conflict"
+  "details": [],
+  "path": "/api/v1/bookings/hold",
+  "requestId": "req_123",
+  "timestamp": "2026-09-07T10:00:00.000Z"
 }
 ```
 
-Chưa có global custom exception filter để chuẩn hóa error code/trace ID.
+Validation error:
+
+```json
+{
+  "statusCode": 400,
+  "code": "BAD_REQUEST",
+  "message": "Request validation failed",
+  "details": ["email must be an email"],
+  "path": "/api/v1/auth/register",
+  "requestId": "req_123",
+  "timestamp": "2026-09-07T10:00:00.000Z"
+}
+```
+
+Filter cũng trả header `X-Request-Id`. Các Prisma error chính được map như sau:
+
+| Prisma error | HTTP | Code |
+|---|---:|---|
+| `P2002` | `409` | `DATABASE_CONFLICT` |
+| `P2003` | `409` | `FOREIGN_KEY_CONFLICT` |
+| `P2025` | `404` | `RESOURCE_NOT_FOUND` |
 
 ## 13. Testing
 
 ### 13.1. Test scripts
+
+Các lệnh từ repository root:
 
 ```bash
 npm test
@@ -1834,7 +1899,10 @@ npm run test:cov
 npm run typecheck
 npm run lint
 npm run build
+npm run check
 ```
+
+`npm run check` chạy lint, typecheck, build, unit test và E2E test cho backend/frontend theo root scripts.
 
 ### 13.2. Test hiện có
 
@@ -1868,46 +1936,99 @@ Cần bổ sung integration test với PostgreSQL/Redis thật cho:
 
 ## 14. Cách chạy project
 
-### 14.1. Setup
+Tất cả lệnh trong phần này chạy từ repository root `ticket-booking/`.
+
+### 14.1. Setup lần đầu
 
 Linux/macOS/Git Bash:
 
 ```bash
-cp .env.example .env
+cp be/.env.example be/.env
+cp fe/.env.example fe/.env
 npm install
-docker compose up -d --wait
+npm run install:all
+npm run infra:up
 npm run prisma:generate
 npm run prisma:deploy
 npm run prisma:seed
-npm run start:dev
 ```
 
 PowerShell:
 
 ```powershell
-Copy-Item .env.example .env
+Copy-Item be/.env.example be/.env
+Copy-Item fe/.env.example fe/.env
 npm install
-docker compose up -d --wait
+npm run install:all
+npm run infra:up
 npm run prisma:generate
 npm run prisma:deploy
 npm run prisma:seed
-npm run start:dev
 ```
 
-### 14.2. Kiểm tra nhanh
+Root `package.json` điều phối commands nhưng không gộp dependency: `be/package-lock.json` và `fe/package-lock.json` vẫn là lockfile độc lập.
+
+### 14.2. Root scripts
+
+| Lệnh | Tác dụng |
+| --- | --- |
+| `npm run dev` | Chạy backend watch và frontend Vite song song |
+| `npm run dev:be` | Chỉ chạy backend watch |
+| `npm run dev:fe` | Chỉ chạy frontend Vite |
+| `npm run dev:all` | Bật PostgreSQL/Redis rồi chạy cả hai app |
+| `npm run build` | Build backend và frontend |
+| `npm run lint` | Lint backend và frontend |
+| `npm run typecheck` | Typecheck backend và frontend |
+| `npm run check` | Lint, typecheck, build, unit test và E2E test |
+| `npm run infra:up` | Start PostgreSQL và Redis |
+| `npm run infra:down` | Stop PostgreSQL và Redis |
+| `npm run prisma:generate` | Generate Prisma Client |
+| `npm run prisma:deploy` | Apply migrations |
+| `npm run prisma:seed` | Seed catalog/admin data |
+| `npm run prisma:studio` | Mở Prisma Studio |
+
+Nếu muốn cài dependency sau clone, chạy `npm install` ở root và `npm run install:all`.
+
+### 14.3. Runtime URL và cấu hình frontend
+
+Backend:
+
+```text
+API root: http://localhost:3000/api/v1
+Swagger:  http://localhost:3000/api/docs
+```
+
+Frontend Vite mặc định chạy tại URL được Vite chọn, thường là `http://localhost:5173`. API URL mặc định:
+
+```text
+http://localhost:3000/api/v1
+```
+
+Có thể đổi bằng `fe/.env`:
+
+```env
+VITE_API_URL=http://localhost:3000/api/v1
+```
+
+Kiểm tra nhanh:
 
 ```bash
 curl http://localhost:3000/api/v1/health
 curl http://localhost:3000/api/v1/movies
 ```
 
-Mở Swagger:
+Các màn hình MVP:
 
-```text
-http://localhost:3000/api/docs
-```
+- Login/register.
+- Movie catalog và search.
+- Showtime selection.
+- Seat map với `AVAILABLE`, `HELD`, `SOLD`.
+- Hold ghế và countdown expiry.
+- Checkout và mock payment success/failure.
+- Booking history.
+- Ticket history.
 
-### 14.3. Manual flow mẫu
+### 14.4. Manual flow mẫu
 
 1. Seed admin.
 2. Login admin qua `/api/v1/auth/login`.
@@ -1932,8 +2053,8 @@ http://localhost:3000/api/docs
 - Chưa có admin user management.
 - Chưa có update showtime endpoint.
 - Booking list chưa pagination.
-- Chưa có response DTO riêng; một số endpoint trả trực tiếp Prisma object.
-- Một số response booking có thể còn field kỹ thuật nested như `heldByBookingId`/`requestHash` tùy include.
+- Response DTO và public response mapper đã được thêm cho các resource chính; response contract vẫn cần mở rộng thêm `@ApiResponse` cho toàn bộ endpoint.
+- Custom error format đã được thêm với `code`, `details`, `path`, `requestId` và `timestamp`.
 - Chưa có Dockerfile cho API.
 - Chưa có CI/CD.
 - Chưa có rate limiting, Helmet, structured logging và tracing.
@@ -1942,7 +2063,7 @@ http://localhost:3000/api/docs
 
 ### 15.2. Roadmap đề xuất
 
-1. Bổ sung response DTO và custom error format.
+1. Hoàn thiện `@ApiResponse` cho toàn bộ endpoint và sinh client type từ OpenAPI.
 2. Tách payment provider interface khỏi mock provider.
 3. Thêm webhook và payment attempt/event table.
 4. Thêm ticket scan/check-in.
