@@ -14,6 +14,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  ApiErrorResponses,
+} from '../../common/http/swagger.decorators.js';
+import {
   BookingResponseDto,
   PaymentResponseDto,
 } from '../../common/http/dto/response.dto.js';
@@ -32,8 +35,9 @@ export class BookingsController {
 
   @Post('hold')
   @ApiResponse({ status: 201, type: BookingResponseDto })
+  @ApiErrorResponses(400, 401, 404, 409, 503)
   @ApiHeader({
-    name: 'Idempotency-Key',
+    name: 'idempotency-key',
     required: false,
     description: 'Client-generated key used to safely retry a hold request',
   })
@@ -47,24 +51,28 @@ export class BookingsController {
 
   @Get()
   @ApiResponse({ status: 200, type: BookingResponseDto, isArray: true })
+  @ApiErrorResponses(401)
   findMine(@CurrentUser() user: AuthUser) {
     return this.bookingsService.findMine(user.id);
   }
 
   @Get(':id')
   @ApiResponse({ status: 200, type: BookingResponseDto })
+  @ApiErrorResponses(401, 404)
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.bookingsService.findOne(user.id, id);
   }
 
   @Post(':id/checkout')
   @ApiResponse({ status: 201, type: PaymentResponseDto })
+  @ApiErrorResponses(401, 404, 409)
   checkout(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.bookingsService.checkout(user.id, id);
   }
 
   @Post(':id/cancel')
   @ApiResponse({ status: 201, type: BookingResponseDto })
+  @ApiErrorResponses(401, 404, 409)
   cancel(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.bookingsService.cancel(user.id, id);
   }

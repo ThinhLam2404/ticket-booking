@@ -279,7 +279,7 @@ export class BookingsService {
 
   async checkout(userId: string, id: string) {
     await this.expireBooking(id);
-    return this.prisma.$transaction(async (transaction) => {
+    const payment = await this.prisma.$transaction(async (transaction) => {
       const booking = await transaction.booking.findFirst({
         where: { id, userId },
         include: { items: true, payment: true },
@@ -323,6 +323,7 @@ export class BookingsService {
         },
       });
     });
+    return toPublicResponse(payment);
   }
 
   async expireBookings() {

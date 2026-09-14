@@ -8,7 +8,9 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { SeatResponseDto } from '../../common/http/dto/response.dto.js';
+import { ApiErrorResponses } from '../../common/http/swagger.decorators.js';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
@@ -22,11 +24,14 @@ export class SeatsController {
   constructor(private readonly seatsService: SeatsService) {}
 
   @Get('room/:roomId')
+  @ApiResponse({ status: 200, type: SeatResponseDto, isArray: true })
   findByRoom(@Param('roomId') roomId: string) {
     return this.seatsService.findByRoom(roomId);
   }
 
   @Post(':roomId')
+  @ApiResponse({ status: 201, type: SeatResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -35,6 +40,8 @@ export class SeatsController {
   }
 
   @Patch(':id')
+  @ApiResponse({ status: 200, type: SeatResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -43,6 +50,8 @@ export class SeatsController {
   }
 
   @Delete(':id')
+  @ApiResponse({ status: 200, type: SeatResponseDto })
+  @ApiErrorResponses(401, 403, 404, 409)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)

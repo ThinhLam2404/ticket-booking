@@ -55,6 +55,54 @@ describe('Application (e2e)', () => {
       .expect(400);
   });
 
+  it('publishes the frontend-facing OpenAPI response contracts', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/docs-json')
+      .expect(200);
+
+    expect(response.body.paths['/api/v1/movies'].get.responses['200'])
+      .toMatchObject({
+        content: {
+          'application/json': {
+            schema: {
+              $ref: '#/components/schemas/PaginatedMoviesResponseDto',
+            },
+          },
+        },
+      });
+    expect(response.body.paths['/api/v1/showtimes'].get.responses['200'])
+      .toMatchObject({
+        content: {
+          'application/json': {
+            schema: {
+              $ref: '#/components/schemas/PaginatedShowtimesResponseDto',
+            },
+          },
+        },
+      });
+    expect(response.body.paths['/api/v1/showtimes/{id}/seats'].get.responses['200'])
+      .toMatchObject({
+        content: {
+          'application/json': {
+            schema: {
+              $ref: '#/components/schemas/ShowtimeSeatsResponseDto',
+            },
+          },
+        },
+      });
+    expect(response.body.paths['/api/v1/payments/mock/{bookingId}'].post.responses['201'])
+      .toMatchObject({
+        content: {
+          'application/json': {
+            schema: {
+              $ref: '#/components/schemas/MockPaymentResponseDto',
+            },
+          },
+        },
+      });
+    expect(response.body.components.schemas.ApiErrorResponseDto).toBeDefined();
+  });
+
   afterEach(async () => {
     if (app) {
       await app.close();

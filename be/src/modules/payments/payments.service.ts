@@ -222,13 +222,14 @@ export class PaymentsService {
       );
       return this.getPaymentResult(userId, bookingId);
     } catch (error) {
+      const existingPayment = await this.prisma.payment.findUnique({
+        where: { idempotencyKey },
+      });
+      if (existingPayment?.bookingId === bookingId) {
+        return this.getPaymentResult(userId, bookingId);
+      }
+
       if (isUniqueConstraintError(error)) {
-        const existingPayment = await this.prisma.payment.findUnique({
-          where: { idempotencyKey },
-        });
-        if (existingPayment?.bookingId === bookingId) {
-          return this.getPaymentResult(userId, bookingId);
-        }
         throw new ConflictException(
           'Payment reference or idempotency key is already used',
         );

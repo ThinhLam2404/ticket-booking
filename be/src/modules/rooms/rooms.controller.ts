@@ -9,7 +9,9 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { RoomResponseDto } from '../../common/http/dto/response.dto.js';
+import { ApiErrorResponses } from '../../common/http/swagger.decorators.js';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
@@ -23,16 +25,22 @@ export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
 
   @Get()
+  @ApiResponse({ status: 200, type: RoomResponseDto, isArray: true })
+  @ApiErrorResponses(400)
   findByCinema(@Query() query: ListRoomsDto) {
     return this.roomsService.findByCinema(query.cinemaId);
   }
 
   @Get(':id')
+  @ApiResponse({ status: 200, type: RoomResponseDto })
+  @ApiErrorResponses(404)
   findOne(@Param('id') id: string) {
     return this.roomsService.findOne(id);
   }
 
   @Post()
+  @ApiResponse({ status: 201, type: RoomResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -41,6 +49,8 @@ export class RoomsController {
   }
 
   @Patch(':id')
+  @ApiResponse({ status: 200, type: RoomResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -49,6 +59,8 @@ export class RoomsController {
   }
 
   @Delete(':id')
+  @ApiResponse({ status: 200, type: RoomResponseDto })
+  @ApiErrorResponses(401, 403, 404, 409)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)

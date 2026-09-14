@@ -24,7 +24,9 @@
     "test:e2e": "npm --prefix be run test:e2e",
     "test:cov": "npm --prefix be run test:cov",
     "test:all": "npm run test && npm run test:e2e",
+    "test:integration": "npm --prefix be run test:integration",
     "check": "npm run lint && npm run typecheck && npm run build && npm run test:all",
+    "check:ci": "npm run api:check && npm run check && npm run test:integration",
     "infra:up": "docker compose -f be/docker-compose.yml up -d --wait",
     "infra:down": "docker compose -f be/docker-compose.yml down",
     "infra:ps": "docker compose -f be/docker-compose.yml ps",
@@ -32,9 +34,14 @@
     "prisma:migrate": "npm --prefix be run prisma:migrate --",
     "prisma:deploy": "npm --prefix be run prisma:deploy",
     "prisma:seed": "npm --prefix be run prisma:seed",
-    "prisma:studio": "npm --prefix be run prisma:studio"
+    "prisma:studio": "npm --prefix be run prisma:studio",
+    "api:spec": "npm --prefix be run openapi:export -- ../openapi/ticket-booking.openapi.json",
+    "api:types": "openapi-typescript openapi/ticket-booking.openapi.json --output fe/src/generated/openapi.d.ts",
+    "api:generate": "npm run api:spec && npm run api:types",
+    "api:check": "node scripts/check-api-artifacts.mjs"
   },
   "devDependencies": {
-    "concurrently": "^10.0.5"
+    "concurrently": "^10.0.5",
+    "openapi-typescript": "7.13.0"
   }
 }

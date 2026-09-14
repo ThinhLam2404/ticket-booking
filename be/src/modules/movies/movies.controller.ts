@@ -10,7 +10,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { MovieResponseDto } from '../../common/http/dto/response.dto.js';
+import {
+  ApiErrorResponses,
+} from '../../common/http/swagger.decorators.js';
+import {
+  MovieDetailsResponseDto,
+  MovieResponseDto,
+  PaginatedMoviesResponseDto,
+} from '../../common/http/dto/response.dto.js';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
@@ -26,18 +33,22 @@ export class MoviesController {
   constructor(private readonly moviesService: MoviesService) {}
 
   @Get()
-  @ApiResponse({ status: 200, type: MovieResponseDto, isArray: true })
+  @ApiResponse({ status: 200, type: PaginatedMoviesResponseDto })
+  @ApiErrorResponses(400)
   findAll(@Query() query: ListMoviesDto) {
     return this.moviesService.findAll(query);
   }
 
   @Get(':id')
-  @ApiResponse({ status: 200, type: MovieResponseDto })
+  @ApiResponse({ status: 200, type: MovieDetailsResponseDto })
+  @ApiErrorResponses(404)
   findOne(@Param('id') id: string) {
     return this.moviesService.findOne(id);
   }
 
   @Post()
+  @ApiResponse({ status: 201, type: MovieResponseDto })
+  @ApiErrorResponses(400, 401, 403, 409)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -46,6 +57,8 @@ export class MoviesController {
   }
 
   @Patch(':id')
+  @ApiResponse({ status: 200, type: MovieResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -54,6 +67,8 @@ export class MoviesController {
   }
 
   @Delete(':id')
+  @ApiResponse({ status: 200, type: MovieResponseDto })
+  @ApiErrorResponses(401, 403, 404)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)

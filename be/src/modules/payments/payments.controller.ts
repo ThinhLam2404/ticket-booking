@@ -7,7 +7,14 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { ApiErrorResponses } from '../../common/http/swagger.decorators.js';
+import { MockPaymentResponseDto } from '../../common/http/dto/response.dto.js';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
@@ -22,6 +29,13 @@ export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post('mock/:bookingId')
+  @ApiResponse({ status: 201, type: MockPaymentResponseDto })
+  @ApiHeader({
+    name: 'idempotency-key',
+    required: false,
+    description: 'Optional when idempotencyKey is provided in the request body',
+  })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
   processMockPayment(
     @CurrentUser() user: AuthUser,
     @Param('bookingId') bookingId: string,

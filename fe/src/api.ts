@@ -3,11 +3,17 @@ import type {
   AuthResponse,
   Booking,
   Cinema,
-  Movie,
-  Paginated,
+  HoldRequest,
+  LoginRequest,
+  MockPaymentRequest,
+  MockPaymentResponse,
+  MovieDetails,
+  MoviesResponse,
   Payment,
-  Showtime,
-  ShowtimeSeat,
+  RegisterRequest,
+  RefreshTokenRequest,
+  ShowtimeSeatsResponse,
+  ShowtimesResponse,
   Ticket,
   User,
 } from './types';
@@ -59,19 +65,25 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
 
   const error = (await response.json().catch(() => ({
     statusCode: response.status,
+    code: 'HTTP_ERROR',
     message: response.statusText,
+    details: [],
+    path,
+    requestId: '',
+    timestamp: new Date().toISOString(),
   }))) as ApiError;
-  throw new Error(Array.isArray(error.message) ? error.message.join(', ') : error.message);
+  throw new Error(error.message);
 }
 
 async function refreshToken() {
   const token = sessionStorage.getItem(REFRESH_TOKEN_KEY);
   if (!token) return false;
 
+  const body: RefreshTokenRequest = { refreshToken: token };
   const response = await fetch(`${API_URL}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken: token }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     clearAuth();
@@ -82,7 +94,7 @@ async function refreshToken() {
 }
 
 export const api = {
-  async register(body: { fullName: string; email: string; password: string }) {
+  async register(body: RegisterRequest) {
     const response = await request<AuthResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -90,7 +102,7 @@ export const api = {
     setAuth(response);
     return response;
   },
-  async login(body: { email: string; password: string }) {
+  async login(body: LoginRequest) {
     const response = await request<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -109,35 +121,37 @@ export const api = {
     clearAuth();
   },
   movies(search = '') {
-    return request<Paginated<Movie>>(`/movies?page=1&pageSize=50${search ? `&search=${encodeURIComponent(search)}` : ''}`);
+    return request<MoviesResponse>(`/movies?page=1&pageSize=50${search ? `&search=${encodeURIComponent(search)}` : ''}`);
   },
   movie(id: string) {
-    return request<Movie & { showtimes: Showtime[] }>(`/movies/${id}`);
+    return request<MovieDetails>(`/movies/${id}`);
   },
   showtimes(movieId?: string) {
-    return request<Paginated<Showtime>>(`/showtimes?page=1&pageSize=100${movieId ? `&movieId=${movieId}` : ''}`);
+    return request<ShowtimesResponse>(`/showtimes?page=1&pageSize=100${movieId ? `&movieId=${movieId}` : ''}`);
   },
   cinemas() {
     return request<Cinema[]>('/cinemas');
   },
   showtimeSeats(id: string) {
-    return request<{ showtimeId: string; startsAt: string; endsAt: string; seats: ShowtimeSeat[] }>(`/showtimes/${id}/seats`);
+    return request<ShowtimeSeatsResponse>(`/showtimes/${id}/seats`);
   },
   hold(showtimeId: string, showtimeSeatIds: string[]) {
+    const body: HoldRequest = { showtimeId, showtimeSeatIds };
     return request<Booking>('/bookings/hold', {
       method: 'POST',
       headers: { 'Idempotency-Key': `hold-${crypto.randomUUID()}` },
-      body: JSON.stringify({ showtimeId, showtimeSeatIds }),
+      body: JSON.stringify(body),
     });
   },
   checkout(bookingId: string) {
     return request<Payment>(`/bookings/${bookingId}/checkout`, { method: 'POST' });
   },
   mockPayment(bookingId: string, success: boolean) {
-    return request<{ payment: Payment; booking: Booking }>(`/payments/mock/${bookingId}`, {
+    const body: MockPaymentRequest = { success };
+    return request<MockPaymentResponse>(`/payments/mock/${bookingId}`, {
       method: 'POST',
       headers: { 'Idempotency-Key': `payment-${crypto.randomUUID()}` },
-      body: JSON.stringify({ success }),
+      body: JSON.stringify(body),
     });
   },
   bookings() {

@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import {
+  BookingStatus,
+  MovieStatus,
+  PaymentStatus,
+  SeatType,
+  ShowtimeSeatStatus,
+  TicketStatus,
+  UserRole,
+} from '@prisma/client';
 
 export class PaginationMetaDto {
   @ApiProperty({ example: 1 })
@@ -28,8 +36,8 @@ export class UserResponseDto {
   @ApiProperty({ enum: UserRole, example: UserRole.CUSTOMER })
   role!: UserRole;
 
-  @ApiPropertyOptional({ example: '2026-09-07T10:00:00.000Z' })
-  createdAt?: Date | string;
+  @ApiPropertyOptional({ type: String, example: '2026-09-07T10:00:00.000Z', format: 'date-time', nullable: true })
+  createdAt?: string | null;
 }
 
 export class AuthResponseDto {
@@ -50,20 +58,71 @@ export class MovieResponseDto {
   @ApiProperty({ example: 'Interstellar' })
   title!: string;
 
-  @ApiPropertyOptional({ example: 'A science fiction film.' })
+  @ApiPropertyOptional({ type: String, example: 'A science fiction film.', nullable: true })
   description?: string | null;
 
   @ApiProperty({ example: 169 })
   duration!: number;
 
-  @ApiProperty({ example: 'PUBLISHED' })
-  status!: string;
+  @ApiProperty({ enum: MovieStatus, example: MovieStatus.PUBLISHED })
+  status!: MovieStatus;
 
-  @ApiProperty({ example: '2026-09-07T10:00:00.000Z' })
-  createdAt!: Date | string;
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  createdAt!: string;
 
-  @ApiProperty({ example: '2026-09-07T10:00:00.000Z' })
-  updatedAt!: Date | string;
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  updatedAt!: string;
+}
+
+export class MovieShowtimeResponseDto {
+  @ApiProperty({ example: 'clx-showtime-id' })
+  id!: string;
+
+  @ApiProperty({ example: '2026-10-01T19:00:00.000Z', format: 'date-time' })
+  startsAt!: string;
+
+  @ApiProperty({ example: '2026-10-01T21:49:00.000Z', format: 'date-time' })
+  endsAt!: string;
+
+  @ApiProperty({ example: 'clx-movie-id' })
+  movieId!: string;
+
+  @ApiProperty({ example: 'clx-room-id' })
+  roomId!: string;
+
+  @ApiProperty({ type: () => RoomResponseDto })
+  room!: object;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  updatedAt!: string;
+}
+
+export class MovieDetailsResponseDto extends MovieResponseDto {
+  @ApiProperty({ type: [MovieShowtimeResponseDto] })
+  showtimes!: MovieShowtimeResponseDto[];
+}
+
+export class CinemaRoomResponseDto {
+  @ApiProperty({ example: 'clx-room-id' })
+  id!: string;
+
+  @ApiProperty({ example: 'Room 1' })
+  name!: string;
+
+  @ApiProperty({ example: 'clx-cinema-id' })
+  cinemaId!: string;
+
+  @ApiProperty({ example: 32 })
+  seatCount!: number;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  updatedAt!: string;
 }
 
 export class CinemaResponseDto {
@@ -78,6 +137,17 @@ export class CinemaResponseDto {
 
   @ApiPropertyOptional({ example: 3 })
   roomCount?: number;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  updatedAt!: string;
+}
+
+export class CinemaDetailsResponseDto extends CinemaResponseDto {
+  @ApiProperty({ type: [CinemaRoomResponseDto] })
+  rooms!: CinemaRoomResponseDto[];
 }
 
 export class SeatResponseDto {
@@ -90,8 +160,8 @@ export class SeatResponseDto {
   @ApiProperty({ example: 1 })
   number!: number;
 
-  @ApiProperty({ example: 'STANDARD' })
-  type!: string;
+  @ApiProperty({ enum: SeatType, example: SeatType.STANDARD })
+  type!: SeatType;
 
   @ApiProperty({ example: 'clx-room-id' })
   roomId!: string;
@@ -115,6 +185,12 @@ export class RoomResponseDto {
 
   @ApiPropertyOptional({ example: 32 })
   seatCount?: number;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  updatedAt!: string;
 }
 
 export class ShowtimeSeatResponseDto {
@@ -124,11 +200,11 @@ export class ShowtimeSeatResponseDto {
   @ApiProperty({ example: '100000.00' })
   price!: string;
 
-  @ApiProperty({ example: 'AVAILABLE' })
-  status!: string;
+  @ApiProperty({ enum: ShowtimeSeatStatus, example: ShowtimeSeatStatus.AVAILABLE })
+  status!: ShowtimeSeatStatus;
 
-  @ApiPropertyOptional({ example: '2026-09-07T10:10:00.000Z' })
-  heldUntil?: Date | string | null;
+  @ApiPropertyOptional({ type: String, example: '2026-09-07T10:10:00.000Z', format: 'date-time', nullable: true })
+  heldUntil?: string | null;
 
   @ApiProperty({ example: 'clx-showtime-id' })
   showtimeId!: string;
@@ -144,20 +220,62 @@ export class ShowtimeResponseDto {
   @ApiProperty({ example: 'clx-showtime-id' })
   id!: string;
 
-  @ApiProperty({ example: '2026-10-01T19:00:00.000Z' })
-  startsAt!: Date | string;
+  @ApiProperty({ example: '2026-10-01T19:00:00.000Z', format: 'date-time' })
+  startsAt!: string;
 
-  @ApiProperty({ example: '2026-10-01T21:49:00.000Z' })
-  endsAt!: Date | string;
+  @ApiProperty({ example: '2026-10-01T21:49:00.000Z', format: 'date-time' })
+  endsAt!: string;
+
+  @ApiProperty({ example: 'clx-movie-id' })
+  movieId!: string;
 
   @ApiProperty({ type: MovieResponseDto })
   movie!: MovieResponseDto;
+
+  @ApiProperty({ example: 'clx-room-id' })
+  roomId!: string;
 
   @ApiProperty({ type: RoomResponseDto })
   room!: RoomResponseDto;
 
   @ApiPropertyOptional({ type: [ShowtimeSeatResponseDto] })
   showtimeSeats?: ShowtimeSeatResponseDto[];
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  updatedAt!: string;
+}
+
+export class ShowtimeSeatsResponseDto {
+  @ApiProperty({ example: 'clx-showtime-id' })
+  showtimeId!: string;
+
+  @ApiProperty({ example: '2026-10-01T19:00:00.000Z', format: 'date-time' })
+  startsAt!: string;
+
+  @ApiProperty({ example: '2026-10-01T21:49:00.000Z', format: 'date-time' })
+  endsAt!: string;
+
+  @ApiProperty({ type: [ShowtimeSeatResponseDto] })
+  seats!: ShowtimeSeatResponseDto[];
+}
+
+export class PaginatedMoviesResponseDto {
+  @ApiProperty({ type: [MovieResponseDto] })
+  data!: MovieResponseDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
+}
+
+export class PaginatedShowtimesResponseDto {
+  @ApiProperty({ type: [ShowtimeResponseDto] })
+  data!: ShowtimeResponseDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
 }
 
 export class PaymentResponseDto {
@@ -167,11 +285,11 @@ export class PaymentResponseDto {
   @ApiProperty({ example: 'MOCK' })
   provider!: string;
 
-  @ApiPropertyOptional({ example: 'MOCK-PAYMENT-001' })
+  @ApiPropertyOptional({ type: String, example: 'MOCK-PAYMENT-001', nullable: true })
   reference?: string | null;
 
-  @ApiProperty({ example: 'SUCCEEDED' })
-  status!: string;
+  @ApiProperty({ enum: PaymentStatus, example: PaymentStatus.SUCCEEDED })
+  status!: PaymentStatus;
 
   @ApiProperty({ example: '100000.00' })
   amount!: string;
@@ -179,22 +297,22 @@ export class PaymentResponseDto {
   @ApiProperty({ example: 'clx-booking-id' })
   bookingId!: string;
 
-  @ApiProperty({ example: '2026-09-07T10:00:00.000Z' })
-  createdAt!: Date | string;
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  createdAt!: string;
 
-  @ApiProperty({ example: '2026-09-07T10:00:00.000Z' })
-  updatedAt!: Date | string;
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  updatedAt!: string;
 }
 
-export class TicketResponseDto {
+export class TicketSummaryResponseDto {
   @ApiProperty({ example: 'clx-ticket-id' })
   id!: string;
 
   @ApiProperty({ example: 'TKT-ABC123' })
   code!: string;
 
-  @ApiProperty({ example: 'ACTIVE' })
-  status!: string;
+  @ApiProperty({ enum: TicketStatus, example: TicketStatus.ACTIVE })
+  status!: TicketStatus;
 
   @ApiProperty({ example: 'clx-booking-id' })
   bookingId!: string;
@@ -202,23 +320,65 @@ export class TicketResponseDto {
   @ApiProperty({ example: 'clx-booking-item-id' })
   bookingItemId!: string;
 
-  @ApiPropertyOptional({ example: '2026-09-07T10:00:00.000Z' })
-  usedAt?: Date | string | null;
+  @ApiPropertyOptional({ type: String, example: '2026-09-07T10:00:00.000Z', format: 'date-time', nullable: true })
+  usedAt?: string | null;
 
-  @ApiProperty({ example: '2026-09-07T10:00:00.000Z' })
-  createdAt!: Date | string;
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  createdAt!: string;
+}
 
-  @ApiPropertyOptional({ type: MovieResponseDto })
-  movie?: MovieResponseDto;
+export class TicketBookingResponseDto {
+  @ApiProperty({ example: 'clx-booking-id' })
+  id!: string;
 
-  @ApiPropertyOptional({ type: CinemaResponseDto })
-  cinema?: CinemaResponseDto;
+  @ApiProperty({ enum: BookingStatus, example: BookingStatus.CONFIRMED })
+  status!: BookingStatus;
 
-  @ApiPropertyOptional({ type: RoomResponseDto })
-  room?: RoomResponseDto;
+  @ApiProperty({ example: '200000.00' })
+  totalAmount!: string;
 
-  @ApiPropertyOptional({ type: SeatResponseDto })
-  seat?: SeatResponseDto;
+  @ApiProperty({ example: '2026-09-07T10:10:00.000Z', format: 'date-time' })
+  expiresAt!: string;
+
+  @ApiProperty({ example: 'clx-user-id' })
+  userId!: string;
+
+  @ApiProperty({ example: 'clx-showtime-id' })
+  showtimeId!: string;
+
+  @ApiProperty({ type: ShowtimeResponseDto })
+  showtime!: ShowtimeResponseDto;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  createdAt!: string;
+
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  updatedAt!: string;
+}
+
+export class TicketBookingItemResponseDto {
+  @ApiProperty({ example: 'clx-booking-item-id' })
+  id!: string;
+
+  @ApiProperty({ example: '100000.00' })
+  price!: string;
+
+  @ApiProperty({ example: 'clx-booking-id' })
+  bookingId!: string;
+
+  @ApiProperty({ example: 'clx-showtime-seat-id' })
+  showtimeSeatId!: string;
+
+  @ApiProperty({ type: ShowtimeSeatResponseDto })
+  showtimeSeat!: ShowtimeSeatResponseDto;
+}
+
+export class TicketResponseDto extends TicketSummaryResponseDto {
+  @ApiProperty({ type: TicketBookingResponseDto })
+  booking!: TicketBookingResponseDto;
+
+  @ApiProperty({ type: TicketBookingItemResponseDto })
+  bookingItem!: TicketBookingItemResponseDto;
 }
 
 export class BookingItemResponseDto {
@@ -228,28 +388,31 @@ export class BookingItemResponseDto {
   @ApiProperty({ example: '100000.00' })
   price!: string;
 
+  @ApiProperty({ example: 'clx-booking-id' })
+  bookingId!: string;
+
   @ApiProperty({ example: 'clx-showtime-seat-id' })
   showtimeSeatId!: string;
 
   @ApiPropertyOptional({ type: ShowtimeSeatResponseDto })
   showtimeSeat?: ShowtimeSeatResponseDto;
 
-  @ApiPropertyOptional({ type: TicketResponseDto })
-  ticket?: TicketResponseDto | null;
+  @ApiPropertyOptional({ type: TicketSummaryResponseDto })
+  ticket?: TicketSummaryResponseDto | null;
 }
 
 export class BookingResponseDto {
   @ApiProperty({ example: 'clx-booking-id' })
   id!: string;
 
-  @ApiProperty({ example: 'PENDING' })
-  status!: string;
+  @ApiProperty({ enum: BookingStatus, example: BookingStatus.PENDING })
+  status!: BookingStatus;
 
   @ApiProperty({ example: '200000.00' })
   totalAmount!: string;
 
-  @ApiProperty({ example: '2026-09-07T10:10:00.000Z' })
-  expiresAt!: Date | string;
+  @ApiProperty({ example: '2026-09-07T10:10:00.000Z', format: 'date-time' })
+  expiresAt!: string;
 
   @ApiProperty({ example: 'clx-user-id' })
   userId!: string;
@@ -266,19 +429,27 @@ export class BookingResponseDto {
   @ApiPropertyOptional({ type: PaymentResponseDto })
   payment?: PaymentResponseDto | null;
 
-  @ApiProperty({ type: [TicketResponseDto] })
-  tickets!: TicketResponseDto[];
+  @ApiProperty({ type: [TicketSummaryResponseDto] })
+  tickets!: TicketSummaryResponseDto[];
 
-  @ApiProperty({ example: '2026-09-07T10:00:00.000Z' })
-  createdAt!: Date | string;
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  createdAt!: string;
 
-  @ApiProperty({ example: '2026-09-07T10:00:00.000Z' })
-  updatedAt!: Date | string;
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
+  updatedAt!: string;
+}
+
+export class MockPaymentResponseDto {
+  @ApiProperty({ type: PaymentResponseDto })
+  payment!: PaymentResponseDto;
+
+  @ApiProperty({ type: BookingResponseDto })
+  booking!: BookingResponseDto;
 }
 
 export class HealthResponseDto {
-  @ApiProperty({ example: 'ok' })
-  status!: string;
+  @ApiProperty({ enum: ['ok', 'degraded'], example: 'ok' })
+  status!: 'ok' | 'degraded';
 
   @ApiPropertyOptional({ example: 'ticket-booking-api' })
   service?: string;
@@ -289,7 +460,7 @@ export class HealthResponseDto {
   @ApiPropertyOptional({ example: { database: 'up', redis: 'up' } })
   checks?: Record<string, string>;
 
-  @ApiProperty({ example: '2026-09-07T10:00:00.000Z' })
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
   timestamp!: string;
 }
 
@@ -297,7 +468,7 @@ export class ApiErrorResponseDto {
   @ApiProperty({ example: 409 })
   statusCode!: number;
 
-  @ApiProperty({ example: 'SEAT_UNAVAILABLE' })
+  @ApiProperty({ example: 'CONFLICT' })
   code!: string;
 
   @ApiProperty({ example: 'One or more seats are being held' })
@@ -312,6 +483,6 @@ export class ApiErrorResponseDto {
   @ApiProperty({ example: 'req_123' })
   requestId!: string;
 
-  @ApiProperty({ example: '2026-09-07T10:00:00.000Z' })
+  @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
   timestamp!: string;
 }

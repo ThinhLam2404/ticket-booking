@@ -16,8 +16,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
-    "crawl:demo": "tsx scripts/crawl-demo.ts",
     "prisma:studio": "prisma studio",
+    "openapi:export": "npm run build && node dist/scripts/export-openapi.js",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -29,7 +29,9 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
+    "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
+    "test:integration": "node scripts/run-integration-tests.mjs",
+    "test:integration:spec": "vitest run --config ./vitest.config.integration.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -44,7 +46,8 @@
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "ticket-booking": "file:.."
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",

@@ -1893,16 +1893,33 @@ Filter cũng trả header `X-Request-Id`. Các Prisma error chính được map 
 Các lệnh từ repository root:
 
 ```bash
+npm run api:generate
+npm run api:check
 npm test
 npm run test:e2e
+npm run test:integration
 npm run test:cov
 npm run typecheck
 npm run lint
 npm run build
 npm run check
+npm run check:ci
 ```
 
-`npm run check` chạy lint, typecheck, build, unit test và E2E test cho backend/frontend theo root scripts.
+- `npm run api:generate` export OpenAPI và sinh frontend declarations.
+- `npm run api:check` kiểm tra generated artifacts có deterministic và up to date.
+- `npm run check` chạy lint, typecheck, build, unit test và E2E test cho backend/frontend.
+- `npm run test:integration` dùng PostgreSQL/Redis test riêng, deploy migrations và tự teardown containers.
+- `npm run check:ci` thêm API drift check và integration suite.
+
+Generated API artifacts:
+
+```text
+openapi/ticket-booking.openapi.json
+fe/src/generated/openapi.d.ts
+```
+
+Backend controller/DTO là nguồn contract. Không chỉnh tay generated files; chạy `npm run api:generate` sau khi thay đổi API. `npm run api:check` export vào thư mục tạm và so sánh byte-for-byte để phát hiện drift mà không cần Git tracking hoặc infrastructure.
 
 ### 13.2. Test hiện có
 
@@ -1919,17 +1936,21 @@ E2E test:
 - Root route dưới `/api/v1`.
 - Health liveness.
 - Auth payload validation.
+- OpenAPI response contracts cho pagination, seat map, mock payment và error schema.
 
-### 13.3. Test chưa có
+Integration test với PostgreSQL/Redis thật:
 
-Cần bổ sung integration test với PostgreSQL/Redis thật cho:
-
+- Readiness database/Redis.
 - Hai user giữ cùng seat đồng thời.
-- Retry cùng hold idempotency key.
+- Retry cùng hold idempotency key, bao gồm concurrent retry.
 - Cùng idempotency key nhưng payload khác.
-- Booking expiry giải phóng seat.
+- Booking expiry giải phóng seat và cho user khác hold lại.
 - Payment success retry không tạo ticket trùng.
-- Payment failure giải phóng seat.
+- Concurrent payment retry trả canonical result.
+- Payment failure giải phóng seat và cho user khác hold lại.
+
+Test chưa có trong Sprint 1:
+
 - Hai showtime overlap cùng room.
 - Migration backfill trên dữ liệu cũ.
 - Refresh token rotation concurrent.
@@ -1980,6 +2001,10 @@ Root `package.json` điều phối commands nhưng không gộp dependency: `be/
 | `npm run lint` | Lint backend và frontend |
 | `npm run typecheck` | Typecheck backend và frontend |
 | `npm run check` | Lint, typecheck, build, unit test và E2E test |
+| `npm run check:ci` | API drift check, static checks và integration test |
+| `npm run api:generate` | Export OpenAPI và sinh frontend types |
+| `npm run api:check` | Kiểm tra generated API artifacts deterministic |
+| `npm run test:integration` | Chạy integration test với PostgreSQL/Redis test riêng |
 | `npm run infra:up` | Start PostgreSQL và Redis |
 | `npm run infra:down` | Stop PostgreSQL và Redis |
 | `npm run prisma:generate` | Generate Prisma Client |
@@ -2053,24 +2078,24 @@ Các màn hình MVP:
 - Chưa có admin user management.
 - Chưa có update showtime endpoint.
 - Booking list chưa pagination.
-- Response DTO và public response mapper đã được thêm cho các resource chính; response contract vẫn cần mở rộng thêm `@ApiResponse` cho toàn bộ endpoint.
+- Response DTO và public response mapper đã được chuẩn hóa cho API contract hiện tại.
+- OpenAPI JSON và frontend declarations được sinh từ backend contract qua root scripts.
 - Custom error format đã được thêm với `code`, `details`, `path`, `requestId` và `timestamp`.
+- Integration/concurrency suite đã có cho hold, idempotency, expiry và payment; các case migration backfill/showtime overlap/refresh rotation vẫn chưa có.
 - Chưa có Dockerfile cho API.
 - Chưa có CI/CD.
 - Chưa có rate limiting, Helmet, structured logging và tracing.
-- Chưa có integration/concurrency test với PostgreSQL/Redis thật.
 - `prisma:seed` cập nhật admin role/name nhưng không đổi password nếu admin đã tồn tại.
 
 ### 15.2. Roadmap đề xuất
 
-1. Hoàn thiện `@ApiResponse` cho toàn bộ endpoint và sinh client type từ OpenAPI.
+1. Bổ sung integration test cho showtime overlap, migration backfill và refresh rotation concurrent.
 2. Tách payment provider interface khỏi mock provider.
 3. Thêm webhook và payment attempt/event table.
 4. Thêm ticket scan/check-in.
 5. Thêm admin user management và audit log.
 6. Thêm pagination/filter/sort chuẩn hóa cho booking/ticket/catalog.
-7. Bổ sung integration/concurrency test chạy bằng Docker.
-8. Thêm rate limiting, Helmet, logging, metrics và tracing.
+7. Thêm rate limiting, Helmet, logging, metrics và tracing.
 9. Thêm cleanup job cho refresh token hết hạn.
 10. Tạo Dockerfile/API container và CI pipeline.
 11. Kiểm tra `npm audit` và cập nhật dependencies.

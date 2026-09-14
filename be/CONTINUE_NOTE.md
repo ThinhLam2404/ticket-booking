@@ -60,9 +60,24 @@ npm run lint
 npm run typecheck
 npm run build
 npm run test:all
+npm run check:ci
 ```
 
-Kết quả: lint, typecheck, backend/frontend build, 6 unit tests và 3 E2E tests đều pass.
+Kết quả: lint, typecheck, backend/frontend build, 6 unit tests, 4 E2E tests và 9 integration tests đều pass.
+
+OpenAPI artifacts:
+
+- `openapi/ticket-booking.openapi.json` được export từ backend Swagger document factory.
+- `fe/src/generated/openapi.d.ts` được sinh bằng `openapi-typescript`.
+- `npm run api:check` kiểm tra artifacts deterministic bằng temporary output.
+- Spec đã được chuẩn hóa cho pagination, seat map, payment wrapper, nested tickets, enum/date-time và error response.
+
+Integration:
+
+- `npm run test:integration` chạy với PostgreSQL/Redis thật trên test ports `55432`/`56379` và tự teardown.
+- Suite bao phủ readiness, concurrent hold, hold idempotency, different payload conflict, expiry, payment retry và payment failure.
+- Concurrent payment retry đã yêu cầu sửa production fallback để trả canonical result, không tạo duplicate payment/ticket.
+- Integration runner có safety guard và không thể reset development database/Redis.
 
 ### Root runtime smoke
 
@@ -94,7 +109,7 @@ Kết quả:
 - Typecheck pass.
 - Build pass.
 - 4 test files, 6 unit tests pass.
-- 1 E2E file, 3 E2E tests pass.
+- 1 E2E file, 4 E2E tests pass.
 
 ### Frontend static checks
 
@@ -210,10 +225,10 @@ Nếu cần dừng các process app thủ công, dừng process Nest/Vite tươn
 ## Vấn đề còn tồn tại
 
 - Docker Compose chỉ có PostgreSQL và Redis, không có API/frontend container.
-- Chưa có integration test được commit cho concurrency; mới smoke test thủ công bằng script tạm.
+- Integration suite hiện chưa bao phủ showtime overlap, migration backfill và refresh token rotation concurrent.
 - Frontend chưa có component/integration test.
 - Tài liệu system/API canonical đã chuyển ra `docs/SYSTEM_AND_API.md` để dùng chung cho `be/` và `fe/`.
-- Root `package.json` đã có command runner để chạy cả backend/frontend mà không cần đổi thư mục.
+- Root `package.json` đã có command runner và API generation pipeline để chạy cả backend/frontend mà không cần đổi thư mục.
 - `package.json#prisma` seed config có warning deprecated khi nâng Prisma 7; hiện project dùng Prisma 6.19.3.
 - `npm ci` backend báo vulnerabilities từ dependency tree; cần xử lý riêng bằng `npm audit`.
 - Mock payment chỉ dành cho development/test.
@@ -233,7 +248,11 @@ Các lệnh riêng:
 npm run dev:be
 npm run dev:fe
 npm run prisma:studio
+npm run api:generate
+npm run api:check
+npm run test:integration
 npm run check
+npm run check:ci
 ```
 
 Swagger:
@@ -244,11 +263,10 @@ http://localhost:3000/api/docs
 
 ## Ưu tiên tiếp theo
 
-1. Thêm integration/concurrency test vào repository.
+1. Bổ sung integration test cho showtime overlap, migration backfill và refresh token rotation concurrent.
 2. Bổ sung admin UI.
 3. Tách payment provider thật và webhook verification.
 4. Bổ sung ticket check-in/refund.
-5. Chuẩn hóa `@ApiResponse` cho mọi endpoint.
-6. Thêm frontend tests.
-7. Thêm Dockerfile/CI cho `be` và `fe`.
-8. Xử lý `npm audit`.
+5. Thêm frontend component/integration tests.
+6. Thêm Dockerfile/CI cho `be` và `fe`.
+7. Xử lý `npm audit` và Prisma config warning.
