@@ -1,5 +1,14 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "DESIGN.md"
+  ],
+  "skills": {
+    "paths": [
+      ".opencode/skills"
+    ]
+  },
   "mcp": {
     "graft": {
       "type": "local",
@@ -9,6 +18,29 @@
         "@nanonets/graft",
         "mcp"
       ],
+      "enabled": true
+    },
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "enabled": true
+    },
+    "stitch": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@_davideast/stitch-mcp",
+        "proxy"
+      ],
+      "timeout": 120000,
+      "environment": {
+        "STITCH_API_KEY": "{file:.stitch-key}"
+      },
       "enabled": true
     }
   }

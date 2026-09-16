@@ -4,8 +4,10 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -23,8 +25,16 @@ import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
 import { CreateMovieDto } from './dto/create-movie.dto.js';
-import { ListMoviesDto } from './dto/list-movies.dto.js';
+import {
+  ListAdminMoviesDto,
+  ListMoviesDto,
+} from './dto/list-movies.dto.js';
 import { UpdateMovieDto } from './dto/update-movie.dto.js';
+import {
+  ListTmdbMoviesDto,
+  PaginatedTmdbMoviesResponseDto,
+  TmdbMovieImportResponseDto,
+} from './dto/tmdb-movie.dto.js';
 import { MoviesService } from './movies.service.js';
 
 @ApiTags('movies')
@@ -37,6 +47,36 @@ export class MoviesController {
   @ApiErrorResponses(400)
   findAll(@Query() query: ListMoviesDto) {
     return this.moviesService.findAll(query);
+  }
+
+  @Get('admin')
+  @ApiResponse({ status: 200, type: PaginatedMoviesResponseDto })
+  @ApiErrorResponses(400, 401, 403)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  findAllAdmin(@Query() query: ListAdminMoviesDto) {
+    return this.moviesService.findAllAdmin(query);
+  }
+
+  @Get('admin/tmdb')
+  @ApiResponse({ status: 200, type: PaginatedTmdbMoviesResponseDto })
+  @ApiErrorResponses(400, 401, 403, 503, 504)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  findTmdb(@Query() query: ListTmdbMoviesDto) {
+    return this.moviesService.findTmdb(query);
+  }
+
+  @Put('admin/tmdb/:tmdbId/import')
+  @ApiResponse({ status: 200, type: TmdbMovieImportResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 409, 503, 504)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  importTmdb(@Param('tmdbId', ParseIntPipe) tmdbId: number) {
+    return this.moviesService.importTmdbMovie(tmdbId);
   }
 
   @Get(':id')

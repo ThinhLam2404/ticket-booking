@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { MovieStatus } from '@prisma/client';
 
 export class ListMoviesDto {
   @ApiPropertyOptional({
@@ -25,4 +26,11 @@ export class ListMoviesDto {
   @Min(1)
   @Max(100)
   pageSize = 20;
+}
+
+export class ListAdminMoviesDto extends ListMoviesDto {
+  @ApiPropertyOptional({ enum: MovieStatus, example: MovieStatus.PUBLISHED })
+  @IsOptional()
+  @IsEnum(MovieStatus)
+  status?: MovieStatus;
 }

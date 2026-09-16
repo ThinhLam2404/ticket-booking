@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -20,7 +21,11 @@ import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
 import { CreateShowtimeDto } from './dto/create-showtime.dto.js';
-import { ListShowtimesDto } from './dto/list-showtimes.dto.js';
+import {
+  ListAdminShowtimesDto,
+  ListShowtimesDto,
+} from './dto/list-showtimes.dto.js';
+import { UpdateShowtimeDto } from './dto/update-showtime.dto.js';
 import { ShowtimesService } from './showtimes.service.js';
 
 @ApiTags('showtimes')
@@ -33,6 +38,16 @@ export class ShowtimesController {
   @ApiErrorResponses(400)
   findAll(@Query() query: ListShowtimesDto) {
     return this.showtimesService.findAll(query);
+  }
+
+  @Get('admin')
+  @ApiResponse({ status: 200, type: PaginatedShowtimesResponseDto })
+  @ApiErrorResponses(400, 401, 403)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  findAllAdmin(@Query() query: ListAdminShowtimesDto) {
+    return this.showtimesService.findAllAdmin(query);
   }
 
   @Get(':id')
@@ -57,6 +72,16 @@ export class ShowtimesController {
   @Roles(UserRole.ADMIN)
   create(@Body() dto: CreateShowtimeDto) {
     return this.showtimesService.create(dto);
+  }
+
+  @Patch(':id')
+  @ApiResponse({ status: 200, type: ShowtimeResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  update(@Param('id') id: string, @Body() dto: UpdateShowtimeDto) {
+    return this.showtimesService.update(id, dto);
   }
 
   @Delete(':id')

@@ -457,6 +457,312 @@
         ]
       }
     },
+    "/api/v1/movies/admin": {
+      "get": {
+        "operationId": "Movies_findAllAdmin",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search by movie title",
+            "schema": {
+              "example": "interstellar",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "PUBLISHED",
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED",
+                "ARCHIVED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedMoviesResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "movies"
+        ]
+      }
+    },
+    "/api/v1/movies/admin/tmdb": {
+      "get": {
+        "operationId": "Movies_findTmdb",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Dune",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedTmdbMoviesResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "movies"
+        ]
+      }
+    },
+    "/api/v1/movies/admin/tmdb/{tmdbId}/import": {
+      "put": {
+        "operationId": "Movies_importTmdb",
+        "parameters": [
+          {
+            "name": "tmdbId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TmdbMovieImportResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "movies"
+        ]
+      }
+    },
     "/api/v1/movies/{id}": {
       "get": {
         "operationId": "Movies_findOne",
@@ -1314,6 +1620,107 @@
         ]
       }
     },
+    "/api/v1/seats/room/{roomId}/layout": {
+      "put": {
+        "operationId": "Seats_replaceLayout",
+        "parameters": [
+          {
+            "name": "roomId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/BulkSeatLayoutItemDto"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SeatResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "seats"
+        ]
+      }
+    },
     "/api/v1/seats/{roomId}": {
       "post": {
         "operationId": "Seats_create",
@@ -1744,6 +2151,148 @@
         ]
       }
     },
+    "/api/v1/showtimes/admin": {
+      "get": {
+        "operationId": "Showtimes_findAllAdmin",
+        "parameters": [
+          {
+            "name": "movieId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "clx123movie",
+              "type": "string"
+            }
+          },
+          {
+            "name": "cinemaId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "clx123cinema",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "example": "2026-10-01T00:00:00.000Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "example": "2026-10-02T00:00:00.000Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "includePast",
+            "required": false,
+            "in": "query",
+            "description": "Include showtimes that have already started",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by the linked movie status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED",
+                "ARCHIVED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedShowtimesResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "showtimes"
+        ]
+      }
+    },
     "/api/v1/showtimes/{id}": {
       "get": {
         "operationId": "Showtimes_findOne",
@@ -1779,6 +2328,99 @@
             }
           }
         },
+        "tags": [
+          "showtimes"
+        ]
+      },
+      "patch": {
+        "operationId": "Showtimes_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShowtimeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShowtimeResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
           "showtimes"
         ]
@@ -2641,6 +3283,11 @@
             "type": "string",
             "example": "clx-movie-id"
           },
+          "tmdbId": {
+            "type": "number",
+            "example": 693134,
+            "nullable": true
+          },
           "title": {
             "type": "string",
             "example": "Interstellar"
@@ -2648,6 +3295,16 @@
           "description": {
             "type": "string",
             "example": "A science fiction film.",
+            "nullable": true
+          },
+          "posterUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/posters/interstellar.jpg",
+            "nullable": true
+          },
+          "backdropUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/backdrops/interstellar.jpg",
             "nullable": true
           },
           "duration": {
@@ -2726,6 +3383,119 @@
         "required": [
           "data",
           "meta"
+        ]
+      },
+      "TmdbMovieResponseDto": {
+        "type": "object",
+        "properties": {
+          "tmdbId": {
+            "type": "number",
+            "example": 693134
+          },
+          "title": {
+            "type": "string",
+            "example": "Dune: Part Two"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "example": "Paul Atreides..."
+          },
+          "posterUrl": {
+            "type": "string",
+            "nullable": true,
+            "example": "https://image.tmdb.org/t/p/w500/poster.jpg"
+          },
+          "backdropUrl": {
+            "type": "string",
+            "nullable": true,
+            "example": "https://image.tmdb.org/t/p/w1280/backdrop.jpg"
+          },
+          "releaseDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2024-02-27"
+          },
+          "rating": {
+            "type": "number",
+            "nullable": true,
+            "example": 8.7
+          },
+          "imported": {
+            "type": "boolean",
+            "example": false
+          },
+          "importedMovieId": {
+            "type": "string",
+            "nullable": true,
+            "example": "clx-movie-id"
+          }
+        },
+        "required": [
+          "tmdbId",
+          "title",
+          "imported"
+        ]
+      },
+      "TmdbPaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "example": 100
+          },
+          "totalPages": {
+            "type": "number",
+            "example": 5
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "totalPages"
+        ]
+      },
+      "PaginatedTmdbMoviesResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TmdbMovieResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/TmdbPaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "TmdbMovieImportResponseDto": {
+        "type": "object",
+        "properties": {
+          "movie": {
+            "$ref": "#/components/schemas/MovieResponseDto"
+          },
+          "imported": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "movie",
+          "imported"
         ]
       },
       "CinemaResponseDto": {
@@ -2907,6 +3677,11 @@
             "type": "string",
             "example": "clx-movie-id"
           },
+          "tmdbId": {
+            "type": "number",
+            "example": 693134,
+            "nullable": true
+          },
           "title": {
             "type": "string",
             "example": "Interstellar"
@@ -2914,6 +3689,16 @@
           "description": {
             "type": "string",
             "example": "A science fiction film.",
+            "nullable": true
+          },
+          "posterUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/posters/interstellar.jpg",
+            "nullable": true
+          },
+          "backdropUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/backdrops/interstellar.jpg",
             "nullable": true
           },
           "duration": {
@@ -2967,6 +3752,18 @@
             "type": "string",
             "example": "A science fiction film about space exploration."
           },
+          "posterUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/posters/interstellar.jpg",
+            "format": "uri",
+            "nullable": true
+          },
+          "backdropUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/backdrops/interstellar.jpg",
+            "format": "uri",
+            "nullable": true
+          },
           "duration": {
             "type": "number",
             "example": 169,
@@ -2997,6 +3794,18 @@
           "description": {
             "type": "string",
             "example": "A science fiction film about space exploration."
+          },
+          "posterUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/posters/interstellar.jpg",
+            "format": "uri",
+            "nullable": true
+          },
+          "backdropUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/backdrops/interstellar.jpg",
+            "format": "uri",
+            "nullable": true
           },
           "duration": {
             "type": "number",
@@ -3154,6 +3963,31 @@
           }
         }
       },
+      "BulkSeatLayoutItemDto": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "string",
+            "example": "A"
+          },
+          "number": {
+            "type": "number",
+            "example": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "VIP",
+              "COUPLE"
+            ]
+          }
+        },
+        "required": [
+          "row",
+          "number"
+        ]
+      },
       "CreateSeatDto": {
         "type": "object",
         "properties": {
@@ -3266,6 +4100,21 @@
           "roomId": {
             "type": "string",
             "example": "clx-room-id"
+          },
+          "basePrice": {
+            "type": "string",
+            "example": "100000.00",
+            "nullable": true
+          },
+          "vipMultiplier": {
+            "type": "string",
+            "example": "1.50",
+            "nullable": true
+          },
+          "coupleMultiplier": {
+            "type": "string",
+            "example": "2.20",
+            "nullable": true
           },
           "room": {
             "$ref": "#/components/schemas/RoomResponseDto"
@@ -3390,6 +4239,42 @@
           "endsAt",
           "basePrice"
         ]
+      },
+      "UpdateShowtimeDto": {
+        "type": "object",
+        "properties": {
+          "movieId": {
+            "type": "string",
+            "example": "clx123movie"
+          },
+          "roomId": {
+            "type": "string",
+            "example": "clx123room"
+          },
+          "startsAt": {
+            "type": "string",
+            "example": "2026-10-01T19:00:00.000Z"
+          },
+          "endsAt": {
+            "type": "string",
+            "example": "2026-10-01T21:49:00.000Z"
+          },
+          "basePrice": {
+            "type": "number",
+            "example": 100000,
+            "description": "Base price for standard seats"
+          },
+          "vipMultiplier": {
+            "type": "number",
+            "example": 1.5,
+            "description": "VIP price multiplier"
+          },
+          "coupleMultiplier": {
+            "type": "number",
+            "example": 2,
+            "description": "Couple seat price multiplier"
+          }
+        }
       },
       "CreateBookingDto": {
         "type": "object",

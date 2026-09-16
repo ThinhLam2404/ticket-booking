@@ -29,6 +29,7 @@ MVP hiện tại hỗ trợ:
 - Đăng ký, đăng nhập, refresh token và logout.
 - Phân quyền `CUSTOMER` và `ADMIN`.
 - CRUD phim, rạp, phòng, ghế và suất chiếu.
+- Admin tìm kiếm và nhập phim từ TMDB vào catalog nội bộ.
 - Xem sơ đồ ghế theo suất chiếu.
 - Giữ ghế tạm thời bằng Redis.
 - Tạo booking và tính tiền ở server.
@@ -63,6 +64,7 @@ Một ghế theo một suất chiếu chỉ được bán một lần. Hệ th�
 | Password       | Node `crypto.scrypt`                   | Hash password                                     |
 | Validation     | `class-validator`, `class-transformer` | Validate body/query                               |
 | Documentation  | `@nestjs/swagger`                      | OpenAPI/Swagger UI                                |
+| Movie source   | TMDB API v3                            | Tìm kiếm và nhập metadata phim cho Admin          |
 | Scheduler      | `@nestjs/schedule`                     | Expire booking mỗi phút                           |
 | Frontend      | React 19, Vite 8, TypeScript             | Customer UI và API client                         |
 | Frontend data  | Fetch API, sessionStorage                | HTTP request, token session và refresh            |
@@ -104,6 +106,7 @@ flowchart LR
     Ticket[Ticket Module]
     Health[Health Module]
     Scheduler[Booking Expiry Scheduler]
+    Tmdb[TMDB API]
     Prisma[Prisma Client]
     PostgreSQL[(PostgreSQL)]
     Redis[(Redis)]
@@ -117,6 +120,7 @@ flowchart LR
     API --> Ticket
     API --> Health
     Scheduler --> Booking
+    Catalog --> Tmdb
     Auth --> Prisma
     Catalog --> Prisma
     Booking --> Prisma
@@ -144,6 +148,8 @@ be/src/
 │   ├── auth/
 │   ├── users/
 │   ├── movies/
+│   │   ├── tmdb.client.ts
+│   │   └── dto/tmdb-movie.dto.ts
 │   ├── cinemas/
 │   ├── rooms/
 │   ├── seats/
@@ -177,7 +183,7 @@ Root điều phối cả hai ứng dụng bằng `package.json`; dependency và 
 | ----------- | --------------------------------------------------- |
 | `auth`      | Register, login, refresh, logout, JWT token service |
 | `users`     | Lấy thông tin user hiện tại                         |
-| `movies`    | Movie catalog và movie lifecycle                    |
+| `movies`    | Movie catalog, lifecycle và TMDB import cho Admin   |
 | `cinemas`   | Cụm rạp                                             |
 | `rooms`     | Phòng chiếu                                         |
 | `seats`     | Ghế vật lý trong phòng                              |
@@ -198,6 +204,8 @@ Root điều phối cả hai ứng dụng bằng `package.json`; dependency và 
 ### 3.3. Frontend runtime
 
 Frontend là React SPA được build và serve bởi Vite. `fe/src/api.ts` là HTTP client dùng Fetch API, tự gắn Bearer access token, thử refresh một lần khi nhận `401`, rồi xóa session nếu refresh thất bại. Access token, refresh token và user hiện tại được giữ trong `sessionStorage`.
+
+Admin UI có modal nhập phim từ TMDB trong màn quản lý phim. Modal gọi API backend, không gọi TMDB trực tiếp và không biết `TMDB_ACCESS_TOKEN`.
 
 Customer UI hiện có:
 
@@ -238,6 +246,7 @@ JWT_ACCESS_SECRET=local-access-secret-change-me-32-chars-minimum
 JWT_REFRESH_SECRET=local-refresh-secret-change-me-32-chars-minimum
 JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
+TMDB_ACCESS_TOKEN=<tmdb-api-read-access-token>
 SEED_ADMIN_EMAIL=admin@example.com
 SEED_ADMIN_PASSWORD=change-this-seed-password
 ```
@@ -252,6 +261,7 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `JWT_REFRESH_SECRET`     | Có       | Secret ký refresh token; phải khác access secret               |
 | `JWT_ACCESS_EXPIRES_IN`  | Không    | TTL access token, default `15m`                                |
 | `JWT_REFRESH_EXPIRES_IN` | Không    | TTL refresh token, default `7d`                                |
+| `TMDB_ACCESS_TOKEN`      | Không    | TMDB API Read Access Token; cần nếu Admin tìm hoặc nhập phim  |
 | `SEED_ADMIN_EMAIL`       | Seed     | Email admin bootstrap, default `admin@example.com`             |
 | `SEED_ADMIN_PASSWORD`    | Seed     | Password admin bootstrap, bắt buộc khi seed                    |
 
@@ -262,6 +272,8 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 - Production yêu cầu mỗi JWT secret dài tối thiểu 32 ký tự.
 - Access và refresh secret phải khác nhau.
 - Mock payment chỉ được dùng ở `development` và `test`.
+- `TMDB_ACCESS_TOKEN` chỉ nằm ở backend `.env`; không truyền token sang frontend hoặc commit vào repository.
+- TMDB là nguồn dữ liệu ngoài. Chỉ phim đã được Admin nhập vào catalog nội bộ mới có thể publish, tạo showtime và booking.
 
 ## 5. Database data dictionary
 
@@ -357,9 +369,12 @@ Nguồn: `be/prisma/schema.prisma`, model `User`.
 
 | Field         | Type          | Nullability | Default/constraint | Mô tả                   |
 | ------------- | ------------- | ----------- | ------------------ | ----------------------- |
-| `id`          | `String`      | REQ         | PK, `cuid()`       | ID phim                 |
+| `id`          | `String`      | REQ         | PK, `cuid()`       | ID phim nội bộ          |
+| `tmdbId`      | `Int?`        | OPT         | UQ                 | ID phim trên TMDB       |
 | `title`       | `String`      | REQ         | —                  | Tên phim                |
 | `description` | `String?`     | OPT         | —                  | Mô tả phim              |
+| `posterUrl`   | `String?`     | OPT         | —                  | URL poster phim         |
+| `backdropUrl` | `String?`     | OPT         | —                  | URL backdrop phim       |
 | `duration`    | `Int`         | REQ         | —                  | Thời lượng, đơn vị phút |
 | `status`      | `MovieStatus` | REQ         | `DRAFT`            | Lifecycle phim          |
 | `showtimes`   | `Showtime[]`  | Relation    | —                  | Các suất chiếu          |
@@ -592,8 +607,11 @@ erDiagram
     }
     Movie {
         String id PK
+        Int tmdbId UK
         String title
         String description
+        String posterUrl
+        String backdropUrl
         Int duration
         MovieStatus status
         DateTime createdAt
@@ -790,6 +808,23 @@ Bổ sung booking flow:
 - Thêm check constraint giá/tổng tiền/trạng thái hold.
 - Thêm exclusion constraint chống showtime overlap.
 - Backfill booking pending/confirmed/cancelled/expired và seat/payment state cũ.
+
+#### `20260915120000_admin_catalog_controls`
+
+Bổ sung các trường điều khiển catalog và pricing cho Admin:
+
+- `Movie.posterUrl` và `Movie.backdropUrl`.
+- `Showtime.basePrice`, `vipMultiplier` và `coupleMultiplier`.
+- Check constraint không cho giá âm.
+
+#### `20260915150000_tmdb_movie_import`
+
+Bổ sung liên kết phim nội bộ với TMDB:
+
+- Thêm `Movie.tmdbId`, kiểu `Int?`.
+- Tạo unique index `Movie_tmdbId_key`.
+- Không backfill phim cũ vì phim seed/thủ công không có TMDB ID.
+- Phim import từ TMDB luôn được tạo với `status = DRAFT`.
 
 ### 6.2. Seed
 
@@ -1123,8 +1158,11 @@ sequenceDiagram
   "data": [
     {
       "id": "clx-movie-id",
+      "tmdbId": null,
       "title": "Interstellar",
       "description": "A science fiction film.",
+      "posterUrl": "https://cdn.example.com/posters/interstellar.jpg",
+      "backdropUrl": "https://cdn.example.com/backdrops/interstellar.jpg",
       "duration": 169,
       "status": "PUBLISHED",
       "createdAt": "2026-09-07T10:00:00.000Z",
@@ -1180,6 +1218,100 @@ sequenceDiagram
 - Role: `ADMIN`.
 - Success: `200`.
 - Không xóa cứng; chuyển movie thành `ARCHIVED`.
+
+#### `GET /api/v1/movies/admin`
+
+- Auth: Bearer JWT.
+- Role: `ADMIN`.
+- Trả tất cả movie nội bộ, gồm `DRAFT`, `PUBLISHED` và `ARCHIVED`.
+- Query dùng `search`, `page`, `pageSize` và thêm `status` để lọc lifecycle.
+- Endpoint này chỉ đọc PostgreSQL, không gọi TMDB.
+
+#### `GET /api/v1/movies/admin/tmdb`
+
+- Auth: Bearer JWT.
+- Role: `ADMIN`.
+- Mục đích: tìm phim trên TMDB hoặc lấy danh sách TMDB đang chiếu để Admin chọn nhập.
+- Query:
+
+| Param    | Required | Ví dụ  | Mô tả                                      |
+| -------- | -------- | ------ | ------------------------------------------ |
+| `search` | Không    | `Dune` | Tìm theo title TMDB; bỏ trống dùng now playing |
+| `page`   | Không    | `1`    | Trang TMDB, từ `1` đến `20`, default `1`  |
+
+- Backend gọi TMDB v3 với Bearer `TMDB_ACCESS_TOKEN`, `language=vi-VN`, `region=VN`, `include_adult=false`.
+- Khi lỗi transport tạm thời với `vi-VN`, client thử lại với `language=en-US`.
+- Response được chuẩn hóa, không trả raw TMDB:
+
+```json
+{
+  "data": [
+    {
+      "tmdbId": 693134,
+      "title": "Dune: Part Two",
+      "description": "Paul Atreides...",
+      "posterUrl": "https://image.tmdb.org/t/p/w500/poster.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/w1280/backdrop.jpg",
+      "releaseDate": "2024-02-27",
+      "rating": 8.7,
+      "imported": false,
+      "importedMovieId": null
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "pageSize": 20,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+```
+
+- `imported` cho biết `tmdbId` đã tồn tại trong catalog nội bộ.
+- `importedMovieId` là ID nội bộ nếu phim đã được nhập.
+- Errors: `400` query sai, `401/403` thiếu quyền Admin, `502/504` TMDB không kết nối được, `503` chưa cấu hình hoặc bị giới hạn.
+- Endpoint không tạo hoặc cập nhật movie trong DB.
+
+#### `PUT /api/v1/movies/admin/tmdb/:tmdbId/import`
+
+- Auth: Bearer JWT.
+- Role: `ADMIN`.
+- Mục đích: lấy detail TMDB và tạo movie nội bộ.
+- Ví dụ: `PUT /api/v1/movies/admin/tmdb/693134/import`.
+- Không có request body.
+- Backend lấy detail để có `runtime`, sau đó map:
+
+| TMDB field       | Movie field             |
+| ---------------- | ----------------------- |
+| `id`             | `tmdbId`                |
+| `title`          | `title`                 |
+| `overview`       | `description`           |
+| `poster_path`    | `posterUrl` với size `w500` |
+| `backdrop_path`  | `backdropUrl` với size `w1280` |
+| `runtime`        | `duration`; fallback `120` phút nếu thiếu/không hợp lệ |
+| —                | `status = DRAFT`        |
+
+- Import idempotent theo `Movie.tmdbId`:
+  - Nếu phim đã tồn tại, trả movie hiện có và `imported: false`.
+  - Nếu chưa tồn tại, tạo movie và trả `imported: true`.
+  - Concurrent import được bảo vệ bởi unique index; request thắng sau trả movie hiện có.
+- Response:
+
+```json
+{
+  "movie": {
+    "id": "clx-movie-id",
+    "tmdbId": 693134,
+    "title": "Dune: Part Two",
+    "duration": 166,
+    "status": "DRAFT"
+  },
+  "imported": true
+}
+```
+
+- Phim mới nhập chưa xuất hiện trên public catalog. Admin phải cập nhật `status` thành `PUBLISHED`, sau đó tạo showtime thì customer mới có thể đặt vé.
+- Errors: `400`, `401`, `403`, `404` TMDB movie không tồn tại, `409` conflict, `502/504` TMDB connection, `503` cấu hình/rate limit.
 
 ### 8.6. Cinemas API
 
@@ -1647,7 +1779,13 @@ GET /tickets
 ```text
 Seed hoặc login admin
     ↓
-POST /movies
+GET /movies/admin/tmdb?search=... hoặc GET /movies/admin/tmdb
+    ↓
+PUT /movies/admin/tmdb/:tmdbId/import
+    ↓
+Movie nội bộ được tạo với status DRAFT
+    ↓
+PATCH /movies/:id { status: PUBLISHED }
     ↓
 POST /cinemas
     ↓
@@ -1656,7 +1794,56 @@ POST /rooms
 POST /seats/:roomId
     ↓
 POST /showtimes
+    ↓
+Customer thấy movie qua GET /movies và có thể booking
 ```
+
+#### 9.2.1. TMDB movie import flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin UI
+    participant API as NestJS API
+    participant T as TMDB API
+    participant DB as PostgreSQL
+
+    A->>API: GET /movies/admin/tmdb?search=Dune
+    API->>T: GET /3/search/movie hoặc /3/movie/now_playing
+    T-->>API: TMDB movie list
+    API->>DB: Kiểm tra Movie.tmdbId trong kết quả
+    DB-->>API: imported/importedMovieId markers
+    API-->>A: Chuẩn hóa { data, meta }
+
+    A->>API: PUT /movies/admin/tmdb/:tmdbId/import
+    API->>DB: Tìm Movie.tmdbId
+    alt Đã import
+        DB-->>API: Movie hiện tại
+        API-->>A: imported=false
+    else Chưa import
+        API->>T: GET /3/movie/:tmdbId
+        T-->>API: Movie detail/runtime
+        API->>DB: Tạo Movie với status DRAFT
+        DB-->>API: Movie nội bộ
+        API-->>A: imported=true
+    end
+
+    A->>API: PATCH /movies/:id với status=PUBLISHED
+    A->>API: POST /showtimes
+    API-->>A: Movie sẵn sàng cho customer booking
+```
+
+Quy tắc của flow:
+
+- Chỉ Admin có JWT hợp lệ mới được gọi hai endpoint TMDB.
+- API key/token TMDB chỉ được backend sử dụng; frontend không gọi TMDB trực tiếp.
+- Search/list TMDB không ghi database.
+- Import lấy detail TMDB để lấy `runtime`; duration thiếu thì dùng `120` phút.
+- Import không tự publish và không tự tạo cinema, room, seat hoặc showtime.
+- `Movie.tmdbId` unique giúp thao tác import lặp lại an toàn.
+- Public `GET /movies` và `GET /movies/:id` chỉ dùng movie nội bộ `PUBLISHED`.
+- Không được dùng trực tiếp TMDB ID làm `movieId` trong showtime hoặc booking.
+
 
 ### 9.3. Booking sequence
 
@@ -1846,7 +2033,9 @@ Tác dụng:
 |  `403` | Không đủ role hoặc mock payment bị disable                              |
 |  `404` | Resource không tồn tại hoặc không thuộc user                            |
 |  `409` | Duplicate, seat conflict, overlap, state conflict, idempotency conflict |
-|  `503` | Database/Redis readiness không sẵn sàng                                 |
+|  `502` | TMDB upstream hoặc kết nối TMDB thất bại                              |
+|  `503` | Database/Redis readiness không sẵn sàng, TMDB chưa cấu hình hoặc rate limit |
+|  `504` | TMDB upstream timeout                                                   |
 
 ### 12.3. Error response
 
@@ -1948,6 +2137,8 @@ Integration test với PostgreSQL/Redis thật:
 - Payment success retry không tạo ticket trùng.
 - Concurrent payment retry trả canonical result.
 - Payment failure giải phóng seat và cho user khác hold lại.
+- TMDB response normalization và đánh dấu movie đã import.
+- TMDB import lặp lại không tạo movie duplicate.
 
 Test chưa có trong Sprint 1:
 
@@ -2055,17 +2246,23 @@ Các màn hình MVP:
 
 ### 14.4. Manual flow mẫu
 
-1. Seed admin.
-2. Login admin qua `/api/v1/auth/login`.
-3. Dùng `Authorize` trên Swagger với access token.
-4. Tạo/publish movie nếu không dùng seed.
-5. Tạo cinema, room, seats, showtime.
-6. Register/login customer.
-7. Lấy showtime seats.
-8. Hold một hoặc nhiều ghế.
-9. Checkout booking.
-10. Gọi mock payment với `Idempotency-Key`.
-11. Lấy ticket.
+1. Copy `be/.env.example` thành `be/.env`.
+2. Đặt TMDB API Read Access Token vào `TMDB_ACCESS_TOKEN` trong `be/.env`; không đặt token ở `fe/.env`.
+3. Seed admin.
+4. Login admin qua `/api/v1/auth/login`.
+5. Dùng `Authorize` trên Swagger với access token.
+6. Gọi `GET /api/v1/movies/admin/tmdb` hoặc mở Admin > Phim > Nhập từ TMDB.
+7. Tìm phim bằng `search` hoặc xem danh sách now playing.
+8. Gọi `PUT /api/v1/movies/admin/tmdb/:tmdbId/import` cho phim được chọn.
+9. Kiểm tra phim trong `GET /api/v1/movies/admin`; phim mới có trạng thái `DRAFT`.
+10. Dùng `PATCH /api/v1/movies/:id` để chuyển phim sang `PUBLISHED` sau khi kiểm tra.
+11. Tạo cinema, room, seats, showtime cho movie nội bộ bằng `id`.
+12. Register/login customer.
+13. Lấy showtime seats.
+14. Hold một hoặc nhiều ghế.
+15. Checkout booking.
+16. Gọi mock payment với `Idempotency-Key`.
+17. Lấy ticket.
 
 ## 15. Known limitations và roadmap
 
@@ -2076,7 +2273,7 @@ Các màn hình MVP:
 - Chưa có refund flow dù enum `REFUNDED` đã tồn tại.
 - Chưa có ticket check-in/consume.
 - Chưa có admin user management.
-- Chưa có update showtime endpoint.
+- TMDB search/import hiện do Admin chủ động; chưa có scheduler tự động đồng bộ phim từ TMDB.
 - Booking list chưa pagination.
 - Response DTO và public response mapper đã được chuẩn hóa cho API contract hiện tại.
 - OpenAPI JSON và frontend declarations được sinh từ backend contract qua root scripts.

@@ -148,6 +148,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/movies/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Movies_findAllAdmin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/movies/admin/tmdb": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Movies_findTmdb"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/movies/admin/tmdb/{tmdbId}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Movies_importTmdb"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/movies/{id}": {
         parameters: {
             query?: never;
@@ -244,6 +292,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/seats/room/{roomId}/layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Seats_replaceLayout"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/seats/{roomId}": {
         parameters: {
             query?: never;
@@ -292,6 +356,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/showtimes/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Showtimes_findAllAdmin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/showtimes/{id}": {
         parameters: {
             query?: never;
@@ -305,7 +385,7 @@ export interface paths {
         delete: operations["Showtimes_remove"];
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["Showtimes_update"];
         trace?: never;
     };
     "/api/v1/showtimes/{id}/seats": {
@@ -559,10 +639,16 @@ export interface components {
         MovieResponseDto: {
             /** @example clx-movie-id */
             id: string;
+            /** @example 693134 */
+            tmdbId?: number | null;
             /** @example Interstellar */
             title: string;
             /** @example A science fiction film. */
             description?: string | null;
+            /** @example https://cdn.example.com/posters/interstellar.jpg */
+            posterUrl?: string | null;
+            /** @example https://cdn.example.com/backdrops/interstellar.jpg */
+            backdropUrl?: string | null;
             /** @example 169 */
             duration: number;
             /**
@@ -594,6 +680,45 @@ export interface components {
         PaginatedMoviesResponseDto: {
             data: components["schemas"]["MovieResponseDto"][];
             meta: components["schemas"]["PaginationMetaDto"];
+        };
+        TmdbMovieResponseDto: {
+            /** @example 693134 */
+            tmdbId: number;
+            /** @example Dune: Part Two */
+            title: string;
+            /** @example Paul Atreides... */
+            description?: string | null;
+            /** @example https://image.tmdb.org/t/p/w500/poster.jpg */
+            posterUrl?: string | null;
+            /** @example https://image.tmdb.org/t/p/w1280/backdrop.jpg */
+            backdropUrl?: string | null;
+            /** @example 2024-02-27 */
+            releaseDate?: string | null;
+            /** @example 8.7 */
+            rating?: number | null;
+            /** @example false */
+            imported: boolean;
+            /** @example clx-movie-id */
+            importedMovieId?: string | null;
+        };
+        TmdbPaginationMetaDto: {
+            /** @example 1 */
+            page: number;
+            /** @example 20 */
+            pageSize: number;
+            /** @example 100 */
+            total: number;
+            /** @example 5 */
+            totalPages: number;
+        };
+        PaginatedTmdbMoviesResponseDto: {
+            data: components["schemas"]["TmdbMovieResponseDto"][];
+            meta: components["schemas"]["TmdbPaginationMetaDto"];
+        };
+        TmdbMovieImportResponseDto: {
+            movie: components["schemas"]["MovieResponseDto"];
+            /** @example true */
+            imported: boolean;
         };
         CinemaResponseDto: {
             /** @example clx-cinema-id */
@@ -684,10 +809,16 @@ export interface components {
         MovieDetailsResponseDto: {
             /** @example clx-movie-id */
             id: string;
+            /** @example 693134 */
+            tmdbId?: number | null;
             /** @example Interstellar */
             title: string;
             /** @example A science fiction film. */
             description?: string | null;
+            /** @example https://cdn.example.com/posters/interstellar.jpg */
+            posterUrl?: string | null;
+            /** @example https://cdn.example.com/backdrops/interstellar.jpg */
+            backdropUrl?: string | null;
             /** @example 169 */
             duration: number;
             /**
@@ -713,6 +844,16 @@ export interface components {
             /** @example A science fiction film about space exploration. */
             description?: string;
             /**
+             * Format: uri
+             * @example https://cdn.example.com/posters/interstellar.jpg
+             */
+            posterUrl?: string | null;
+            /**
+             * Format: uri
+             * @example https://cdn.example.com/backdrops/interstellar.jpg
+             */
+            backdropUrl?: string | null;
+            /**
              * @description Duration in minutes
              * @example 169
              */
@@ -728,6 +869,16 @@ export interface components {
             title?: string;
             /** @example A science fiction film about space exploration. */
             description?: string;
+            /**
+             * Format: uri
+             * @example https://cdn.example.com/posters/interstellar.jpg
+             */
+            posterUrl?: string | null;
+            /**
+             * Format: uri
+             * @example https://cdn.example.com/backdrops/interstellar.jpg
+             */
+            backdropUrl?: string | null;
             /**
              * @description Duration in minutes
              * @example 169
@@ -802,6 +953,14 @@ export interface components {
             /** @example Room 1 */
             name?: string;
         };
+        BulkSeatLayoutItemDto: {
+            /** @example A */
+            row: string;
+            /** @example 1 */
+            number: number;
+            /** @enum {string} */
+            type?: "STANDARD" | "VIP" | "COUPLE";
+        };
         CreateSeatDto: {
             /** @example A */
             row: string;
@@ -853,6 +1012,12 @@ export interface components {
             movie: components["schemas"]["MovieResponseDto"];
             /** @example clx-room-id */
             roomId: string;
+            /** @example 100000.00 */
+            basePrice?: string | null;
+            /** @example 1.50 */
+            vipMultiplier?: string | null;
+            /** @example 2.20 */
+            coupleMultiplier?: string | null;
             room: components["schemas"]["RoomResponseDto"];
             showtimeSeats?: components["schemas"]["ShowtimeSeatResponseDto"][];
             /**
@@ -899,6 +1064,31 @@ export interface components {
              * @example 100000
              */
             basePrice: number;
+            /**
+             * @description VIP price multiplier
+             * @example 1.5
+             */
+            vipMultiplier?: number;
+            /**
+             * @description Couple seat price multiplier
+             * @example 2
+             */
+            coupleMultiplier?: number;
+        };
+        UpdateShowtimeDto: {
+            /** @example clx123movie */
+            movieId?: string;
+            /** @example clx123room */
+            roomId?: string;
+            /** @example 2026-10-01T19:00:00.000Z */
+            startsAt?: string;
+            /** @example 2026-10-01T21:49:00.000Z */
+            endsAt?: string;
+            /**
+             * @description Base price for standard seats
+             * @example 100000
+             */
+            basePrice?: number;
             /**
              * @description VIP price multiplier
              * @example 1.5
@@ -1447,6 +1637,194 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Movies_findAllAdmin: {
+        parameters: {
+            query?: {
+                /** @description Search by movie title */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+                status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedMoviesResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Movies_findTmdb: {
+        parameters: {
+            query?: {
+                search?: string;
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedTmdbMoviesResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Movies_importTmdb: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TmdbMovieImportResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            504: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2068,6 +2446,71 @@ export interface operations {
             };
         };
     };
+    Seats_replaceLayout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roomId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkSeatLayoutItemDto"][];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeatResponseDto"][];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
     Seats_create: {
         parameters: {
             query?: never;
@@ -2340,6 +2783,60 @@ export interface operations {
             };
         };
     };
+    Showtimes_findAllAdmin: {
+        parameters: {
+            query?: {
+                movieId?: string;
+                cinemaId?: string;
+                from?: string;
+                to?: string;
+                page?: number;
+                pageSize?: number;
+                /** @description Include showtimes that have already started */
+                includePast?: boolean;
+                /** @description Filter by the linked movie status */
+                status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedShowtimesResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
     Showtimes_findOne: {
         parameters: {
             query?: never;
@@ -2386,6 +2883,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShowtimeResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Showtimes_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateShowtimeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShowtimeResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
                 };
             };
             401: {

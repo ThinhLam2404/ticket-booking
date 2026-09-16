@@ -64,8 +64,11 @@ model User {
 
 model Movie {
   id          String      @id @default(cuid())
+  tmdbId      Int?        @unique
   title       String
   description String?
+  posterUrl   String?
+  backdropUrl String?
   duration    Int
   status      MovieStatus @default(DRAFT)
   showtimes   Showtime[]
@@ -108,17 +111,20 @@ model Seat {
 }
 
 model Showtime {
-  id            String         @id @default(cuid())
-  startsAt      DateTime
-  endsAt        DateTime
-  movieId       String
-  movie         Movie          @relation(fields: [movieId], references: [id], onDelete: Restrict)
-  roomId        String
-  room          Room           @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  showtimeSeats ShowtimeSeat[]
-  bookings      Booking[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id               String    @id @default(cuid())
+  startsAt         DateTime
+  endsAt           DateTime
+  movieId          String
+  movie            Movie     @relation(fields: [movieId], references: [id], onDelete: Restrict)
+  roomId           String
+  room             Room      @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  basePrice        Decimal?  @db.Decimal(10, 2)
+  vipMultiplier    Decimal?  @db.Decimal(5, 2)
+  coupleMultiplier Decimal?  @db.Decimal(5, 2)
+  showtimeSeats    ShowtimeSeat[]
+  bookings         Booking[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([movieId, startsAt])
   @@index([roomId, startsAt, endsAt])

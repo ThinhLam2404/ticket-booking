@@ -30,6 +30,10 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  TMDB_ACCESS_TOKEN?: string;
+
+  @IsOptional()
+  @IsString()
   JWT_ACCESS_EXPIRES_IN = '15m';
 
   @IsOptional()

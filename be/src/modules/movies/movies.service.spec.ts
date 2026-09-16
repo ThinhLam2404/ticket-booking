@@ -1,0 +1,77 @@
+import { MovieStatus } from '@prisma/client';
+import { MoviesService } from './movies.service.js';
+
+describe('MoviesService TMDB import', () => {
+  it('normalizes TMDB results and marks imported movies', async () => {
+    const prisma = {
+      movie: {
+        findMany: vi.fn().mockResolvedValue([{ id: 'movie-1', tmdbId: 10 }]),
+      },
+    };
+    const tmdb = {
+      listMovies: vi.fn().mockResolvedValue({
+        page: 1,
+        results: [
+          {
+            id: 10,
+            title: 'Dune: Part Two',
+            overview: 'A desert story',
+            poster_path: '/poster.jpg',
+            backdrop_path: '/backdrop.jpg',
+            release_date: '2024-02-27',
+            vote_average: 8.7,
+          },
+        ],
+        total_pages: 1,
+        total_results: 1,
+      }),
+      image: vi.fn((path: string | null, size: string) => path ? `${size}${path}` : null),
+    };
+    const service = new MoviesService(prisma as never, tmdb as never);
+
+    await expect(service.findTmdb({ page: 1 })).resolves.toEqual({
+      data: [{
+        tmdbId: 10,
+        title: 'Dune: Part Two',
+        description: 'A desert story',
+        posterUrl: 'w500/poster.jpg',
+        backdropUrl: 'w1280/backdrop.jpg',
+        releaseDate: '2024-02-27',
+        rating: 8.7,
+        imported: true,
+        importedMovieId: 'movie-1',
+      }],
+      meta: { page: 1, pageSize: 1, total: 1, totalPages: 1 },
+    });
+  });
+
+  it('returns an existing movie without importing it again', async () => {
+    const existing = {
+      id: 'movie-1',
+      tmdbId: 10,
+      title: 'Dune: Part Two',
+      description: null,
+      posterUrl: null,
+      backdropUrl: null,
+      duration: 120,
+      status: MovieStatus.DRAFT,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const prisma = {
+      movie: {
+        findUnique: vi.fn().mockResolvedValue(existing),
+        create: vi.fn(),
+      },
+    };
+    const tmdb = { movie: vi.fn() };
+    const service = new MoviesService(prisma as never, tmdb as never);
+
+    await expect(service.importTmdbMovie(10)).resolves.toMatchObject({
+      imported: false,
+      movie: { id: 'movie-1', tmdbId: 10 },
+    });
+    expect(tmdb.movie).not.toHaveBeenCalled();
+    expect(prisma.movie.create).not.toHaveBeenCalled();
+  });
+});

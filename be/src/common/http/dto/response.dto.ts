@@ -36,7 +36,12 @@ export class UserResponseDto {
   @ApiProperty({ enum: UserRole, example: UserRole.CUSTOMER })
   role!: UserRole;
 
-  @ApiPropertyOptional({ type: String, example: '2026-09-07T10:00:00.000Z', format: 'date-time', nullable: true })
+  @ApiPropertyOptional({
+    type: String,
+    example: '2026-09-07T10:00:00.000Z',
+    format: 'date-time',
+    nullable: true,
+  })
   createdAt?: string | null;
 }
 
@@ -55,11 +60,32 @@ export class MovieResponseDto {
   @ApiProperty({ example: 'clx-movie-id' })
   id!: string;
 
+  @ApiPropertyOptional({ type: Number, example: 693134, nullable: true })
+  tmdbId?: number | null;
+
   @ApiProperty({ example: 'Interstellar' })
   title!: string;
 
-  @ApiPropertyOptional({ type: String, example: 'A science fiction film.', nullable: true })
+  @ApiPropertyOptional({
+    type: String,
+    example: 'A science fiction film.',
+    nullable: true,
+  })
   description?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    example: 'https://cdn.example.com/posters/interstellar.jpg',
+    nullable: true,
+  })
+  posterUrl?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    example: 'https://cdn.example.com/backdrops/interstellar.jpg',
+    nullable: true,
+  })
+  backdropUrl?: string | null;
 
   @ApiProperty({ example: 169 })
   duration!: number;
@@ -200,10 +226,18 @@ export class ShowtimeSeatResponseDto {
   @ApiProperty({ example: '100000.00' })
   price!: string;
 
-  @ApiProperty({ enum: ShowtimeSeatStatus, example: ShowtimeSeatStatus.AVAILABLE })
+  @ApiProperty({
+    enum: ShowtimeSeatStatus,
+    example: ShowtimeSeatStatus.AVAILABLE,
+  })
   status!: ShowtimeSeatStatus;
 
-  @ApiPropertyOptional({ type: String, example: '2026-09-07T10:10:00.000Z', format: 'date-time', nullable: true })
+  @ApiPropertyOptional({
+    type: String,
+    example: '2026-09-07T10:10:00.000Z',
+    format: 'date-time',
+    nullable: true,
+  })
   heldUntil?: string | null;
 
   @ApiProperty({ example: 'clx-showtime-id' })
@@ -234,6 +268,15 @@ export class ShowtimeResponseDto {
 
   @ApiProperty({ example: 'clx-room-id' })
   roomId!: string;
+
+  @ApiPropertyOptional({ type: String, example: '100000.00', nullable: true })
+  basePrice?: string | null;
+
+  @ApiPropertyOptional({ type: String, example: '1.50', nullable: true })
+  vipMultiplier?: string | null;
+
+  @ApiPropertyOptional({ type: String, example: '2.20', nullable: true })
+  coupleMultiplier?: string | null;
 
   @ApiProperty({ type: RoomResponseDto })
   room!: RoomResponseDto;
@@ -285,7 +328,11 @@ export class PaymentResponseDto {
   @ApiProperty({ example: 'MOCK' })
   provider!: string;
 
-  @ApiPropertyOptional({ type: String, example: 'MOCK-PAYMENT-001', nullable: true })
+  @ApiPropertyOptional({
+    type: String,
+    example: 'MOCK-PAYMENT-001',
+    nullable: true,
+  })
   reference?: string | null;
 
   @ApiProperty({ enum: PaymentStatus, example: PaymentStatus.SUCCEEDED })
@@ -320,7 +367,12 @@ export class TicketSummaryResponseDto {
   @ApiProperty({ example: 'clx-booking-item-id' })
   bookingItemId!: string;
 
-  @ApiPropertyOptional({ type: String, example: '2026-09-07T10:00:00.000Z', format: 'date-time', nullable: true })
+  @ApiPropertyOptional({
+    type: String,
+    example: '2026-09-07T10:00:00.000Z',
+    format: 'date-time',
+    nullable: true,
+  })
   usedAt?: string | null;
 
   @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })

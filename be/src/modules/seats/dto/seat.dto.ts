@@ -36,3 +36,22 @@ export class UpdateSeatDto {
   @IsEnum(SeatType)
   type?: SeatType;
 }
+
+export class BulkSeatLayoutItemDto {
+  @ApiProperty({ example: 'A' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(3)
+  row!: string;
+
+  @ApiProperty({ example: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  number!: number;
+
+  @ApiPropertyOptional({ enum: SeatType })
+  @IsOptional()
+  @IsEnum(SeatType)
+  type?: SeatType;
+}

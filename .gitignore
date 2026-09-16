@@ -3,7 +3,11 @@ dist/
 coverage/
 .env
 *.log
+.stitch-key
 .prisma/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# Playwright MCP runtime snapshots
+/.playwright-mcp/

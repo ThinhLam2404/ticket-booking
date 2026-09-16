@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUrl,
   Max,
   MaxLength,
   Min,
@@ -25,6 +26,26 @@ export class CreateMovieDto {
   @IsString()
   @MaxLength(5000)
   description?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    example: 'https://cdn.example.com/posters/interstellar.jpg',
+    format: 'uri',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_tld: false })
+  posterUrl?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    example: 'https://cdn.example.com/backdrops/interstellar.jpg',
+    format: 'uri',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_tld: false })
+  backdropUrl?: string | null;
 
   @ApiProperty({ example: 169, description: 'Duration in minutes' })
   @IsInt()

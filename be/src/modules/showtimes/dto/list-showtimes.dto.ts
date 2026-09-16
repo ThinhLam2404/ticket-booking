@@ -1,13 +1,16 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsDateString,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
   Max,
   Min,
 } from 'class-validator';
+import { MovieStatus } from '@prisma/client';
 
 export class ListShowtimesDto {
   @ApiPropertyOptional({ example: 'clx123movie' })
@@ -50,4 +53,26 @@ export class ListShowtimesDto {
   @Min(1)
   @Max(100)
   pageSize = 20;
+}
+
+export class ListAdminShowtimesDto extends ListShowtimesDto {
+  @ApiPropertyOptional({
+    type: Boolean,
+    default: true,
+    description: 'Include showtimes that have already started',
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  includePast = true;
+
+  @ApiPropertyOptional({
+    enum: MovieStatus,
+    description: 'Filter by the linked movie status',
+  })
+  @IsOptional()
+  @IsEnum(MovieStatus)
+  status?: MovieStatus;
 }
