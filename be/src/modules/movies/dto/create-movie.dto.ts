@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -46,6 +47,17 @@ export class CreateMovieDto {
   @IsOptional()
   @IsUrl({ protocols: ['http', 'https'], require_tld: false })
   backdropUrl?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    example: 'Way9Dexny3w',
+    nullable: true,
+    description: 'YouTube trailer video key',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{11}$/)
+  trailerKey?: string | null;
 
   @ApiProperty({ example: 169, description: 'Duration in minutes' })
   @IsInt()

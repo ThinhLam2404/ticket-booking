@@ -62,7 +62,12 @@ export class ShowtimesService {
         ...(!options.publishedOnly && query.status && { status: query.status }),
         ...(query.movieId && { id: query.movieId }),
       },
-      ...(query.cinemaId && { room: { cinemaId: query.cinemaId } }),
+      ...((query.cinemaId || query.provinceCode) && {
+        room: {
+          ...(query.cinemaId && { cinemaId: query.cinemaId }),
+          ...(query.provinceCode && { cinema: { provinceCode: query.provinceCode } }),
+        },
+      }),
     };
 
     if (to && to <= from) {

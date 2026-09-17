@@ -8,19 +8,25 @@ import { isUniqueConstraintError } from '../../common/database/prisma-errors.js'
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { CreateCinemaDto, UpdateCinemaDto } from './dto/cinema.dto.js';
+import { ListCinemasDto } from './dto/list-cinemas.dto.js';
+import { PROVINCES } from '../locations/provinces.js';
 
 @Injectable()
 export class CinemasService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(query: ListCinemasDto = {}) {
     const cinemas = await this.prisma.cinema.findMany({
+      where: query.provinceCode ? { provinceCode: query.provinceCode } : undefined,
       include: {
         _count: { select: { rooms: true } },
       },
       orderBy: { name: 'asc' },
     });
-    return toPublicResponse(cinemas);
+    return toPublicResponse(cinemas.map((cinema) => ({
+      ...cinema,
+      province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
+    })));
   }
 
   async findOne(id: string) {
@@ -40,7 +46,10 @@ export class CinemasService {
       throw new NotFoundException('Cinema not found');
     }
 
-    return toPublicResponse(cinema);
+    return toPublicResponse({
+      ...cinema,
+      province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
+    });
   }
 
   async create(dto: CreateCinemaDto) {
@@ -49,9 +58,13 @@ export class CinemasService {
         data: {
           name: dto.name.trim(),
           address: dto.address.trim(),
+          provinceCode: dto.provinceCode,
         },
       });
-      return toPublicResponse(cinema);
+      return toPublicResponse({
+        ...cinema,
+        province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
+      });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         throw new ConflictException('Cinema already exists');
@@ -68,9 +81,13 @@ export class CinemasService {
       data: {
         ...(dto.name !== undefined && { name: dto.name.trim() }),
         ...(dto.address !== undefined && { address: dto.address.trim() }),
+        ...(dto.provinceCode !== undefined && { provinceCode: dto.provinceCode }),
       },
     });
-    return toPublicResponse(cinema);
+    return toPublicResponse({
+      ...cinema,
+      province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
+    });
   }
 
   async remove(id: string) {
@@ -78,7 +95,10 @@ export class CinemasService {
 
     try {
       const cinema = await this.prisma.cinema.delete({ where: { id } });
-      return toPublicResponse(cinema);
+      return toPublicResponse({
+        ...cinema,
+        province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
+      });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&

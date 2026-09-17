@@ -20,7 +20,7 @@ const bookingFilters = [['ALL', 'Tất cả'], ['PENDING', 'Đang chờ'], ['CON
 export function BookingsPage() {
   const [filter, setFilter] = useState<(typeof bookingFilters)[number][0]>('ALL');
   const [search, setSearch] = useState('');
-  const query = useQuery({ queryKey: ['bookings'], queryFn: api.bookings });
+  const query = useQuery({ queryKey: ['bookings'], queryFn: ({ signal }) => api.bookings(signal) });
   const bookings = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (query.data ?? []).filter((booking) => {
@@ -46,7 +46,7 @@ const ticketFilters = [['ALL', 'Tất cả vé'], ['ACTIVE', 'Sắp chiếu'], [
 export function TicketsPage() {
   const [filter, setFilter] = useState<(typeof ticketFilters)[number][0]>('ALL');
   const [search, setSearch] = useState('');
-  const query = useQuery({ queryKey: ['tickets'], queryFn: api.tickets });
+  const query = useQuery({ queryKey: ['tickets'], queryFn: ({ signal }) => api.tickets(signal) });
   const tickets = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (query.data ?? []).filter((ticket) => {
@@ -71,7 +71,7 @@ export function TicketsPage() {
 export function TicketPage() {
   const { ticketId } = useParams();
   const [checkinOpen, setCheckinOpen] = useState(false);
-  const query = useQuery({ queryKey: ['ticket', ticketId], queryFn: () => api.ticket(ticketId!), enabled: Boolean(ticketId) });
+  const query = useQuery({ queryKey: ['ticket', ticketId], queryFn: ({ signal }) => api.ticket(ticketId!, signal), enabled: Boolean(ticketId) });
   const ticket = query.data;
   if (query.isPending) return <LoadingState label="Đang tải vé…" />;
   if (query.isError) return <ErrorState cause={query.error} fallback="Không thể tải vé." onRetry={() => void query.refetch()} />;

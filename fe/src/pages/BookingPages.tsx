@@ -26,8 +26,8 @@ export function SeatsPage() {
   const { user, openAuth } = useAuth();
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const holdKey = useRef(`hold-${crypto.randomUUID()}`);
-  const showtimeQuery = useQuery({ queryKey: ['showtime', showtimeId], queryFn: () => api.showtime(showtimeId!), enabled: Boolean(showtimeId) });
-  const seatsQuery = useQuery({ queryKey: ['showtime-seats', showtimeId], queryFn: () => api.showtimeSeats(showtimeId!), enabled: Boolean(showtimeId), refetchInterval: 10000 });
+  const showtimeQuery = useQuery({ queryKey: ['showtime', showtimeId], queryFn: ({ signal }) => api.showtime(showtimeId!, signal), enabled: Boolean(showtimeId) });
+  const seatsQuery = useQuery({ queryKey: ['showtime-seats', showtimeId], queryFn: ({ signal }) => api.showtimeSeats(showtimeId!, signal), enabled: Boolean(showtimeId), refetchInterval: 10000 });
   const holdMutation = useMutation({ mutationFn: () => api.hold(showtimeId!, selectedSeats, holdKey.current), onSuccess: (booking) => { queryClient.setQueryData(['booking', booking.id], booking); void queryClient.invalidateQueries({ queryKey: ['showtime-seats', showtimeId] }); navigate(`/bookings/${booking.id}`); }, onError: () => { void seatsQuery.refetch(); } });
 
   useEffect(() => { holdKey.current = `hold-${crypto.randomUUID()}`; setSelectedSeats([]); }, [showtimeId]);
@@ -51,7 +51,7 @@ export function BookingPage() {
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'momo' | 'vnpay' | 'zalopay' | 'card'>('momo');
-  const bookingQuery = useQuery({ queryKey: ['booking', bookingId], queryFn: () => api.booking(bookingId!), enabled: Boolean(bookingId), refetchInterval: (query) => query.state.data?.status === 'PENDING' ? 5000 : false });
+  const bookingQuery = useQuery({ queryKey: ['booking', bookingId], queryFn: ({ signal }) => api.booking(bookingId!, signal), enabled: Boolean(bookingId), refetchInterval: (query) => query.state.data?.status === 'PENDING' ? 5000 : false });
   const { refetch: refetchBooking } = bookingQuery;
   const booking = bookingQuery.data;
   const countdown = useCountdown(booking?.expiresAt);

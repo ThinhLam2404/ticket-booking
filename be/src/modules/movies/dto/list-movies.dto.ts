@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { PROVINCE_CODES } from '../../locations/provinces.js';
 import { MovieStatus } from '@prisma/client';
 
 export class ListMoviesDto {
@@ -11,6 +12,13 @@ export class ListMoviesDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ type: Number, example: 79, description: 'Filter by cinema province or city code' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsIn(PROVINCE_CODES)
+  provinceCode?: number;
 
   @ApiPropertyOptional({ type: Number, example: 1, default: 1, minimum: 1 })
   @IsOptional()

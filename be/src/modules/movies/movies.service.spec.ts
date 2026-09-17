@@ -1,5 +1,6 @@
 import { MovieStatus } from '@prisma/client';
 import { MoviesService } from './movies.service.js';
+import { TmdbClient } from './tmdb.client.js';
 
 describe('MoviesService TMDB import', () => {
   it('normalizes TMDB results and marks imported movies', async () => {
@@ -42,6 +43,50 @@ describe('MoviesService TMDB import', () => {
         importedMovieId: 'movie-1',
       }],
       meta: { page: 1, pageSize: 1, total: 1, totalPages: 1 },
+    });
+  });
+
+  it('imports the preferred official Vietnamese trailer key', async () => {
+    const prisma = {
+      movie: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({
+          id: 'movie-2',
+          tmdbId: 20,
+          title: 'Dune: Part Two',
+          description: null,
+          posterUrl: null,
+          backdropUrl: null,
+          trailerKey: 'vi-official',
+          duration: 166,
+          status: MovieStatus.DRAFT,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      },
+    };
+    const tmdb = {
+      movie: vi.fn().mockResolvedValue({
+        id: 20,
+        title: 'Dune: Part Two',
+        videos: {
+          results: [
+            { key: 'en-official', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'en' },
+            { key: 'vi-official', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'vi' },
+          ],
+        },
+      }),
+      image: vi.fn().mockReturnValue(null),
+      trailerKey: TmdbClient.prototype.trailerKey,
+    };
+    const service = new MoviesService(prisma as never, tmdb as never);
+
+    await expect(service.importTmdbMovie(20)).resolves.toMatchObject({
+      imported: true,
+      movie: { trailerKey: 'vi-official' },
+    });
+    expect(prisma.movie.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ trailerKey: 'vi-official' }),
     });
   });
 

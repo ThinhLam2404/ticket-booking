@@ -30,6 +30,8 @@ MVP hiện tại hỗ trợ:
 - Phân quyền `CUSTOMER` và `ADMIN`.
 - CRUD phim, rạp, phòng, ghế và suất chiếu.
 - Admin tìm kiếm và nhập phim từ TMDB vào catalog nội bộ.
+- Chọn tỉnh/thành để lọc rạp, phim và suất chiếu.
+- Xem trailer YouTube chính thức trong modal an toàn.
 - Xem sơ đồ ghế theo suất chiếu.
 - Giữ ghế tạm thời bằng Redis.
 - Tạo booking và tính tiền ở server.
@@ -183,8 +185,9 @@ Root điều phối cả hai ứng dụng bằng `package.json`; dependency và 
 | ----------- | --------------------------------------------------- |
 | `auth`      | Register, login, refresh, logout, JWT token service |
 | `users`     | Lấy thông tin user hiện tại                         |
-| `movies`    | Movie catalog, lifecycle và TMDB import cho Admin   |
-| `cinemas`   | Cụm rạp                                             |
+| `movies`    | Movie catalog, lifecycle, trailer và TMDB import cho Admin |
+| `cinemas`   | Cụm rạp và tỉnh/thành                                  |
+| `locations` | Reference data 34 tỉnh/thành Việt Nam                 |
 | `rooms`     | Phòng chiếu                                         |
 | `seats`     | Ghế vật lý trong phòng                              |
 | `showtimes` | Lịch chiếu và snapshot ghế theo lịch chiếu          |
@@ -203,26 +206,26 @@ Root điều phối cả hai ứng dụng bằng `package.json`; dependency và 
 
 ### 3.3. Frontend runtime
 
-Frontend là React SPA được build và serve bởi Vite. `fe/src/api.ts` là HTTP client dùng Fetch API, tự gắn Bearer access token, thử refresh một lần khi nhận `401`, rồi xóa session nếu refresh thất bại. Access token, refresh token và user hiện tại được giữ trong `sessionStorage`.
+Frontend là React SPA được build và serve bởi Vite. `fe/src/api.ts` là HTTP client dùng Fetch API, tự gắn Bearer access token, thử refresh một lần khi nhận `401`, hủy các query đọc dữ liệu cũ bằng `AbortSignal` khi điều hướng, filter hoặc location đổi liên tục, rồi xóa session nếu refresh thất bại. Access token, refresh token và user hiện tại được giữ trong `sessionStorage`.
 
 Admin UI có modal nhập phim từ TMDB trong màn quản lý phim. Modal gọi API backend, không gọi TMDB trực tiếp và không biết `TMDB_ACCESS_TOKEN`.
 
 Customer UI hiện có:
 
 - Catalog phim và tìm kiếm.
+- Bộ chọn tỉnh/thành dùng reference data nội bộ; popup được render ở `document.body`, khóa scroll nền khi mở và khôi phục focus/scroll khi đóng. Catalog debounce 120ms khi đổi khu vực liên tục và hủy request cũ bằng `AbortSignal`.
 - Chọn suất chiếu và sơ đồ ghế.
 - Hold tối đa 10 ghế bằng `Idempotency-Key`.
 - Checkout và mock payment success/failure.
 - Booking history và ticket history.
-- Login/register và logout.
+- Login/register và logout; nút logout dùng màu violet ở trạng thái thường và đỏ trầm khi hover.
 
 ### 3.4. Repository layout
 
 ```text
 .
 ├── package.json
-├── docs/
-│   └── SYSTEM_AND_API.md
+├── README.md
 ├── be/
 │   ├── package.json
 │   ├── docker-compose.yml
@@ -374,7 +377,8 @@ Nguồn: `be/prisma/schema.prisma`, model `User`.
 | `title`       | `String`      | REQ         | —                  | Tên phim                |
 | `description` | `String?`     | OPT         | —                  | Mô tả phim              |
 | `posterUrl`   | `String?`     | OPT         | —                  | URL poster phim         |
-| `backdropUrl` | `String?`     | OPT         | —                  | URL backdrop phim       |
+| `backdropUrl` | `String?`     | OPT         | —                  | URL backdrop phim         |
+| `trailerKey`  | `String?`     | OPT         | —                  | YouTube video key         |
 | `duration`    | `Int`         | REQ         | —                  | Thời lượng, đơn vị phút |
 | `status`      | `MovieStatus` | REQ         | `DRAFT`            | Lifecycle phim          |
 | `showtimes`   | `Showtime[]`  | Relation    | —                  | Các suất chiếu          |
@@ -383,14 +387,15 @@ Nguồn: `be/prisma/schema.prisma`, model `User`.
 
 ### 5.5. Bảng `Cinema`
 
-| Field       | Type       | Nullability | Default/constraint | Mô tả              |
-| ----------- | ---------- | ----------- | ------------------ | ------------------ |
-| `id`        | `String`   | REQ         | PK, `cuid()`       | ID rạp             |
-| `name`      | `String`   | REQ         | —                  | Tên rạp            |
-| `address`   | `String`   | REQ         | —                  | Địa chỉ            |
-| `rooms`     | `Room[]`   | Relation    | —                  | Các phòng chiếu    |
-| `createdAt` | `DateTime` | REQ         | `now()`            | Thời điểm tạo      |
-| `updatedAt` | `DateTime` | REQ         | `@updatedAt`       | Thời điểm cập nhật |
+| Field          | Type       | Nullability | Default/constraint | Mô tả                       |
+| -------------- | ---------- | ----------- | ------------------ | --------------------------- |
+| `id`           | `String`   | REQ         | PK, `cuid()`       | ID rạp                      |
+| `name`         | `String`   | REQ         | —                  | Tên rạp                     |
+| `address`      | `String`   | REQ         | —                  | Địa chỉ chi tiết            |
+| `provinceCode` | `Int`      | REQ         | default `79`, check 34 mã | Mã tỉnh/thành của rạp       |
+| `rooms`        | `Room[]`   | Relation    | —                  | Các phòng chiếu             |
+| `createdAt`    | `DateTime` | REQ         | `now()`            | Thời điểm tạo               |
+| `updatedAt`    | `DateTime` | REQ         | `@updatedAt`       | Thời điểm cập nhật           |
 
 Cinema hiện không có unique constraint trên `name` hoặc `address`.
 
@@ -826,6 +831,16 @@ Bổ sung liên kết phim nội bộ với TMDB:
 - Không backfill phim cũ vì phim seed/thủ công không có TMDB ID.
 - Phim import từ TMDB luôn được tạo với `status = DRAFT`.
 
+#### `20260916100000_location_and_trailers`
+
+Bổ sung location context và trailer cho catalog:
+
+- Thêm `Movie.trailerKey`, kiểu `String?`, chỉ lưu YouTube video key.
+- Thêm `Cinema.provinceCode`, backfill dữ liệu cũ về mã `79` (TP. Hồ Chí Minh).
+- Tạo index `Cinema_provinceCode_idx`.
+- Thêm check constraint giới hạn `provinceCode` trong 34 mã tỉnh/thành sau sáp nhập 07/2025.
+- Reference data 34 tỉnh/thành được phục vụ nội bộ qua `GET /api/v1/locations/provinces`.
+
 ### 6.2. Seed
 
 File: `be/prisma/seed.ts`.
@@ -842,6 +857,7 @@ Seed chạy idempotent bằng `upsert`:
 - Cinema:
   - ID `seed-cinema-central`.
   - `Central Cinema`, address `1 Example Street`.
+  - `provinceCode = 79` (Thành phố Hồ Chí Minh).
 - Room:
   - ID `seed-room-1`.
   - `Room 1`.
@@ -1137,7 +1153,17 @@ sequenceDiagram
 }
 ```
 
-### 8.5. Movies API
+### 8.5. Locations API
+
+#### `GET /api/v1/locations/provinces`
+
+- Auth: public.
+- Trả reference data nội bộ gồm đúng 34 tỉnh/thành Việt Nam theo cập nhật địa giới 07/2025.
+- Không gọi dịch vụ tỉnh/thành bên ngoài ở runtime.
+- Mỗi item gồm `code`, `name` và `codename`.
+- Frontend dùng danh sách này cho bộ chọn khu vực và lưu mã tỉnh đã chọn trong `localStorage`.
+
+### 8.6. Movies API
 
 #### `GET /api/v1/movies`
 
@@ -1149,6 +1175,7 @@ sequenceDiagram
 | ---------- | -------- | -------------- | --------------------------- |
 | `search`   | Không    | `interstellar` | Tìm title, case-insensitive |
 | `page`     | Không    | `1`            | Default `1`                 |
+| `provinceCode` | Không | `79` | Lọc phim có suất chiếu tương lai tại tỉnh/thành |
 | `pageSize` | Không    | `20`           | Default `20`, max `100`     |
 
 - Success: `200`.
@@ -1162,8 +1189,9 @@ sequenceDiagram
       "title": "Interstellar",
       "description": "A science fiction film.",
       "posterUrl": "https://cdn.example.com/posters/interstellar.jpg",
-      "backdropUrl": "https://cdn.example.com/backdrops/interstellar.jpg",
-      "duration": 169,
+       "backdropUrl": "https://cdn.example.com/backdrops/interstellar.jpg",
+       "trailerKey": null,
+       "duration": 169,
       "status": "PUBLISHED",
       "createdAt": "2026-09-07T10:00:00.000Z",
       "updatedAt": "2026-09-07T10:00:00.000Z"
@@ -1183,6 +1211,7 @@ sequenceDiagram
 - Auth: public.
 - Success: `200`.
 - Trả movie published và các showtime tương lai, include room/cinema.
+- Có thể truyền `provinceCode` để chỉ include showtime thuộc tỉnh/thành đã chọn.
 - Không tìm thấy: `404`.
 
 #### `POST /api/v1/movies`
@@ -1288,6 +1317,7 @@ sequenceDiagram
 | `overview`       | `description`           |
 | `poster_path`    | `posterUrl` với size `w500` |
 | `backdrop_path`  | `backdropUrl` với size `w1280` |
+| Video YouTube official `Trailer` | `trailerKey`; ưu tiên tiếng Việt, sau đó tiếng Anh |
 | `runtime`        | `duration`; fallback `120` phút nếu thiếu/không hợp lệ |
 | —                | `status = DRAFT`        |
 
@@ -1313,13 +1343,14 @@ sequenceDiagram
 - Phim mới nhập chưa xuất hiện trên public catalog. Admin phải cập nhật `status` thành `PUBLISHED`, sau đó tạo showtime thì customer mới có thể đặt vé.
 - Errors: `400`, `401`, `403`, `404` TMDB movie không tồn tại, `409` conflict, `502/504` TMDB connection, `503` cấu hình/rate limit.
 
-### 8.6. Cinemas API
+### 8.7. Cinemas API
 
 #### `GET /api/v1/cinemas`
 
 - Auth: public.
 - Success: `200`.
-- Trả cinema và `_count.rooms`.
+- Trả cinema, `provinceCode`, thông tin tỉnh/thành và `_count.rooms`.
+- Query `provinceCode` là optional; nếu có chỉ trả các rạp thuộc mã tỉnh/thành hợp lệ.
 
 #### `GET /api/v1/cinemas/:id`
 
@@ -1338,7 +1369,8 @@ sequenceDiagram
 ```json
 {
   "name": "CGV Landmark 81",
-  "address": "208 Nguyen Huu Canh, Ho Chi Minh City"
+  "address": "208 Nguyen Huu Canh, Ho Chi Minh City",
+  "provinceCode": 79
 }
 ```
 
@@ -1362,7 +1394,7 @@ sequenceDiagram
 - Success: `200` nếu xóa được.
 - Có thể `409`/database error nếu còn relation bị restrict.
 
-### 8.7. Rooms API
+### 8.8. Rooms API
 
 #### `GET /api/v1/rooms?cinemaId=:cinemaId`
 
@@ -1413,7 +1445,7 @@ sequenceDiagram
 - Role: `ADMIN`.
 - Success: `200` nếu không còn showtime phụ thuộc.
 
-### 8.8. Seats API
+### 8.9. Seats API
 
 #### `GET /api/v1/seats/room/:roomId`
 
@@ -1460,18 +1492,20 @@ sequenceDiagram
 - Role: `ADMIN`.
 - Success: `200` nếu seat chưa bị showtime sử dụng.
 
-### 8.9. Showtimes API
+### 8.10. Showtimes API
 
 #### `GET /api/v1/showtimes`
 
 - Auth: public.
 - Chỉ trả showtime tương lai của movie `PUBLISHED`.
+- Nếu truyền `provinceCode`, chỉ trả suất chiếu thuộc cinema trong tỉnh/thành đó.
 - Query:
 
 | Param      | Required | Ví dụ                      | Mô tả                   |
 | ---------- | -------- | -------------------------- | ----------------------- |
 | `movieId`  | Không    | `clx-movie-id`             | Lọc theo movie          |
 | `cinemaId` | Không    | `clx-cinema-id`            | Lọc theo cinema         |
+| `provinceCode` | Không | `79` | Lọc theo tỉnh/thành của cinema |
 | `from`     | Không    | `2026-10-01T00:00:00.000Z` | Mốc bắt đầu             |
 | `to`       | Không    | `2026-10-02T00:00:00.000Z` | Mốc kết thúc            |
 | `page`     | Không    | `1`                        | Default `1`             |
@@ -1557,7 +1591,7 @@ Rules:
 - Success: `200` nếu chưa có booking.
 - Nếu đã có booking: `409`.
 
-### 8.10. Bookings API
+### 8.11. Bookings API
 
 Tất cả route booking yêu cầu Bearer JWT và chỉ đọc/thay đổi booking của user hiện tại.
 
@@ -1645,7 +1679,7 @@ Errors: `400`, `401`, `404`, `409`, `503`.
   - Release Redis lock.
 - Errors: `401`, `404`, `409`.
 
-### 8.11. Payments API
+### 8.12. Payments API
 
 #### `POST /api/v1/payments/mock/:bookingId`
 
@@ -1728,7 +1762,7 @@ Response có dạng:
 }
 ```
 
-### 8.12. Tickets API
+### 8.13. Tickets API
 
 #### `GET /api/v1/tickets`
 
@@ -2274,6 +2308,8 @@ Các màn hình MVP:
 - Chưa có ticket check-in/consume.
 - Chưa có admin user management.
 - TMDB search/import hiện do Admin chủ động; chưa có scheduler tự động đồng bộ phim từ TMDB.
+- Province context mặc định mã `79` (Thành phố Hồ Chí Minh), được lưu ở frontend localStorage key `ticket_booking_province_code`.
+- Trailer chỉ lưu YouTube key; customer phát bằng `youtube-nocookie.com` trong modal, không nhận iframe tùy ý.
 - Booking list chưa pagination.
 - Response DTO và public response mapper đã được chuẩn hóa cho API contract hiện tại.
 - OpenAPI JSON và frontend declarations được sinh từ backend contract qua root scripts.

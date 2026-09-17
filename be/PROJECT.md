@@ -1,6 +1,6 @@
 # Movie Ticket Booking Backend
 
-Tài liệu hệ thống/API dùng chung nằm tại [`../docs/SYSTEM_AND_API.md`](../docs/SYSTEM_AND_API.md).
+Tài liệu hệ thống/API dùng chung nằm tại [`../README.md`](../README.md).
 
 ## Mục tiêu
 

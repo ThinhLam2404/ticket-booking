@@ -1,6 +1,6 @@
 # Movie Ticket Booking Backend
 
-Backend NestJS của hệ thống đặt vé phim. Tài liệu system/API dùng chung nằm tại [`../docs/SYSTEM_AND_API.md`](../docs/SYSTEM_AND_API.md).
+Backend NestJS của hệ thống đặt vé phim. Tài liệu system/API dùng chung nằm tại [`../README.md`](../README.md).
 
 ## Công nghệ
 

@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
+import { PROVINCE_CODES } from '../../locations/provinces.js';
 
 export class CreateCinemaDto {
   @ApiProperty({ example: 'CGV Landmark 81' })
@@ -13,6 +21,11 @@ export class CreateCinemaDto {
   @IsNotEmpty()
   @MaxLength(500)
   address!: string;
+
+  @ApiProperty({ example: 79, description: 'Vietnamese province or city code' })
+  @IsInt()
+  @IsIn(PROVINCE_CODES)
+  provinceCode!: number;
 }
 
 export class UpdateCinemaDto {
@@ -29,4 +42,10 @@ export class UpdateCinemaDto {
   @IsNotEmpty()
   @MaxLength(500)
   address?: string;
+
+  @ApiPropertyOptional({ example: 79, description: 'Vietnamese province or city code' })
+  @IsOptional()
+  @IsInt()
+  @IsIn(PROVINCE_CODES)
+  provinceCode?: number;
 }

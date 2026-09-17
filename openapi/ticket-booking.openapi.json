@@ -23,6 +23,30 @@
         ]
       }
     },
+    "/api/v1/locations/provinces": {
+      "get": {
+        "operationId": "Locations_listProvinces",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProvinceResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "locations"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "Health_liveness",
@@ -333,6 +357,16 @@
             }
           },
           {
+            "name": "provinceCode",
+            "required": false,
+            "in": "query",
+            "description": "Filter by cinema province or city code",
+            "schema": {
+              "example": 79,
+              "type": "number"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -469,6 +503,16 @@
             "schema": {
               "example": "interstellar",
               "type": "string"
+            }
+          },
+          {
+            "name": "provinceCode",
+            "required": false,
+            "in": "query",
+            "description": "Filter by cinema province or city code",
+            "schema": {
+              "example": 79,
+              "type": "number"
             }
           },
           {
@@ -774,6 +818,49 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search by movie title",
+            "schema": {
+              "example": "interstellar",
+              "type": "string"
+            }
+          },
+          {
+            "name": "provinceCode",
+            "required": false,
+            "in": "query",
+            "description": "Filter by cinema province or city code",
+            "schema": {
+              "example": 79,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -962,7 +1049,17 @@
     "/api/v1/cinemas": {
       "get": {
         "operationId": "Cinemas_findAll",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "provinceCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 79,
+              "type": "number"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -1997,6 +2094,16 @@
             }
           },
           {
+            "name": "provinceCode",
+            "required": false,
+            "in": "query",
+            "description": "Filter by cinema province or city code",
+            "schema": {
+              "example": 79,
+              "type": "number"
+            }
+          },
+          {
             "name": "from",
             "required": false,
             "in": "query",
@@ -2171,6 +2278,16 @@
             "schema": {
               "example": "clx123cinema",
               "type": "string"
+            }
+          },
+          {
+            "name": "provinceCode",
+            "required": false,
+            "in": "query",
+            "description": "Filter by cinema province or city code",
+            "schema": {
+              "example": 79,
+              "type": "number"
             }
           },
           {
@@ -3075,6 +3192,28 @@
       }
     },
     "schemas": {
+      "ProvinceResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "number",
+            "example": 79
+          },
+          "name": {
+            "type": "string",
+            "example": "Thành phố Hồ Chí Minh"
+          },
+          "codename": {
+            "type": "string",
+            "example": "ho_chi_minh"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "codename"
+        ]
+      },
       "HealthResponseDto": {
         "type": "object",
         "properties": {
@@ -3307,6 +3446,12 @@
             "example": "https://cdn.example.com/backdrops/interstellar.jpg",
             "nullable": true
           },
+          "trailerKey": {
+            "type": "string",
+            "example": "Way9Dexny3w",
+            "nullable": true,
+            "description": "YouTube trailer video key"
+          },
           "duration": {
             "type": "number",
             "example": 169
@@ -3513,6 +3658,19 @@
             "type": "string",
             "example": "1 Example Street"
           },
+          "provinceCode": {
+            "type": "number",
+            "example": 79
+          },
+          "province": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProvinceResponseDto"
+              }
+            ]
+          },
           "roomCount": {
             "type": "number",
             "example": 3
@@ -3532,6 +3690,7 @@
           "id",
           "name",
           "address",
+          "provinceCode",
           "createdAt",
           "updatedAt"
         ]
@@ -3701,6 +3860,12 @@
             "example": "https://cdn.example.com/backdrops/interstellar.jpg",
             "nullable": true
           },
+          "trailerKey": {
+            "type": "string",
+            "example": "Way9Dexny3w",
+            "nullable": true,
+            "description": "YouTube trailer video key"
+          },
           "duration": {
             "type": "number",
             "example": 169
@@ -3764,6 +3929,12 @@
             "format": "uri",
             "nullable": true
           },
+          "trailerKey": {
+            "type": "string",
+            "example": "Way9Dexny3w",
+            "nullable": true,
+            "description": "YouTube trailer video key"
+          },
           "duration": {
             "type": "number",
             "example": 169,
@@ -3806,6 +3977,12 @@
             "example": "https://cdn.example.com/backdrops/interstellar.jpg",
             "format": "uri",
             "nullable": true
+          },
+          "trailerKey": {
+            "type": "string",
+            "example": "Way9Dexny3w",
+            "nullable": true,
+            "description": "YouTube trailer video key"
           },
           "duration": {
             "type": "number",
@@ -3877,6 +4054,19 @@
             "type": "string",
             "example": "1 Example Street"
           },
+          "provinceCode": {
+            "type": "number",
+            "example": 79
+          },
+          "province": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProvinceResponseDto"
+              }
+            ]
+          },
           "roomCount": {
             "type": "number",
             "example": 3
@@ -3902,6 +4092,7 @@
           "id",
           "name",
           "address",
+          "provinceCode",
           "createdAt",
           "updatedAt",
           "rooms"
@@ -3917,11 +4108,17 @@
           "address": {
             "type": "string",
             "example": "208 Nguyen Huu Canh, Ho Chi Minh City"
+          },
+          "provinceCode": {
+            "type": "number",
+            "example": 79,
+            "description": "Vietnamese province or city code"
           }
         },
         "required": [
           "name",
-          "address"
+          "address",
+          "provinceCode"
         ]
       },
       "UpdateCinemaDto": {
@@ -3934,6 +4131,11 @@
           "address": {
             "type": "string",
             "example": "208 Nguyen Huu Canh, Ho Chi Minh City"
+          },
+          "provinceCode": {
+            "type": "number",
+            "example": 79,
+            "description": "Vietnamese province or city code"
           }
         }
       },

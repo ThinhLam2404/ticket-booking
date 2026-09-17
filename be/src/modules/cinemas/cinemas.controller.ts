@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -19,6 +20,7 @@ import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
 import { CreateCinemaDto, UpdateCinemaDto } from './dto/cinema.dto.js';
+import { ListCinemasDto } from './dto/list-cinemas.dto.js';
 import { CinemasService } from './cinemas.service.js';
 
 @ApiTags('cinemas')
@@ -28,8 +30,8 @@ export class CinemasController {
 
   @Get()
   @ApiResponse({ status: 200, type: CinemaResponseDto, isArray: true })
-  findAll() {
-    return this.cinemasService.findAll();
+  findAll(@Query() query: ListCinemasDto) {
+    return this.cinemasService.findAll(query);
   }
 
   @Get(':id')

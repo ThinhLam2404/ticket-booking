@@ -69,6 +69,7 @@ model Movie {
   description String?
   posterUrl   String?
   backdropUrl String?
+  trailerKey  String?
   duration    Int
   status      MovieStatus @default(DRAFT)
   showtimes   Showtime[]
@@ -77,10 +78,11 @@ model Movie {
 }
 
 model Cinema {
-  id        String   @id @default(cuid())
-  name      String
-  address   String
-  rooms     Room[]
+  id            String   @id @default(cuid())
+  name          String
+  address       String
+  provinceCode  Int      @default(79)
+  rooms         Room[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/provinces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Locations_listProvinces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -536,6 +552,14 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ProvinceResponseDto: {
+            /** @example 79 */
+            code: number;
+            /** @example Thành phố Hồ Chí Minh */
+            name: string;
+            /** @example ho_chi_minh */
+            codename: string;
+        };
         HealthResponseDto: {
             /**
              * @example ok
@@ -649,6 +673,11 @@ export interface components {
             posterUrl?: string | null;
             /** @example https://cdn.example.com/backdrops/interstellar.jpg */
             backdropUrl?: string | null;
+            /**
+             * @description YouTube trailer video key
+             * @example Way9Dexny3w
+             */
+            trailerKey?: string | null;
             /** @example 169 */
             duration: number;
             /**
@@ -727,6 +756,9 @@ export interface components {
             name: string;
             /** @example 1 Example Street */
             address: string;
+            /** @example 79 */
+            provinceCode: number;
+            province?: components["schemas"]["ProvinceResponseDto"] | null;
             /** @example 3 */
             roomCount?: number;
             /**
@@ -819,6 +851,11 @@ export interface components {
             posterUrl?: string | null;
             /** @example https://cdn.example.com/backdrops/interstellar.jpg */
             backdropUrl?: string | null;
+            /**
+             * @description YouTube trailer video key
+             * @example Way9Dexny3w
+             */
+            trailerKey?: string | null;
             /** @example 169 */
             duration: number;
             /**
@@ -854,6 +891,11 @@ export interface components {
              */
             backdropUrl?: string | null;
             /**
+             * @description YouTube trailer video key
+             * @example Way9Dexny3w
+             */
+            trailerKey?: string | null;
+            /**
              * @description Duration in minutes
              * @example 169
              */
@@ -879,6 +921,11 @@ export interface components {
              * @example https://cdn.example.com/backdrops/interstellar.jpg
              */
             backdropUrl?: string | null;
+            /**
+             * @description YouTube trailer video key
+             * @example Way9Dexny3w
+             */
+            trailerKey?: string | null;
             /**
              * @description Duration in minutes
              * @example 169
@@ -917,6 +964,9 @@ export interface components {
             name: string;
             /** @example 1 Example Street */
             address: string;
+            /** @example 79 */
+            provinceCode: number;
+            province?: components["schemas"]["ProvinceResponseDto"] | null;
             /** @example 3 */
             roomCount?: number;
             /**
@@ -936,12 +986,22 @@ export interface components {
             name: string;
             /** @example 208 Nguyen Huu Canh, Ho Chi Minh City */
             address: string;
+            /**
+             * @description Vietnamese province or city code
+             * @example 79
+             */
+            provinceCode: number;
         };
         UpdateCinemaDto: {
             /** @example CGV Landmark 81 */
             name?: string;
             /** @example 208 Nguyen Huu Canh, Ho Chi Minh City */
             address?: string;
+            /**
+             * @description Vietnamese province or city code
+             * @example 79
+             */
+            provinceCode?: number;
         };
         CreateRoomDto: {
             /** @example Room 1 */
@@ -1324,6 +1384,25 @@ export interface operations {
             };
         };
     };
+    Locations_listProvinces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvinceResponseDto"][];
+                };
+            };
+        };
+    };
     Health_liveness: {
         parameters: {
             query?: never;
@@ -1564,6 +1643,8 @@ export interface operations {
             query?: {
                 /** @description Search by movie title */
                 search?: string;
+                /** @description Filter by cinema province or city code */
+                provinceCode?: number;
                 page?: number;
                 pageSize?: number;
             };
@@ -1651,6 +1732,8 @@ export interface operations {
             query?: {
                 /** @description Search by movie title */
                 search?: string;
+                /** @description Filter by cinema province or city code */
+                provinceCode?: number;
                 page?: number;
                 pageSize?: number;
                 status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -1836,7 +1919,14 @@ export interface operations {
     };
     Movies_findOne: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Search by movie title */
+                search?: string;
+                /** @description Filter by cinema province or city code */
+                provinceCode?: number;
+                page?: number;
+                pageSize?: number;
+            };
             header?: never;
             path: {
                 id: string;
@@ -1975,7 +2065,9 @@ export interface operations {
     };
     Cinemas_findAll: {
         parameters: {
-            query?: never;
+            query?: {
+                provinceCode?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2691,6 +2783,8 @@ export interface operations {
             query?: {
                 movieId?: string;
                 cinemaId?: string;
+                /** @description Filter by cinema province or city code */
+                provinceCode?: number;
                 from?: string;
                 to?: string;
                 page?: number;
@@ -2788,6 +2882,8 @@ export interface operations {
             query?: {
                 movieId?: string;
                 cinemaId?: string;
+                /** @description Filter by cinema province or city code */
+                provinceCode?: number;
                 from?: string;
                 to?: string;
                 page?: number;

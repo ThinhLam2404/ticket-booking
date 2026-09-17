@@ -20,12 +20,14 @@ type RequestBody<Path extends keyof paths, Method extends keyof paths[Path]> =
     ? Body
     : never;
 
+export type Province = components['schemas']['ProvinceResponseDto'];
 export type User = components['schemas']['UserResponseDto'];
 export type AuthResponse = components['schemas']['AuthResponseDto'];
 export type Movie = components['schemas']['MovieResponseDto'];
 export type MovieDetails = components['schemas']['MovieDetailsResponseDto'];
 export type TmdbMovieResponse = components['schemas']['TmdbMovieResponseDto'];
 export type Cinema = components['schemas']['CinemaResponseDto'];
+export type ProvincesResponse = JsonResponse<'/api/v1/locations/provinces', 'get'>;
 export type Seat = components['schemas']['SeatResponseDto'];
 export type ShowtimeSeat = components['schemas']['ShowtimeSeatResponseDto'];
 export type Showtime = components['schemas']['ShowtimeResponseDto'];

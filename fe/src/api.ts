@@ -53,6 +53,7 @@ import type {
   ShowtimeMutationResponse,
   ShowtimeUpdateResponse,
   ShowtimeDeleteResponse,
+  ProvincesResponse,
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1';
@@ -202,20 +203,26 @@ export const api = {
     }
     clearAuth();
   },
-  movies(search = '') {
-    return request<MoviesResponse>(`/movies?page=1&pageSize=50${search ? `&search=${encodeURIComponent(search)}` : ''}`);
+  provinces(signal?: AbortSignal) {
+    return request<ProvincesResponse>('/locations/provinces', { signal });
   },
-  adminMovies(filters: AdminMoviesQuery = {}) {
+  movies(search = '', provinceCode?: number, signal?: AbortSignal) {
+    const params = new URLSearchParams({ page: '1', pageSize: '50' });
+    if (search) params.set('search', search);
+    if (provinceCode) params.set('provinceCode', String(provinceCode));
+    return request<MoviesResponse>(`/movies?${params.toString()}`, { signal });
+  },
+  adminMovies(filters: AdminMoviesQuery = {}, signal?: AbortSignal) {
     const params = new URLSearchParams({ page: '1', pageSize: '100' });
     for (const [key, value] of Object.entries(filters)) {
       if (value !== undefined && value !== '') params.set(key, String(value));
     }
-    return request<AdminMoviesResponse>(`/movies/admin?${params.toString()}`);
+    return request<AdminMoviesResponse>(`/movies/admin?${params.toString()}`, { signal });
   },
-  tmdbMovies(query: TmdbMoviesQuery = {}) {
+  tmdbMovies(query: TmdbMoviesQuery = {}, signal?: AbortSignal) {
     const params = new URLSearchParams({ page: String(query.page ?? 1) });
     if (query.search) params.set('search', query.search);
-    return request<TmdbMoviesResponse>(`/movies/admin/tmdb?${params.toString()}`);
+    return request<TmdbMoviesResponse>(`/movies/admin/tmdb?${params.toString()}`, { signal });
   },
   importTmdbMovie(tmdbId: number) {
     return request<TmdbMovieImportResponse>(`/movies/admin/tmdb/${tmdbId}/import`, { method: 'PUT' });
@@ -229,21 +236,23 @@ export const api = {
   archiveMovie(id: string) {
     return request<MovieUpdateResponse>(`/movies/${id}`, { method: 'DELETE' });
   },
-  movie(id: string) {
-    return request<MovieDetails>(`/movies/${id}`);
+  movie(id: string, provinceCode?: number, signal?: AbortSignal) {
+    const params = provinceCode ? `?provinceCode=${provinceCode}` : '';
+    return request<MovieDetails>(`/movies/${id}${params}`, { signal });
   },
-  showtimes(filters: { movieId?: string; cinemaId?: string; from?: string; to?: string } = {}) {
+  showtimes(filters: { movieId?: string; cinemaId?: string; provinceCode?: number; from?: string; to?: string } = {}, signal?: AbortSignal) {
     const params = new URLSearchParams({ page: '1', pageSize: '100' });
     for (const [key, value] of Object.entries(filters)) {
-      if (value) params.set(key, value);
+      if (value) params.set(key, String(value));
     }
-    return request<ShowtimesResponse>(`/showtimes?${params.toString()}`);
+    return request<ShowtimesResponse>(`/showtimes?${params.toString()}`, { signal });
   },
-  cinemas() {
-    return request<Cinema[]>('/cinemas');
+  cinemas(provinceCode?: number, signal?: AbortSignal) {
+    const params = provinceCode ? `?provinceCode=${provinceCode}` : '';
+    return request<Cinema[]>(`/cinemas${params}`, { signal });
   },
-  cinema(id: string) {
-    return request<CinemaDetails>(`/cinemas/${id}`);
+  cinema(id: string, signal?: AbortSignal) {
+    return request<CinemaDetails>(`/cinemas/${id}`, { signal });
   },
   createCinema(body: CreateCinemaRequest) {
     return request<CinemaMutationResponse>('/cinemas', { method: 'POST', body: JSON.stringify(body) });
@@ -254,11 +263,11 @@ export const api = {
   deleteCinema(id: string) {
     return request<CinemaDeleteResponse>(`/cinemas/${id}`, { method: 'DELETE' });
   },
-  rooms(cinemaId: string) {
-    return request<RoomsResponse>(`/rooms?cinemaId=${encodeURIComponent(cinemaId)}`);
+  rooms(cinemaId: string, signal?: AbortSignal) {
+    return request<RoomsResponse>(`/rooms?cinemaId=${encodeURIComponent(cinemaId)}`, { signal });
   },
-  room(id: string) {
-    return request<RoomResponse>(`/rooms/${id}`);
+  room(id: string, signal?: AbortSignal) {
+    return request<RoomResponse>(`/rooms/${id}`, { signal });
   },
   createRoom(body: CreateRoomRequest) {
     return request<RoomMutationResponse>('/rooms', { method: 'POST', body: JSON.stringify(body) });
@@ -269,8 +278,8 @@ export const api = {
   deleteRoom(id: string) {
     return request<RoomDeleteResponse>(`/rooms/${id}`, { method: 'DELETE' });
   },
-  seats(roomId: string) {
-    return request<SeatsResponse>(`/seats/room/${roomId}`);
+  seats(roomId: string, signal?: AbortSignal) {
+    return request<SeatsResponse>(`/seats/room/${roomId}`, { signal });
   },
   createSeat(roomId: string, body: CreateSeatRequest) {
     return request<SeatMutationResponse>(`/seats/${roomId}`, { method: 'POST', body: JSON.stringify(body) });
@@ -284,15 +293,15 @@ export const api = {
   replaceSeatLayout(roomId: string, body: BulkSeatLayoutRequest) {
     return request<SeatsResponse>(`/seats/room/${roomId}/layout`, { method: 'PUT', body: JSON.stringify(body) });
   },
-  adminShowtimes(filters: AdminShowtimesQuery = {}) {
+  adminShowtimes(filters: AdminShowtimesQuery = {}, signal?: AbortSignal) {
     const params = new URLSearchParams({ page: '1', pageSize: '100' });
     for (const [key, value] of Object.entries(filters)) {
       if (value !== undefined && value !== '') params.set(key, String(value));
     }
-    return request<AdminShowtimesResponse>(`/showtimes/admin?${params.toString()}`);
+    return request<AdminShowtimesResponse>(`/showtimes/admin?${params.toString()}`, { signal });
   },
-  adminShowtime(id: string) {
-    return request<ShowtimeResponse>(`/showtimes/${id}`);
+  adminShowtime(id: string, signal?: AbortSignal) {
+    return request<ShowtimeResponse>(`/showtimes/${id}`, { signal });
   },
   createShowtime(body: CreateShowtimeRequest) {
     return request<ShowtimeMutationResponse>('/showtimes', { method: 'POST', body: JSON.stringify(body) });
@@ -303,11 +312,11 @@ export const api = {
   deleteShowtime(id: string) {
     return request<ShowtimeDeleteResponse>(`/showtimes/${id}`, { method: 'DELETE' });
   },
-  showtime(id: string) {
-    return request<ShowtimeResponse>(`/showtimes/${id}`);
+  showtime(id: string, signal?: AbortSignal) {
+    return request<ShowtimeResponse>(`/showtimes/${id}`, { signal });
   },
-  showtimeSeats(id: string) {
-    return request<ShowtimeSeatsResponse>(`/showtimes/${id}/seats`);
+  showtimeSeats(id: string, signal?: AbortSignal) {
+    return request<ShowtimeSeatsResponse>(`/showtimes/${id}/seats`, { signal });
   },
   hold(showtimeId: string, showtimeSeatIds: string[], idempotencyKey = `hold-${crypto.randomUUID()}`) {
     const body: HoldRequest = { showtimeId, showtimeSeatIds };
@@ -317,8 +326,8 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
-  booking(id: string) {
-    return request<Booking>(`/bookings/${id}`);
+  booking(id: string, signal?: AbortSignal) {
+    return request<Booking>(`/bookings/${id}`, { signal });
   },
   checkout(bookingId: string) {
     return request<Payment>(`/bookings/${bookingId}/checkout`, { method: 'POST' });
@@ -331,16 +340,16 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
-  bookings() {
-    return request<Booking[]>('/bookings');
+  bookings(signal?: AbortSignal) {
+    return request<Booking[]>('/bookings', { signal });
   },
   cancelBooking(id: string) {
     return request<Booking>(`/bookings/${id}/cancel`, { method: 'POST' });
   },
-  ticket(id: string) {
-    return request<Ticket>(`/tickets/${id}`);
+  ticket(id: string, signal?: AbortSignal) {
+    return request<Ticket>(`/tickets/${id}`, { signal });
   },
-  tickets() {
-    return request<Ticket[]>('/tickets');
+  tickets(signal?: AbortSignal) {
+    return request<Ticket[]>('/tickets', { signal });
   },
 };

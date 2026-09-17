@@ -46,7 +46,7 @@ npm run check
 Canonical documentation nằm tại:
 
 ```text
-docs/SYSTEM_AND_API.md
+README.md
 ```
 
 Tài liệu root bao phủ repository layout, frontend runtime/API client, backend API contract, database, infrastructure, testing và root commands.
@@ -227,7 +227,7 @@ Nếu cần dừng các process app thủ công, dừng process Nest/Vite tươn
 - Docker Compose chỉ có PostgreSQL và Redis, không có API/frontend container.
 - Integration suite hiện chưa bao phủ showtime overlap, migration backfill và refresh token rotation concurrent.
 - Frontend chưa có component/integration test.
-- Tài liệu system/API canonical đã chuyển ra `docs/SYSTEM_AND_API.md` để dùng chung cho `be/` và `fe/`.
+- Tài liệu system/API canonical đã chuyển ra `README.md` để dùng chung cho `be/` và `fe/`.
 - Root `package.json` đã có command runner và API generation pipeline để chạy cả backend/frontend mà không cần đổi thư mục.
 - `package.json#prisma` seed config có warning deprecated khi nâng Prisma 7; hiện project dùng Prisma 6.19.3.
 - `npm ci` backend báo vulnerabilities từ dependency tree; cần xử lý riêng bằng `npm audit`.

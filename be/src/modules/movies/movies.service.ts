@@ -76,6 +76,7 @@ export class MoviesService {
       description: movie.overview?.trim() || null,
       posterUrl: this.tmdb.image(movie.poster_path, 'w500'),
       backdropUrl: this.tmdb.image(movie.backdrop_path, 'w1280'),
+      trailerKey: this.tmdb.trailerKey(movie.videos?.results),
       duration: movie.runtime && movie.runtime > 0 ? movie.runtime : 120,
       status: MovieStatus.DRAFT,
     };
@@ -108,6 +109,15 @@ export class MoviesService {
         ? { status: query.status }
         : {};
 
+    if (options.publishedOnly && query.provinceCode) {
+      where.showtimes = {
+        some: {
+          startsAt: { gte: new Date() },
+          room: { cinema: { provinceCode: query.provinceCode } },
+        },
+      };
+    }
+
     if (query.search?.trim()) {
       where.title = {
         contains: query.search.trim(),
@@ -136,12 +146,15 @@ export class MoviesService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, provinceCode?: number) {
     const movie = await this.prisma.movie.findFirst({
       where: { id, status: MovieStatus.PUBLISHED },
       include: {
         showtimes: {
-          where: { startsAt: { gte: new Date() } },
+          where: {
+            startsAt: { gte: new Date() },
+            ...(provinceCode && { room: { cinema: { provinceCode } } }),
+          },
           include: { room: { include: { cinema: true } } },
           orderBy: { startsAt: 'asc' },
         },
@@ -162,6 +175,7 @@ export class MoviesService {
         description: dto.description?.trim() ?? null,
         posterUrl: dto.posterUrl?.trim() ?? null,
         backdropUrl: dto.backdropUrl?.trim() ?? null,
+        trailerKey: dto.trailerKey?.trim() ?? null,
         duration: dto.duration,
         status: dto.status ?? MovieStatus.DRAFT,
       },
@@ -184,6 +198,9 @@ export class MoviesService {
         }),
         ...(dto.backdropUrl !== undefined && {
           backdropUrl: dto.backdropUrl?.trim() ?? null,
+        }),
+        ...(dto.trailerKey !== undefined && {
+          trailerKey: dto.trailerKey?.trim() ?? null,
         }),
         ...(dto.duration !== undefined && { duration: dto.duration }),
         ...(dto.status !== undefined && { status: dto.status }),

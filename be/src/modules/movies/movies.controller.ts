@@ -82,8 +82,8 @@ export class MoviesController {
   @Get(':id')
   @ApiResponse({ status: 200, type: MovieDetailsResponseDto })
   @ApiErrorResponses(404)
-  findOne(@Param('id') id: string) {
-    return this.moviesService.findOne(id);
+  findOne(@Param('id') id: string, @Query() query: ListMoviesDto) {
+    return this.moviesService.findOne(id, query.provinceCode);
   }
 
   @Post()

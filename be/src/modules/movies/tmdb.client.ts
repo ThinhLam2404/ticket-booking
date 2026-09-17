@@ -24,8 +24,20 @@ export type TmdbMovieList = {
   total_results: number;
 };
 
+export type TmdbVideo = {
+  key: string;
+  name?: string;
+  site?: string;
+  type?: string;
+  official?: boolean;
+  published_at?: string;
+  iso_639_1?: string | null;
+  iso_3166_1?: string | null;
+};
+
 export type TmdbMovieDetails = TmdbMovieListItem & {
   runtime?: number | null;
+  videos?: { results: TmdbVideo[] };
 };
 
 @Injectable()
@@ -48,8 +60,43 @@ export class TmdbClient {
   }
 
   async movie(id: number) {
-    const params = new URLSearchParams({ language: 'vi-VN' });
-    return this.requestWithLanguageFallback<TmdbMovieDetails>(`/movie/${id}`, params);
+    const params = new URLSearchParams({
+      append_to_response: 'videos',
+      include_video_language: 'vi-VN,en-US',
+      language: 'vi-VN',
+    });
+    return this.requestWithLanguageFallback<TmdbMovieDetails>(
+      `/movie/${id}`,
+      params,
+    );
+  }
+
+  trailerKey(videos: TmdbVideo[] | undefined) {
+    //NOTE - filter chỉ giữ video yt
+    const candidates = (videos ?? []).filter(
+      (video) => video.site === 'YouTube' && video.key,
+    );
+    //NOTE - xếp hạng ngôn ngữ: càng nhỏ thì ưu tiên càng cao
+    const languageRank = (video: TmdbVideo) =>
+      video.iso_639_1 === 'vi' || video.iso_3166_1 === 'VN'
+        ? 0
+        : video.iso_639_1 === 'en' || video.iso_3166_1 === 'US'
+          ? 1
+          : 2;
+    //NOTE - sắp xếp theo ưu tiên và lấy cái ưu tiên cao nhất
+    const pick = (items: TmdbVideo[]) =>
+      items.sort((a, b) => languageRank(a) - languageRank(b))[0]?.key ?? null;
+    const officialTrailer = pick(
+      candidates.filter(
+        (video) => video.type === 'Trailer' && video.official === true,
+      ),
+    );
+    if (officialTrailer) return officialTrailer;
+    const trailer = pick(
+      candidates.filter((video) => video.type === 'Trailer'),
+    );
+    if (trailer) return trailer;
+    return pick(candidates.filter((video) => video.type === 'Teaser'));
   }
 
   image(path: string | null | undefined, size: 'w500' | 'w1280') {
@@ -78,7 +125,9 @@ export class TmdbClient {
   private async request<T>(path: string, params: URLSearchParams): Promise<T> {
     const token = this.config.get<string>('TMDB_ACCESS_TOKEN')?.trim();
     if (!token) {
-      throw new ServiceUnavailableException('TMDB integration is not configured');
+      throw new ServiceUnavailableException(
+        'TMDB integration is not configured',
+      );
     }
 
     let response: Response | undefined;
@@ -101,7 +150,10 @@ export class TmdbClient {
       }
     }
     if (!response) {
-      if (lastError instanceof DOMException && lastError.name === 'TimeoutError') {
+      if (
+        lastError instanceof DOMException &&
+        lastError.name === 'TimeoutError'
+      ) {
         throw new GatewayTimeoutException('TMDB request timed out');
       }
       throw new BadGatewayException('TMDB connection failed');

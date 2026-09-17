@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ProvinceResponseDto } from '../../../modules/locations/dto/province.dto.js';
 import {
   BookingStatus,
   MovieStatus,
@@ -87,6 +88,14 @@ export class MovieResponseDto {
   })
   backdropUrl?: string | null;
 
+  @ApiPropertyOptional({
+    type: String,
+    example: 'Way9Dexny3w',
+    nullable: true,
+    description: 'YouTube trailer video key',
+  })
+  trailerKey?: string | null;
+
   @ApiProperty({ example: 169 })
   duration!: number;
 
@@ -160,6 +169,15 @@ export class CinemaResponseDto {
 
   @ApiProperty({ example: '1 Example Street' })
   address!: string;
+
+  @ApiProperty({ example: 79 })
+  provinceCode!: number;
+
+  @ApiPropertyOptional({
+    type: () => ProvinceResponseDto,
+    nullable: true,
+  })
+  province?: ProvinceResponseDto | null;
 
   @ApiPropertyOptional({ example: 3 })
   roomCount?: number;

@@ -59,4 +59,4 @@ npm run typecheck
 npm run build
 ```
 
-Backend cần chạy trước và PostgreSQL/Redis cần sẵn sàng nếu muốn test flow booking thật. Tài liệu contract dùng chung nằm tại [`../docs/SYSTEM_AND_API.md`](../docs/SYSTEM_AND_API.md).
+Backend cần chạy trước và PostgreSQL/Redis cần sẵn sàng nếu muốn test flow booking thật. Tài liệu contract dùng chung nằm tại [`../README.md`](../README.md).

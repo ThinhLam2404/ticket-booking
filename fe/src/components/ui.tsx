@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
-import type { FormEvent, ReactNode } from 'react';
+import type { FormEvent, ReactNode, RefObject } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { useLocationContext } from '../auth/LocationContext';
 import type { User } from '../types';
 import { errorMessage, statusLabel } from '../utils/format';
 
@@ -19,6 +21,112 @@ export function EmptyState({ children }: { children: ReactNode }) {
 
 export function StatusBadge({ status }: { status: string }) {
   return <span className={`status ${status.toLowerCase()}`}>{statusLabel(status)}</span>;
+}
+
+function provinceShortName(name?: string) {
+  return name?.replace(/^Thành phố /, 'TP. ').replace(/^Tỉnh /, '') ?? 'Đang chọn';
+}
+
+function useDialogFocus(open: boolean, dialogRef: RefObject<HTMLElement | null>, onClose: () => void, initialFocusRef?: RefObject<HTMLElement | null>) {
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusInitial = initialFocusRef?.current ?? dialog?.querySelector<HTMLElement>(focusableSelector);
+    focusInitial?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(focusableSelector)].filter((element) => !element.hasAttribute('aria-hidden'));
+      if (!focusable.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [dialogRef, initialFocusRef, open]);
+}
+
+export function LocationPicker({ className = '' }: { className?: string }) {
+  const { provinces, selectedProvince, selectedProvinceCode, setSelectedProvinceCode, isPending, isError, refetch } = useLocationContext();
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dialogRef = useRef<HTMLElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const filteredProvinces = provinces.filter((province) => province.name.toLowerCase().includes(search.trim().toLowerCase()));
+  useDialogFocus(open, dialogRef, () => setOpen(false), searchInput);
+
+  function chooseProvince(code: number) {
+    setSelectedProvinceCode(code);
+    setSearch('');
+    setOpen(false);
+  }
+
+  const picker = open ? <div className="location-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+    <section ref={dialogRef} className="location-picker" role="dialog" aria-modal="true" aria-labelledby="location-picker-title" tabIndex={-1}>
+      <button className="modal-close" type="button" aria-label="Đóng chọn tỉnh thành" onClick={() => setOpen(false)}>×</button>
+      <p className="eyebrow">KHU VỰC CINEBOOK</p>
+      <h2 id="location-picker-title">Bạn muốn xem phim ở đâu?</h2>
+      <p className="location-picker-copy">Chọn tỉnh/thành để lọc rạp và suất chiếu gần bạn.</p>
+      <label className="location-search"><span className="sr-only">Tìm tỉnh thành</span><span aria-hidden="true">⌕</span><input ref={searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tỉnh hoặc thành phố…" /></label>
+      {isPending && <LoadingState label="Đang tải danh sách tỉnh thành…" />}
+      {isError && <ErrorState cause={new Error('provinces')} fallback="Không thể tải danh sách tỉnh thành." onRetry={refetch} />}
+      {!isPending && !isError && !filteredProvinces.length && <EmptyState>Không tìm thấy tỉnh/thành phù hợp.</EmptyState>}
+      {!isPending && !isError && filteredProvinces.length > 0 && <div className="province-list" role="listbox" aria-label="Danh sách tỉnh thành">
+        {filteredProvinces.map((province) => <button className={`province-option${province.code === selectedProvinceCode ? ' active' : ''}`} type="button" role="option" aria-selected={province.code === selectedProvinceCode} key={province.code} onClick={() => chooseProvince(province.code)}><span><strong>{province.name}</strong><small>{province.code === selectedProvinceCode ? 'Khu vực đang chọn' : 'Lọc rạp và suất chiếu'}</small></span>{province.code === selectedProvinceCode && <b aria-hidden="true">✓</b>}</button>)}
+      </div>}
+      <div className="location-picker-footer"><span>Đã chọn: <strong>{selectedProvince?.name ?? 'TP. Hồ Chí Minh'}</strong></span><button className="secondary compact-button" type="button" onClick={() => setOpen(false)}>Đóng</button></div>
+    </section>
+  </div> : null;
+
+  return <>
+    <button className={`location-pill ${className}`} type="button" aria-expanded={open} onClick={() => setOpen(true)}>
+      <span aria-hidden="true">⌖</span><span>{provinceShortName(selectedProvince?.name)}</span><span className="location-chevron" aria-hidden="true" />
+    </button>
+    {picker && createPortal(picker, document.body)}
+  </>;
+}
+
+export function TrailerModal({ movieTitle, trailerKey, onClose }: { movieTitle: string; trailerKey: string; onClose: () => void }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(true, dialogRef, onClose);
+
+  return <div className="trailer-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section ref={dialogRef} className="trailer-modal" role="dialog" aria-modal="true" aria-labelledby="trailer-modal-title" tabIndex={-1}>
+      <div className="trailer-modal-heading"><div><p className="eyebrow">TRAILER CHÍNH THỨC</p><h2 id="trailer-modal-title">{movieTitle}</h2></div><button className="modal-close" type="button" aria-label="Đóng trailer" onClick={onClose}>×</button></div>
+      <div className="trailer-frame"><iframe title={`Trailer ${movieTitle}`} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerKey)}?autoplay=1&rel=0`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div>
+      <div className="trailer-modal-footer"><span>Nhấn ESC hoặc chọn đóng để quay lại trang phim.</span><button className="secondary compact-button" type="button" onClick={onClose}>Đóng</button></div>
+    </section>
+  </div>;
 }
 
 export function Alert({ type, children, onClose }: { type: 'success' | 'error'; children: ReactNode; onClose?: () => void }) {
@@ -69,7 +177,7 @@ export function Layout() {
           {user && <Link className={navClass(location.pathname, '/tickets')} to="/tickets">Vé của tôi</Link>}
         </nav>
         <div className="topbar-actions">
-          <button className="location-pill" type="button"><span>⌖</span><span>TP. Hồ Chí Minh</span><span>⌄</span></button>
+          <LocationPicker />
           <Link className="search-button" aria-label="Tìm kiếm phim" to="/#now-showing">⌕</Link>
           {user ? <div className="account-menu"><span className="account-avatar">{user.fullName.slice(0, 2).toUpperCase()}</span><span className="account-name">{user.fullName}</span><button className="ghost" disabled={loggingOut} onClick={() => void handleLogout()}>{loggingOut ? 'Đang thoát…' : 'Đăng xuất'}</button></div> : <button className="primary login-button" onClick={() => openAuth()}>Đăng nhập</button>}
         </div>

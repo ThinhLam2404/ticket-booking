@@ -104,7 +104,7 @@ export async function createFixture(app: INestApplication): Promise<IntegrationF
     },
   });
   const cinema = await adminPrisma.cinema.create({
-    data: { name: `Integration Cinema ${suffix}`, address: 'Test address' },
+    data: { name: `Integration Cinema ${suffix}`, address: 'Test address', provinceCode: 79 },
   });
   const room = await adminPrisma.room.create({
     data: { name: `Integration Room ${suffix}`, cinemaId: cinema.id },

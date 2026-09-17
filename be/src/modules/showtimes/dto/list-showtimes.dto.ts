@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -11,6 +12,7 @@ import {
   Min,
 } from 'class-validator';
 import { MovieStatus } from '@prisma/client';
+import { PROVINCE_CODES } from '../../locations/provinces.js';
 
 export class ListShowtimesDto {
   @ApiPropertyOptional({ example: 'clx123movie' })
@@ -22,6 +24,13 @@ export class ListShowtimesDto {
   @IsOptional()
   @IsString()
   cinemaId?: string;
+
+  @ApiPropertyOptional({ type: Number, example: 79, description: 'Filter by cinema province or city code' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsIn(PROVINCE_CODES)
+  provinceCode?: number;
 
   @ApiPropertyOptional({
     example: '2026-10-01T00:00:00.000Z',

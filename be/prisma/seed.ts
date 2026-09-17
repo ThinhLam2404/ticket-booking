@@ -47,8 +47,8 @@ async function main() {
 
   await prisma.cinema.upsert({
     where: { id: cinemaId },
-    update: { name: 'Central Cinema', address: '1 Example Street' },
-    create: { id: cinemaId, name: 'Central Cinema', address: '1 Example Street' },
+    update: { name: 'Central Cinema', address: '1 Example Street', provinceCode: 79 },
+    create: { id: cinemaId, name: 'Central Cinema', address: '1 Example Street', provinceCode: 79 },
   });
 
   await prisma.room.upsert({
