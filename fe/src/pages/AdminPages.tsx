@@ -333,13 +333,14 @@ function NumberField({
   label: string;
   value: number;
   min: number;
-  max: number;
+  max?: number;
   step?: number;
   onChange: (value: number) => void;
   wide?: boolean;
 }) {
   function update(nextValue: number) {
-    onChange(Math.min(max, Math.max(min, Number.isFinite(nextValue) ? nextValue : min)));
+    const validValue = Math.max(min, Number.isFinite(nextValue) ? nextValue : min);
+    onChange(max === undefined ? validValue : Math.min(max, validValue));
   }
 
   return (
@@ -349,8 +350,8 @@ function NumberField({
         <button type="button" aria-label={`Giảm ${label.toLowerCase()}`} disabled={value <= min} onClick={() => update(value - step)}>
           −
         </button>
-        <input type="number" min={min} max={max} step={step} value={value} onChange={(event) => update(Number(event.target.value))} />
-        <button type="button" aria-label={`Tăng ${label.toLowerCase()}`} disabled={value >= max} onClick={() => update(value + step)}>
+        <input aria-label={label} type="number" min={min} max={max} step={step} value={value} onChange={(event) => update(Number(event.target.value))} />
+        <button type="button" aria-label={`Tăng ${label.toLowerCase()}`} disabled={max !== undefined && value >= max} onClick={() => update(value + step)}>
           +
         </button>
       </div>
@@ -377,7 +378,7 @@ function CharacterTextarea({
     <label className="admin-field admin-field-wide">
       <span>{label}</span>
       <span className="textarea-shell">
-        <textarea required={required} maxLength={maxLength} value={value} onChange={(event) => onChange(event.target.value)} rows={rows} />
+        <textarea aria-label={label} required={required} maxLength={maxLength} value={value} onChange={(event) => onChange(event.target.value)} rows={rows} />
         <small>{value.length.toLocaleString("vi-VN")} / {maxLength.toLocaleString("vi-VN")} ký tự</small>
       </span>
     </label>
@@ -588,7 +589,7 @@ function TmdbMovieModal({
   const movies = query.data?.data ?? [];
 
   return (
-    <Modal eyebrow="THƯ VIỆN TMDB" title="Nhập phim từ TMDB" onClose={onClose}>
+    <Modal eyebrow="THƯ VIỆN TMDB" title="Nhập phim từ TMDB" onClose={onClose} className="tmdb-admin-modal">
       <div className="tmdb-modal">
         <p className="admin-copy">
           Tìm phim đang chiếu hoặc theo tên, sau đó nhập vào hệ thống dưới trạng
@@ -1999,9 +2000,9 @@ function ShowtimeForm({
               onChange={(event) => setEndsAt(event.target.value)}
             />
           </Field>
-          <NumberField label="Giá cơ bản" min={0} max={1000000} step={1000} value={basePrice} onChange={setBasePrice} />
-          <NumberField label="Hệ số VIP" min={0} max={10} step={0.01} value={vipMultiplier} onChange={setVipMultiplier} />
-          <NumberField label="Hệ số ghế đôi" min={0} max={10} step={0.01} value={coupleMultiplier} onChange={setCoupleMultiplier} />
+          <NumberField label="Giá cơ bản" min={0} step={1000} value={basePrice} onChange={setBasePrice} />
+          <NumberField label="Hệ số VIP" min={0} step={0.01} value={vipMultiplier} onChange={setVipMultiplier} />
+          <NumberField label="Hệ số ghế đôi" min={0} step={0.01} value={coupleMultiplier} onChange={setCoupleMultiplier} />
         </div>
         {roomsQuery.isError && (
           <p className="form-error">Không thể tải phòng chiếu của cụm rạp.</p>
