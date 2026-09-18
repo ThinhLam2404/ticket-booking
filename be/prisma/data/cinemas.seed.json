@@ -1,0 +1,360 @@
+{
+  "version": 1,
+  "defaultRoomLayout": {
+    "rows": 7,
+    "regularColumns": 9,
+    "coupleColumns": 10
+  },
+  "cinemas": [
+    {
+      "id": "cinema-cgv-thao-dien-pearl",
+      "name": "CGV Thảo Điền Pearl",
+      "address": "12 Quốc Hương, Thảo Điền, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-cgv-thao-dien-pearl-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-pham-van-dong",
+      "name": "CGV Phạm Văn Đồng",
+      "address": "234 Đường Phạm Văn Đồng, Bắc Từ Liêm, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-cgv-pham-van-dong-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-xuan-thuy",
+      "name": "CGV Xuân Thủy",
+      "address": "241 Đường Xuân Thủy, Cầu Giấy, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-cgv-xuan-thuy-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-bhd-star-me-tri",
+      "name": "BHD Star Mỹ Đình",
+      "address": "TTTM Garden, Đường Mễ Trì, Nam Từ Liêm, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-bhd-star-me-tri-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-bhd-star-discovery",
+      "name": "BHD Star Discovery Cầu Giấy",
+      "address": "302 Đường Cầu Giấy, Cầu Giấy, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-bhd-star-discovery-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-lotte-thang-long",
+      "name": "Lotte Cinema Thăng Long",
+      "address": "222 Đường Trần Duy Hưng, Cầu Giấy, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-lotte-thang-long-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-tran-duy-hung",
+      "name": "CGV Trần Duy Hưng",
+      "address": "119 Đường Trần Duy Hưng, Cầu Giấy, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-cgv-tran-duy-hung-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cinestar-binh-duong",
+      "name": "Cinestar Bình Dương",
+      "address": "Quảng Trường Sáng Tạo, Dĩ An, Bình Dương",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-cinestar-binh-duong-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cinestar-hue",
+      "name": "Cinestar Huế",
+      "address": "25 Hai Bà Trưng, Thành phố Huế",
+      "provinceCode": 46,
+      "rooms": [{ "id": "room-cinestar-hue-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-bhd-star-long-khanh",
+      "name": "BHD Star Long Khánh",
+      "address": "432 Hồ Thị Hương, Long Khánh, Đồng Nai",
+      "provinceCode": 75,
+      "rooms": [{ "id": "room-bhd-star-long-khanh-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-dabaco-que-vo",
+      "name": "Dabaco Cinema Quế Võ",
+      "address": "Đường Trần Hưng Đạo, Quế Võ, Bắc Ninh",
+      "provinceCode": 24,
+      "rooms": [{ "id": "room-dabaco-que-vo-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-lotte-bac-ninh",
+      "name": "Lotte Cinema Bắc Ninh",
+      "address": "Đường Lý Thái Tổ, Thành phố Bắc Ninh, Bắc Ninh",
+      "provinceCode": 24,
+      "rooms": [{ "id": "room-lotte-bac-ninh-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-beta-xuan-thuy",
+      "name": "Beta Cinemas Xuân Thủy",
+      "address": "122-124 Đường Xuân Thủy, Cầu Giấy, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-beta-xuan-thuy-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-le-do",
+      "name": "Rạp Lê Độ",
+      "address": "46 Trần Phú, Thành phố Đà Nẵng",
+      "provinceCode": 48,
+      "rooms": [{ "id": "room-le-do-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-dabaco-bac-ninh",
+      "name": "Dabaco Cinema Bắc Ninh",
+      "address": "Phố Tô Vĩnh Diện, Thành phố Bắc Ninh, Bắc Ninh",
+      "provinceCode": 24,
+      "rooms": [{ "id": "room-dabaco-bac-ninh-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-beta-bac-giang",
+      "name": "Beta Cinemas Bắc Giang",
+      "address": "Thành phố Bắc Giang, Bắc Ninh",
+      "provinceCode": 24,
+      "rooms": [{ "id": "room-beta-bac-giang-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-galaxy-nguyen-thai-hoc",
+      "name": "Galaxy CineX Nguyễn Thái Học",
+      "address": "175 Phố Nguyễn Thái Học, Đống Đa, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-galaxy-nguyen-thai-hoc-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-truong-dinh",
+      "name": "CGV Trương Định",
+      "address": "461 Đường Trương Định, Hoàng Mai, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-cgv-truong-dinh-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-nguyen-van-linh",
+      "name": "CGV Nguyễn Văn Linh",
+      "address": "101 Nguyễn Văn Linh, Quận 7, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-cgv-nguyen-van-linh-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-venus-hai-duong",
+      "name": "Venus Cinema",
+      "address": "64 Đường Nguyễn Văn Linh, Hải Dương",
+      "provinceCode": 24,
+      "rooms": [{ "id": "room-venus-hai-duong-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-ramestar",
+      "name": "RameStar",
+      "address": "72 Thanh Bình, Hải Dương",
+      "provinceCode": 31,
+      "rooms": [{ "id": "room-ramestar-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-galaxy-vinh-long",
+      "name": "Galaxy Cinema Vĩnh Long",
+      "address": "Sense City, Trần Quốc Tuấn, Vĩnh Long",
+      "provinceCode": 86,
+      "rooms": [{ "id": "room-galaxy-vinh-long-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-binh-tan",
+      "name": "CGV Bình Tân",
+      "address": "1 Đường số 17A, Bình Tân, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-cgv-binh-tan-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-hoang-mai",
+      "name": "CGV Hoàng Mai",
+      "address": "Hoàng Mai, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-cgv-hoang-mai-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-phu-yen",
+      "name": "CGV Vincom Plaza Phú Yên",
+      "address": "Vòng xoay Hùng Vương - Trần Phú, Tuy Hòa, Phú Yên",
+      "provinceCode": 66,
+      "rooms": [{ "id": "room-cgv-phu-yen-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-bhd-star-hue",
+      "name": "BHD Star Cineplex Huế",
+      "address": "50A Hùng Vương, Thành phố Huế",
+      "provinceCode": 46,
+      "rooms": [{ "id": "room-bhd-star-hue-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-trung-tam-chieu-phim-bac-ninh",
+      "name": "Trung tâm Chiếu phim Bắc Ninh",
+      "address": "83 Đường Nguyễn Du, Thành phố Bắc Ninh, Bắc Ninh",
+      "provinceCode": 24,
+      "rooms": [{ "id": "room-trung-tam-chieu-phim-bac-ninh-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-nguyen-van-linh-q7",
+      "name": "CGV Nguyễn Văn Linh Quận 7",
+      "address": "1058 Đường Nguyễn Văn Linh, Quận 7, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-cgv-nguyen-van-linh-q7-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-pasteur",
+      "name": "CGV Pasteur",
+      "address": "59-61 Đường Pasteur, Quận 1, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-cgv-pasteur-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-vincom-imperia",
+      "name": "CGV Vincom Imperia",
+      "address": "1 Bạch Đằng, Hải Phòng",
+      "provinceCode": 31,
+      "rooms": [{ "id": "room-cgv-vincom-imperia-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cgv-aeon-hai-phong",
+      "name": "CGV AEON Hải Phòng",
+      "address": "10 Võ Nguyên Giáp, Lê Chân, Hải Phòng",
+      "provinceCode": 31,
+      "rooms": [{ "id": "room-cgv-aeon-hai-phong-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-lotte-kosmo",
+      "name": "Lotte Cinema Kosmo",
+      "address": "161 Đường Xuân La, Bắc Từ Liêm, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-lotte-kosmo-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-nha-van-hoa-ngoc-khanh",
+      "name": "Nhà Văn hóa Điện ảnh Ngọc Khánh",
+      "address": "523 Phố Kim Mã, Ba Đình, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-nha-van-hoa-ngoc-khanh-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-galaxy-go-vap",
+      "name": "Galaxy Cinema Gò Vấp",
+      "address": "304A Đường Quang Trung, Gò Vấp, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-galaxy-go-vap-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-beta-tran-quang-khai",
+      "name": "Beta Cinemas Trần Quang Khải",
+      "address": "62 Trần Quang Khải, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-beta-tran-quang-khai-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-mega-gs-ly-chinh-thang",
+      "name": "Mega GS Lý Chính Thắng",
+      "address": "212 Đường Lý Chính Thắng, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-mega-gs-ly-chinh-thang-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-rap-thang-8",
+      "name": "Rạp Tháng 8",
+      "address": "45 Phố Hàng Bài, Hoàn Kiếm, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-rap-thang-8-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-rap-pho-hien",
+      "name": "Rạp Phố Hiến",
+      "address": "1 Đường Nguyễn Thiện Thuật, Hưng Yên",
+      "provinceCode": 33,
+      "rooms": [{ "id": "room-rap-pho-hien-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-rap-2-9",
+      "name": "Rạp 2-9",
+      "address": "9 Phố Lê Lai, Phú Thọ",
+      "provinceCode": 25,
+      "rooms": [{ "id": "room-rap-2-9-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-trung-tam-chieu-phim-quoc-gia",
+      "name": "Trung tâm Chiếu phim Quốc gia",
+      "address": "87 Phố Láng Hạ, Ba Đình, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-trung-tam-chieu-phim-quoc-gia-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-rap-thong-nhat",
+      "name": "Rạp chiếu bóng Thống Nhất",
+      "address": "22 Phố Lê Lợi, Hưng Yên",
+      "provinceCode": 33,
+      "rooms": [{ "id": "room-rap-thong-nhat-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-rap-dong-da",
+      "name": "Rạp Đống Đa",
+      "address": "890 Đường Trần Hưng Đạo, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-rap-dong-da-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-rap-kim-dong-buon-ma-thuot",
+      "name": "Rạp Kim Đồng Buôn Ma Thuột",
+      "address": "4 Hai Bà Trưng, Đắk Lắk",
+      "provinceCode": 66,
+      "rooms": [{ "id": "room-rap-kim-dong-buon-ma-thuot-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-rap-hung-dao-buon-ma-thuot",
+      "name": "Rạp Hưng Đạo Buôn Ma Thuột",
+      "address": "235 Lê Hồng Phong, Đắk Lắk",
+      "provinceCode": 66,
+      "rooms": [{ "id": "room-rap-hung-dao-buon-ma-thuot-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-viet-phu-vung-tau",
+      "name": "Việt Phú",
+      "address": "7 Lê Hồng Phong, Bà Rịa - Vũng Tàu",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-viet-phu-vung-tau-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-galaxy-tan-binh",
+      "name": "Galaxy Cinema Tân Bình",
+      "address": "Nguyễn Hồng Đào, Tân Bình, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-galaxy-tan-binh-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-rap-dinh-tuong",
+      "name": "Rạp Định Tường",
+      "address": "53 Trưng Trắc, Mỹ Tho, Tiền Giang",
+      "provinceCode": 82,
+      "rooms": [{ "id": "room-rap-dinh-tuong-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-cinestar-quoc-thanh",
+      "name": "Cinestar Quốc Thanh",
+      "address": "271 Đường Nguyễn Trãi, Thành phố Hồ Chí Minh",
+      "provinceCode": 79,
+      "rooms": [{ "id": "room-cinestar-quoc-thanh-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-starlight-bao-loc",
+      "name": "Starlight Bảo Lộc",
+      "address": "Hẻm 729 Trần Phú, Bảo Lộc, Lâm Đồng",
+      "provinceCode": 68,
+      "rooms": [{ "id": "room-starlight-bao-loc-01", "name": "Phòng 01" }]
+    },
+    {
+      "id": "cinema-rap-kim-dong-ha-noi",
+      "name": "Rạp Kim Đồng",
+      "address": "19 Phố Hàng Bài, Hoàn Kiếm, Hà Nội",
+      "provinceCode": 1,
+      "rooms": [{ "id": "room-rap-kim-dong-ha-noi-01", "name": "Phòng 01" }]
+    }
+  ]
+}

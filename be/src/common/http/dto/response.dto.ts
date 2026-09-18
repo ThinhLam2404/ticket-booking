@@ -290,10 +290,10 @@ export class ShowtimeResponseDto {
   @ApiPropertyOptional({ type: String, example: '100000.00', nullable: true })
   basePrice?: string | null;
 
-  @ApiPropertyOptional({ type: String, example: '1.50', nullable: true })
+  @ApiPropertyOptional({ type: String, example: '1.10', nullable: true })
   vipMultiplier?: string | null;
 
-  @ApiPropertyOptional({ type: String, example: '2.20', nullable: true })
+  @ApiPropertyOptional({ type: String, example: '1.20', nullable: true })
   coupleMultiplier?: string | null;
 
   @ApiProperty({ type: RoomResponseDto })

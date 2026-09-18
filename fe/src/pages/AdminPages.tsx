@@ -36,6 +36,7 @@ import type {
   UpdateShowtimeRequest,
 } from "../types";
 import { errorMessage, formatDate, formatTime, money } from "../utils/format";
+import { buildSeatLayout, isCompleteSeatLayout, validateSeatPreset } from "../utils/seat-layout";
 
 type FormMode = "create" | "edit";
 
@@ -47,6 +48,7 @@ type ConfirmState = {
 
 const movieStatuses: MovieStatus[] = ["DRAFT", "PUBLISHED", "ARCHIVED"];
 const seatTypes: SeatType[] = ["STANDARD", "VIP", "COUPLE"];
+const editableSeatTypes: SeatType[] = ["STANDARD", "VIP"];
 const emptySeats: Seat[] = [];
 
 function movieStatusText(status: MovieStatus) {
@@ -1531,7 +1533,7 @@ type SeatFormProps = {
 function SeatForm({ seat, loading, error, onSubmit, onCancel }: SeatFormProps) {
   const [row, setRow] = useState(seat?.row ?? "A");
   const [number, setNumber] = useState(seat?.number ?? 1);
-  const [type, setType] = useState<SeatType>(seat?.type ?? "STANDARD");
+  const [type, setType] = useState<SeatType>(seat?.type === "VIP" ? "VIP" : "STANDARD");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -1566,13 +1568,14 @@ function SeatForm({ seat, loading, error, onSubmit, onCancel }: SeatFormProps) {
               value={type}
               onChange={(event) => setType(event.target.value as SeatType)}
             >
-              {seatTypes.map((value) => (
+              {editableSeatTypes.map((value) => (
                 <option key={value} value={value}>
                   {seatTypeText(value)}
                 </option>
               ))}
             </select>
           </Field>
+          <p className="form-hint">Ghế đôi phải được tạo theo cặp bằng chức năng tạo nhanh sơ đồ.</p>
         </div>
         {error && <p className="form-error">{error}</p>}
         <FormActions
@@ -1592,8 +1595,8 @@ export function AdminSeatsPage() {
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [mutationError, setMutationError] = useState("");
   const [rows, setRows] = useState(6);
-  const [columns, setColumns] = useState(8);
-  const [layoutType, setLayoutType] = useState<SeatType>("STANDARD");
+  const [regularColumns, setRegularColumns] = useState(7);
+  const [coupleColumns, setCoupleColumns] = useState(8);
   const roomQuery = useQuery({
     queryKey: ["admin-room", roomId],
     queryFn: ({ signal }) => api.room(roomId!, signal),
@@ -1631,6 +1634,7 @@ export function AdminSeatsPage() {
     },
   });
   const seats = seatsQuery.data ?? emptySeats;
+  const completeLayout = isCompleteSeatLayout(seats);
   const groupedSeats = useMemo(
     () =>
       seats.reduce<Record<string, Seat[]>>((groups, seat) => {
@@ -1650,28 +1654,27 @@ export function AdminSeatsPage() {
   }
 
   function makeLayout() {
-    const layout: CreateSeatRequest[] = [];
-    for (let row = 0; row < rows; row += 1) {
-      for (let number = 1; number <= columns; number += 1) {
-        layout.push({
-          row: String.fromCharCode(65 + row),
-          number,
-          type: layoutType,
-        });
-      }
-    }
-    return layout;
+    return buildSeatLayout({ rows, regularColumns, coupleColumns });
   }
 
   function askLayout() {
+    const validationError = validateSeatPreset({ rows, regularColumns, coupleColumns });
+    if (validationError) {
+      setMutationError(validationError);
+      return;
+    }
     setConfirm({
       title: "Thay thế toàn bộ sơ đồ?",
-      message: `Sơ đồ mới gồm ${rows} hàng × ${columns} ghế và sẽ thay thế sơ đồ hiện tại.`,
+      message: `Sơ đồ gồm ${rows} hàng; ${regularColumns} ghế Standard/VIP và ${coupleColumns} ghế Couple ở hàng cuối.`,
       onConfirm: () => layoutMutation.mutate(makeLayout()),
     });
   }
 
   function askDelete(seat: Seat) {
+    if (completeLayout) {
+      setMutationError('Layout hoàn chỉnh chỉ được thay đổi bằng chức năng bulk layout.');
+      return;
+    }
     setConfirm({
       title: "Xóa ghế?",
       message: `Ghế ${seat.row}${seat.number} sẽ được xóa khỏi phòng chiếu.`,
@@ -1703,6 +1706,7 @@ export function AdminSeatsPage() {
         <button
           className="primary"
           type="button"
+          disabled={completeLayout}
           onClick={() => {
             setMutationError("");
             setEditing({
@@ -1734,27 +1738,14 @@ export function AdminSeatsPage() {
             <span>{seats.length} ghế hiện tại</span>
           </div>
           <div className="admin-form-grid">
-          <NumberField label="Số hàng" min={1} max={26} value={rows} onChange={setRows} />
-          <NumberField label="Ghế mỗi hàng" min={1} max={100} value={columns} onChange={setColumns} />
-            <Field label="Loại ghế">
-              <select
-                value={layoutType}
-                onChange={(event) =>
-                  setLayoutType(event.target.value as SeatType)
-                }
-              >
-                {seatTypes.map((value) => (
-                  <option key={value} value={value}>
-                    {seatTypeText(value)}
-                  </option>
-                ))}
-              </select>
-            </Field>
+             <NumberField label="Số hàng" min={5} max={26} value={rows} onChange={setRows} />
+             <NumberField label="Ghế Standard/VIP" min={1} max={100} value={regularColumns} onChange={setRegularColumns} />
+             <NumberField label="Ghế Couple (hàng cuối)" min={2} max={100} step={2} value={coupleColumns} onChange={setCoupleColumns} />
           </div>
           <button
             className="secondary"
             type="button"
-            disabled={layoutMutation.isPending || rows < 1 || columns < 1}
+            disabled={layoutMutation.isPending || rows < 5 || regularColumns < 1 || coupleColumns < 2 || coupleColumns % 2 !== 0}
             onClick={askLayout}
           >
             {layoutMutation.isPending ? "Đang cập nhật…" : "Thay thế sơ đồ"}
@@ -1796,6 +1787,7 @@ export function AdminSeatsPage() {
                           type="button"
                           key={seat.id}
                           onClick={() => {
+                            if (completeLayout || seat.type === "COUPLE") return;
                             setMutationError("");
                             setEditing(seat);
                           }}
@@ -1833,9 +1825,15 @@ export function AdminSeatsPage() {
             {seats.slice().sort((a, b) => `${a.row}${a.number}`.localeCompare(`${b.row}${b.number}`, undefined, { numeric: true })).map((seat) => (
               <div key={seat.id} className="admin-seat-action-row">
                 <span className={`admin-seat-token admin-seat-token-${seat.type.toLowerCase()}`}>{seat.row}{seat.number}</span>
-                <span className="admin-seat-action-copy"><strong>Ghế {seat.row}{seat.number}</strong><small>{seatTypeText(seat.type)}</small></span>
-                <button className="secondary compact-button" type="button" onClick={() => { setMutationError(""); setEditing(seat); }}>Sửa</button>
-                <button className="danger compact-button" type="button" disabled={deleteMutation.isPending} onClick={() => askDelete(seat)}>Xóa</button>
+                  <span className="admin-seat-action-copy"><strong>Ghế {seat.row}{seat.number}</strong><small>{seatTypeText(seat.type)}</small></span>
+                  {completeLayout || seat.type === "COUPLE" ? (
+                    <span className="admin-seat-managed">Theo layout</span>
+                  ) : (
+                    <>
+                      <button className="secondary compact-button" type="button" onClick={() => { setMutationError(""); setEditing(seat); }}>Sửa</button>
+                      <button className="danger compact-button" type="button" disabled={deleteMutation.isPending} onClick={() => askDelete(seat)}>Xóa</button>
+                    </>
+                  )}
               </div>
             ))}
           </div>
@@ -1876,7 +1874,7 @@ type ShowtimeFormProps = {
   loading: boolean;
   error?: string;
   onCancel: () => void;
-  onSubmit: (body: CreateShowtimeRequest) => Promise<void>;
+  onSubmit: (body: CreateShowtimeRequest | UpdateShowtimeRequest) => Promise<void>;
 };
 
 function localDateTime(value?: string) {
@@ -1898,15 +1896,19 @@ function ShowtimeForm({
   const [roomId, setRoomId] = useState(showtime?.roomId ?? "");
   const [startsAt, setStartsAt] = useState(localDateTime(showtime?.startsAt));
   const [endsAt, setEndsAt] = useState(localDateTime(showtime?.endsAt));
-  const [basePrice, setBasePrice] = useState(
-    Number(showtime?.basePrice ?? 100000),
-  );
-  const [vipMultiplier, setVipMultiplier] = useState(
-    showtime?.vipMultiplier ? Number(showtime.vipMultiplier) : 1.5,
-  );
-  const [coupleMultiplier, setCoupleMultiplier] = useState(
-    showtime?.coupleMultiplier ? Number(showtime.coupleMultiplier) : 2.2,
-  );
+  const initialPricing = {
+    basePrice: showtime?.basePrice != null ? Number(showtime.basePrice) : 100000,
+    vipMultiplier: showtime?.vipMultiplier != null ? Number(showtime.vipMultiplier) : 1.1,
+    coupleMultiplier: showtime?.coupleMultiplier != null ? Number(showtime.coupleMultiplier) : 1.2,
+  };
+  const [basePrice, setBasePrice] = useState(initialPricing.basePrice);
+  const [vipMultiplier, setVipMultiplier] = useState(initialPricing.vipMultiplier);
+  const [coupleMultiplier, setCoupleMultiplier] = useState(initialPricing.coupleMultiplier);
+  const [pricingTouched, setPricingTouched] = useState({
+    basePrice: false,
+    vipMultiplier: false,
+    coupleMultiplier: false,
+  });
   const roomsQuery = useQuery({
     queryKey: ["admin-showtime-rooms", cinemaId],
     queryFn: ({ signal }) => api.rooms(cinemaId, signal),
@@ -1915,14 +1917,26 @@ function ShowtimeForm({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (mode === "create") {
+      await onSubmit({
+        movieId,
+        roomId,
+        startsAt: new Date(startsAt).toISOString(),
+        endsAt: new Date(endsAt).toISOString(),
+        basePrice,
+        vipMultiplier,
+        coupleMultiplier,
+      });
+      return;
+    }
     await onSubmit({
       movieId,
       roomId,
       startsAt: new Date(startsAt).toISOString(),
       endsAt: new Date(endsAt).toISOString(),
-      basePrice,
-      vipMultiplier: vipMultiplier || undefined,
-      coupleMultiplier: coupleMultiplier || undefined,
+      ...(pricingTouched.basePrice && { basePrice }),
+      ...(pricingTouched.vipMultiplier && { vipMultiplier }),
+      ...(pricingTouched.coupleMultiplier && { coupleMultiplier }),
     });
   }
 
@@ -2000,9 +2014,9 @@ function ShowtimeForm({
               onChange={(event) => setEndsAt(event.target.value)}
             />
           </Field>
-          <NumberField label="Giá cơ bản" min={0} step={1000} value={basePrice} onChange={setBasePrice} />
-          <NumberField label="Hệ số VIP" min={0} step={0.01} value={vipMultiplier} onChange={setVipMultiplier} />
-          <NumberField label="Hệ số ghế đôi" min={0} step={0.01} value={coupleMultiplier} onChange={setCoupleMultiplier} />
+          <NumberField label="Giá cơ bản" min={0} step={1000} value={basePrice} onChange={(value) => { setBasePrice(value); setPricingTouched((current) => ({ ...current, basePrice: true })); }} />
+          <NumberField label="Hệ số VIP" min={0} step={0.01} value={vipMultiplier} onChange={(value) => { setVipMultiplier(value); setPricingTouched((current) => ({ ...current, vipMultiplier: true })); }} />
+          <NumberField label="Phụ phí ghế đôi trên giá VIP" min={0} step={0.01} value={coupleMultiplier} onChange={(value) => { setCoupleMultiplier(value); setPricingTouched((current) => ({ ...current, coupleMultiplier: true })); }} />
         </div>
         {roomsQuery.isError && (
           <p className="form-error">Không thể tải phòng chiếu của cụm rạp.</p>
@@ -2059,10 +2073,10 @@ export function AdminShowtimesPage() {
     enabled: Boolean(detailId),
   });
   const saveMutation = useMutation({
-    mutationFn: ({ id, body }: { id?: string; body: CreateShowtimeRequest }) =>
+    mutationFn: ({ id, body }: { id?: string; body: CreateShowtimeRequest | UpdateShowtimeRequest }) =>
       id
         ? api.updateShowtime(id, body as UpdateShowtimeRequest)
-        : api.createShowtime(body),
+        : api.createShowtime(body as CreateShowtimeRequest),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] });
       setModal(null);
@@ -2083,7 +2097,7 @@ export function AdminShowtimesPage() {
   const detail = detailQuery.data ?? modal?.showtime;
   const optionsPending = moviesQuery.isPending || cinemasQuery.isPending;
 
-  async function save(body: CreateShowtimeRequest) {
+  async function save(body: CreateShowtimeRequest | UpdateShowtimeRequest) {
     setMutationError("");
     try {
       await saveMutation.mutateAsync({ id: modal?.showtime?.id, body });

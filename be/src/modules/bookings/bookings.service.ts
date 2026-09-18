@@ -35,27 +35,10 @@ export class BookingsService {
     ) {
       throw new ConflictException('Idempotency-Key is too long');
     }
-    //NOTE ko trùng ghế
     const requestedSeatIds = [...new Set(dto.showtimeSeatIds)];
     if (!requestedSeatIds.length) {
       throw new ConflictException('At least one seat is required');
     }
-    const requestHash = this.createRequestHash(
-      dto.showtimeId,
-      requestedSeatIds,
-    );
-    //NOTE - tìm xem có booking cũ đã tạo trước đó không, nếu đã có thì k cần tạo lại
-    if (normalizedIdempotencyKey) {
-      const previousBooking = await this.findIdempotentBooking(
-        userId,
-        normalizedIdempotencyKey,
-        requestHash,
-      );
-      if (previousBooking) {
-        return toPublicResponse(previousBooking);
-      }
-    }
-    //NOTE - check phim đã mở chiếu/hết chiếu chưa
     const showtime = await this.prisma.showtime.findUnique({
       where: { id: dto.showtimeId },
       include: { movie: true },
@@ -67,23 +50,74 @@ export class BookingsService {
     if (showtime.startsAt <= new Date()) {
       throw new ConflictException('Showtime has already started');
     }
-    //NOTE - check ghế có tồn tại ko
+
     const seats = await this.prisma.showtimeSeat.findMany({
-      where: { id: { in: requestedSeatIds }, showtimeId: dto.showtimeId },
+      where: { showtimeId: dto.showtimeId },
       include: { seat: true },
     });
-    if (seats.length !== requestedSeatIds.length) {
-      throw new NotFoundException('One or more showtime seats were not found');
+    const seatsById = new Map(seats.map((seat) => [seat.id, seat]));
+    const seatsByCoordinate = new Map(
+      seats.map((seat) => [`${seat.seat.row}:${seat.seat.number}`, seat]),
+    );
+    const canonicalSeats = new Map<string, (typeof seats)[number]>();
+
+    for (const seatId of requestedSeatIds) {
+      const seat = seatsById.get(seatId);
+      if (!seat) {
+        throw new NotFoundException(
+          'One or more showtime seats were not found',
+        );
+      }
+      canonicalSeats.set(seat.id, seat);
+      //NOTE - nếu chọn ghế couple thì tự động chọn ghế gần kề
+      if (seat.seat.type === 'COUPLE') {
+        const partnerNumber =
+          seat.seat.number % 2 === 1
+            ? seat.seat.number + 1
+            : seat.seat.number - 1;
+        const partner = seatsByCoordinate.get(
+          `${seat.seat.row}:${partnerNumber}`,
+        );
+        if (!partner || partner.seat.type !== 'COUPLE') {
+          throw new ConflictException('Couple seat must have a valid partner');
+        }
+        canonicalSeats.set(partner.id, partner);
+      }
+    }
+    //NOTE - sắp xếp ghế theo thứ tự tăng dần
+    const canonicalSeatIds = [...canonicalSeats.values()]
+      .sort(
+        (left, right) =>
+          left.seat.row.localeCompare(right.seat.row) ||
+          left.seat.number - right.seat.number,
+      )
+      .map((seat) => seat.id);
+    //NOTE - maximum select 10 ghế
+    if (canonicalSeatIds.length > 10) {
+      throw new ConflictException('A maximum of 10 physical seats can be held');
+    }
+    const requestHash = this.createRequestHash(
+      dto.showtimeId,
+      canonicalSeatIds,
+    );
+    if (normalizedIdempotencyKey) {
+      const previousBooking = await this.findIdempotentBooking(
+        userId,
+        normalizedIdempotencyKey,
+        requestHash,
+      );
+      if (previousBooking) {
+        return toPublicResponse(previousBooking);
+      }
     }
 
     const holdToken = randomUUID();
     const acquiredSeatIds: string[] = [];
-
+    //NOTE - HOlD logic
     try {
-      for (const seat of seats) {
-        //NOTE - lock ghế 10p nếu chưa có ai đặt
+      for (const seatId of canonicalSeatIds) {
         const acquired = await this.redis.setIfAbsent(
-          this.seatLockKey(dto.showtimeId, seat.id),
+          this.seatLockKey(dto.showtimeId, seatId),
           holdToken,
           HOLD_TTL_SECONDS,
         );
@@ -101,7 +135,7 @@ export class BookingsService {
           }
           throw new ConflictException('One or more seats are being held');
         }
-        acquiredSeatIds.push(seat.id);
+        acquiredSeatIds.push(seatId);
       }
 
       const expiresAt = new Date(Date.now() + HOLD_TTL_SECONDS * 1000);
@@ -110,7 +144,7 @@ export class BookingsService {
         //NOTE - update trạng thái ghế held -> available nếu đã hết hạn
         await transaction.showtimeSeat.updateMany({
           where: {
-            id: { in: requestedSeatIds },
+            id: { in: canonicalSeatIds },
             status: ShowtimeSeatStatus.HELD,
             heldUntil: { lte: now },
           },
@@ -123,13 +157,13 @@ export class BookingsService {
         //NOTE - kiểm tra xem còn đủ ghế trống k
         const availableSeats = await transaction.showtimeSeat.findMany({
           where: {
-            id: { in: requestedSeatIds },
+            id: { in: canonicalSeatIds },
             showtimeId: dto.showtimeId,
             status: ShowtimeSeatStatus.AVAILABLE,
           },
           include: { seat: true },
         });
-        if (availableSeats.length !== requestedSeatIds.length) {
+        if (availableSeats.length !== canonicalSeatIds.length) {
           throw new ConflictException(
             'One or more seats are no longer available',
           );
@@ -161,7 +195,7 @@ export class BookingsService {
         //NOTE - update hold
         const claimedSeats = await transaction.showtimeSeat.updateMany({
           where: {
-            id: { in: requestedSeatIds },
+            id: { in: canonicalSeatIds },
             status: ShowtimeSeatStatus.AVAILABLE,
           },
           data: {
@@ -170,7 +204,7 @@ export class BookingsService {
             heldByBookingId: createdBooking.id,
           },
         });
-        if (claimedSeats.count !== requestedSeatIds.length) {
+        if (claimedSeats.count !== canonicalSeatIds.length) {
           throw new ConflictException(
             'One or more seats are no longer available',
           );

@@ -1074,9 +1074,9 @@ export interface components {
             roomId: string;
             /** @example 100000.00 */
             basePrice?: string | null;
-            /** @example 1.50 */
+            /** @example 1.10 */
             vipMultiplier?: string | null;
-            /** @example 2.20 */
+            /** @example 1.20 */
             coupleMultiplier?: string | null;
             room: components["schemas"]["RoomResponseDto"];
             showtimeSeats?: components["schemas"]["ShowtimeSeatResponseDto"][];
@@ -1125,13 +1125,13 @@ export interface components {
              */
             basePrice: number;
             /**
-             * @description VIP price multiplier
-             * @example 1.5
+             * @description VIP price multiplier, defaults to 1.1
+             * @example 1.1
              */
             vipMultiplier?: number;
             /**
-             * @description Couple seat price multiplier
-             * @example 2
+             * @description Couple seat price multiplier applied after the VIP multiplier, defaults to 1.2
+             * @example 1.2
              */
             coupleMultiplier?: number;
         };
@@ -1150,13 +1150,13 @@ export interface components {
              */
             basePrice?: number;
             /**
-             * @description VIP price multiplier
-             * @example 1.5
+             * @description VIP price multiplier, defaults to 1.1
+             * @example 1.1
              */
             vipMultiplier?: number;
             /**
-             * @description Couple seat price multiplier
-             * @example 2
+             * @description Couple seat price multiplier applied after the VIP multiplier, defaults to 1.2
+             * @example 1.2
              */
             coupleMultiplier?: number;
         };

@@ -1,2 +1,2 @@
 -- DropIndex
-DROP INDEX "Cinema_provinceCode_idx";
+DROP INDEX IF EXISTS "Cinema_provinceCode_idx";

@@ -854,24 +854,22 @@ Seed chạy idempotent bằng `upsert`:
 - Movie:
   - ID `seed-movie-interstellar`.
   - `Interstellar`, duration `169`, status `PUBLISHED`.
-- Cinema:
-  - ID `seed-cinema-central`.
-  - `Central Cinema`, address `1 Example Street`.
-  - `provinceCode = 79` (Thành phố Hồ Chí Minh).
-- Room:
-  - ID `seed-room-1`.
-  - `Room 1`.
-- Seats:
-  - Rows `A`, `B`, `C`, `D`.
-  - Mỗi row 8 ghế, tổng 32 ghế.
-  - Rows A/B/C là `STANDARD`, row D là `VIP`.
+- Cinema, room và layout ghế:
+  - Đọc từ `be/prisma/data/cinemas.seed.json`.
+  - File hiện chứa 50 cinema và mỗi cinema có một room mặc định.
+  - Cinema chỉ lưu `id`, `name`, `address`, `provinceCode`.
+  - Layout tạo 3 hàng đầu `STANDARD`, các hàng giữa `VIP`, hàng cuối `COUPLE`.
+  - Hàng Couple luôn có số ghế chẵn; các ghế ghép cặp theo `1-2`, `3-4`, `5-6`.
+- Showtime demo dùng cinema và room đầu tiên trong file seed tĩnh.
+- Khi chạy lại seed, layout chỉ được làm mới ở room chưa có showtime. Cinema/room seed cũ thuộc các namespace `cinema-`, `seed-cinema-`, `room-` hoặc `seed-room-` chỉ bị dọn khi không còn showtime liên quan; dữ liệu đang được sử dụng không bị xóa.
 - Showtime:
   - ID `seed-showtime-interstellar`.
   - Bắt đầu khoảng 24 giờ sau thời điểm seed.
   - Kết thúc theo duration phim.
-- Showtime seats:
-  - Standard: `100000.00`.
-  - VIP: `150000.00`.
+  - Showtime seats:
+    - Standard: `100000.00`.
+    - VIP: `110000.00`.
+    - Couple: `132000.00` cho mỗi ghế.
 
 Seed không tạo customer, booking, payment, ticket hoặc refresh token.
 
@@ -1471,6 +1469,8 @@ sequenceDiagram
 - `type`: optional `STANDARD | VIP | COUPLE`, default `STANDARD`.
 - `row`: trim và uppercase trước khi lưu.
 - `number`: integer 1-100.
+- `COUPLE` phải được cấu hình theo cặp bằng bulk layout; không tạo một ghế Couple đơn lẻ.
+- Phòng có showtime không cho thay đổi ghế.
 - Unique: `(roomId, row, number)`.
 
 #### `PATCH /api/v1/seats/:id`
@@ -1478,7 +1478,7 @@ sequenceDiagram
 - Auth: Bearer JWT.
 - Role: `ADMIN`.
 - Success: `200`.
-- Chỉ cập nhật `type`:
+- Chỉ cập nhật `type`; ghế Couple phải luôn giữ nguyên cặp:
 
 ```json
 {
@@ -1491,6 +1491,14 @@ sequenceDiagram
 - Auth: Bearer JWT.
 - Role: `ADMIN`.
 - Success: `200` nếu seat chưa bị showtime sử dụng.
+
+#### `PUT /api/v1/seats/room/:roomId/layout`
+
+- Auth: Bearer JWT.
+- Role: `ADMIN`.
+- Thay thế toàn bộ layout khi phòng chưa có showtime.
+- Layout yêu cầu ít nhất 5 hàng: 3 hàng đầu `STANDARD`, hàng giữa `VIP`, hàng cuối `COUPLE`.
+- Số ghế trong hàng phải liên tục từ 1; hàng Couple phải có số ghế chẵn.
 
 ### 8.10. Showtimes API
 
@@ -1567,21 +1575,22 @@ sequenceDiagram
   "startsAt": "2026-10-01T19:00:00.000Z",
   "endsAt": "2026-10-01T21:49:00.000Z",
   "basePrice": 100000,
-  "vipMultiplier": 1.5,
-  "coupleMultiplier": 2
+  "vipMultiplier": 1.1,
+  "coupleMultiplier": 1.2
 }
 ```
 
 Rules:
 
 - Movie phải tồn tại và `PUBLISHED`.
-- Room phải tồn tại và có ít nhất một seat.
+- Room phải tồn tại và có layout hợp lệ với ít nhất 5 hàng.
 - `startsAt < endsAt`.
 - `startsAt` phải ở tương lai.
 - Không overlap với showtime khác trong cùng room.
 - Standard price = `basePrice`.
-- VIP price = `basePrice * vipMultiplier`; default multiplier `1.5`.
-- Couple price = `basePrice * coupleMultiplier`; default multiplier `2`.
+- VIP price = `basePrice * vipMultiplier`; default multiplier `1.1`.
+- Couple price trên mỗi ghế = `basePrice * vipMultiplier * coupleMultiplier`; default multiplier `1.2`.
+- Một cặp Couple gồm 2 `ShowtimeSeat`, giá cả cặp với ví dụ trên là `264000.00`.
 - Tạo một `ShowtimeSeat` cho mỗi seat của room.
 
 #### `DELETE /api/v1/showtimes/:id`
@@ -2237,6 +2246,7 @@ Root `package.json` điều phối commands nhưng không gộp dependency: `be/
 | `npm run prisma:seed` | Seed catalog/admin data |
 | `npm run prisma:studio` | Mở Prisma Studio |
 
+
 Nếu muốn cài dependency sau clone, chạy `npm install` ở root và `npm run install:all`.
 
 ### 14.3. Runtime URL và cấu hình frontend
@@ -2292,11 +2302,21 @@ Các màn hình MVP:
 10. Dùng `PATCH /api/v1/movies/:id` để chuyển phim sang `PUBLISHED` sau khi kiểm tra.
 11. Tạo cinema, room, seats, showtime cho movie nội bộ bằng `id`.
 12. Register/login customer.
-13. Lấy showtime seats.
-14. Hold một hoặc nhiều ghế.
+13. Lấy showtime seats; chọn một ghế Couple sẽ chọn cả cặp.
+14. Hold một hoặc nhiều ghế; backend canonicalize cặp Couple và giới hạn 10 ghế vật lý.
 15. Checkout booking.
 16. Gọi mock payment với `Idempotency-Key`.
 17. Lấy ticket.
+
+### 14.5. Dữ liệu cinema seed tĩnh
+
+`be/prisma/data/cinemas.seed.json` là file dữ liệu tĩnh được chuẩn bị một lần từ nguồn dữ liệu bản đồ đã rà soát. File chỉ chứa dữ liệu nghiệp vụ cần phục hồi:
+
+- `id`, `name`, `address`, `provinceCode` của cinema.
+- `id`, `name` và tùy chọn layout của room.
+- Layout ghế được `be/prisma/seed.ts` sinh bằng `buildSeatLayout()`.
+
+Khi reset database, chạy migration rồi chạy `npm run prisma:seed`. Seed không gọi mạng và không phụ thuộc OSM runtime. Nếu phân phối dữ liệu bản đồ gốc hoặc phái sinh, cần giữ attribution và tuân thủ ODbL.
 
 ## 15. Known limitations và roadmap
 

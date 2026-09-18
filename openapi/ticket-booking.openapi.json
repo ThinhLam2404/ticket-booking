@@ -4310,12 +4310,12 @@
           },
           "vipMultiplier": {
             "type": "string",
-            "example": "1.50",
+            "example": "1.10",
             "nullable": true
           },
           "coupleMultiplier": {
             "type": "string",
-            "example": "2.20",
+            "example": "1.20",
             "nullable": true
           },
           "room": {
@@ -4425,13 +4425,13 @@
           },
           "vipMultiplier": {
             "type": "number",
-            "example": 1.5,
-            "description": "VIP price multiplier"
+            "example": 1.1,
+            "description": "VIP price multiplier, defaults to 1.1"
           },
           "coupleMultiplier": {
             "type": "number",
-            "example": 2,
-            "description": "Couple seat price multiplier"
+            "example": 1.2,
+            "description": "Couple seat price multiplier applied after the VIP multiplier, defaults to 1.2"
           }
         },
         "required": [
@@ -4468,13 +4468,13 @@
           },
           "vipMultiplier": {
             "type": "number",
-            "example": 1.5,
-            "description": "VIP price multiplier"
+            "example": 1.1,
+            "description": "VIP price multiplier, defaults to 1.1"
           },
           "coupleMultiplier": {
             "type": "number",
-            "example": 2,
-            "description": "Couple seat price multiplier"
+            "example": 1.2,
+            "description": "Couple seat price multiplier applied after the VIP multiplier, defaults to 1.2"
           }
         }
       },

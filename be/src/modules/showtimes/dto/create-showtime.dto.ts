@@ -35,15 +35,15 @@ export class CreateShowtimeDto {
   @Min(0)
   basePrice!: number;
 
-  @ApiPropertyOptional({ example: 1.5, description: 'VIP price multiplier' })
+  @ApiPropertyOptional({ example: 1.1, description: 'VIP price multiplier, defaults to 1.1' })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   vipMultiplier?: number;
 
   @ApiPropertyOptional({
-    example: 2,
-    description: 'Couple seat price multiplier',
+    example: 1.2,
+    description: 'Couple seat price multiplier applied after the VIP multiplier, defaults to 1.2',
   })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })

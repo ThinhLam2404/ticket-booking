@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, SeatType } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
@@ -12,6 +12,7 @@ import {
   CreateSeatDto,
   UpdateSeatDto,
 } from './dto/seat.dto.js';
+import { validateSeatLayout } from './seat-layout.js';
 
 @Injectable()
 export class SeatsService {
@@ -53,13 +54,21 @@ export class SeatsService {
             throw new NotFoundException('Room not found');
           }
           //NOTE - nếu phòng đã có suất chiếu thì k cho đổi layout
-          if (room._count.showtimes > 0) {
-            throw new ConflictException(
-              'Room layout cannot be replaced while it has showtimes',
-            );
-          }
+           if (room._count.showtimes > 0) {
+             throw new ConflictException(
+               'Room layout cannot be replaced while it has showtimes',
+             );
+           }
 
-          await transaction.seat.deleteMany({ where: { roomId } });
+           try {
+             validateSeatLayout(normalizedLayout);
+           } catch (error) {
+             throw new ConflictException(
+               error instanceof Error ? error.message : 'Invalid seat layout',
+             );
+           }
+
+           await transaction.seat.deleteMany({ where: { roomId } });
           if (normalizedLayout.length) {
             await transaction.seat.createMany({
               data: normalizedLayout.map((seat) => ({ ...seat, roomId })),
@@ -88,14 +97,30 @@ export class SeatsService {
   }
 
   async create(roomId: string, dto: CreateSeatDto) {
+    const row = dto.row.trim().toUpperCase();
+    const type = dto.type ?? SeatType.STANDARD;
+    if (type === SeatType.COUPLE) {
+      throw new ConflictException('Couple seats must be managed as a complete room layout');
+    }
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        _count: { select: { showtimes: true } },
+        seats: true,
+      },
+    });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room._count.showtimes > 0) {
+      throw new ConflictException('Seat cannot be changed while the room has showtimes');
+    }
+    if (this.isCompleteLayout(room.seats)) {
+      throw new ConflictException(
+        'Complete seat layouts must be managed in bulk',
+      );
+    }
     try {
       const seat = await this.prisma.seat.create({
-        data: {
-          roomId,
-          row: dto.row.trim().toUpperCase(),
-          number: dto.number,
-          type: dto.type ?? 'STANDARD',
-        },
+        data: { roomId, row, number: dto.number, type },
       });
       return toPublicResponse(seat);
     } catch (error) {
@@ -113,19 +138,58 @@ export class SeatsService {
   }
 
   async update(id: string, dto: UpdateSeatDto) {
-    await this.getById(id);
-    const seat = await this.prisma.seat.update({
-      where: { id },
-      data: dto.type === undefined ? {} : { type: dto.type },
+    const seat = await this.getById(id);
+    if (dto.type === undefined) return toPublicResponse(seat);
+    const room = await this.prisma.room.findUnique({
+      where: { id: seat.roomId },
+      include: {
+        _count: { select: { showtimes: true } },
+        seats: true,
+      },
     });
-    return toPublicResponse(seat);
+    if (!room) throw new NotFoundException('Room not found');
+    if (room._count.showtimes > 0) {
+      throw new ConflictException('Seat cannot be changed while the room has showtimes');
+    }
+    if (dto.type === SeatType.COUPLE || seat.type === SeatType.COUPLE) {
+      throw new ConflictException('Couple seats must be managed as a complete room layout');
+    }
+    if (this.isCompleteLayout(room.seats)) {
+      throw new ConflictException(
+        'Complete seat layouts must be managed in bulk',
+      );
+    }
+    const updated = await this.prisma.seat.update({
+      where: { id },
+      data: { type: dto.type },
+    });
+    return toPublicResponse(updated);
   }
 
   async remove(id: string) {
-    await this.getById(id);
+    const seat = await this.getById(id);
+    const room = await this.prisma.room.findUnique({
+      where: { id: seat.roomId },
+      include: {
+        _count: { select: { showtimes: true } },
+        seats: true,
+      },
+    });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room._count.showtimes > 0) {
+      throw new ConflictException('Seat cannot be changed while the room has showtimes');
+    }
+    if (seat.type === SeatType.COUPLE) {
+      throw new ConflictException('Couple seats must be managed as a complete room layout');
+    }
+    if (this.isCompleteLayout(room.seats)) {
+      throw new ConflictException(
+        'Complete seat layouts must be managed in bulk',
+      );
+    }
     try {
-      const seat = await this.prisma.seat.delete({ where: { id } });
-      return toPublicResponse(seat);
+      const deleted = await this.prisma.seat.delete({ where: { id } });
+      return toPublicResponse(deleted);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -136,6 +200,17 @@ export class SeatsService {
         );
       }
       throw error;
+    }
+  }
+
+  private isCompleteLayout(
+    seats: Array<{ row: string; number: number; type: SeatType }>,
+  ) {
+    try {
+      validateSeatLayout(seats);
+      return true;
+    } catch {
+      return false;
     }
   }
 

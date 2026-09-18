@@ -78,13 +78,15 @@ model Movie {
 }
 
 model Cinema {
-  id            String   @id @default(cuid())
-  name          String
-  address       String
-  provinceCode  Int      @default(79)
-  rooms         Room[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  address      String
+  provinceCode Int      @default(79)
+  rooms        Room[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([provinceCode])
 }
 
 model Room {

@@ -8,6 +8,7 @@ import { MovieStatus, Prisma, SeatType } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
+import { validateSeatLayout } from '../seats/seat-layout.js';
 import { CreateShowtimeDto } from './dto/create-showtime.dto.js';
 import {
   ListAdminShowtimesDto,
@@ -172,6 +173,13 @@ export class ShowtimesService {
     if (!room.seats.length) {
       throw new BadRequestException('Room must have at least one seat');
     }
+    try {
+      validateSeatLayout(room.seats);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Room has an invalid seat layout',
+      );
+    }
 
     if (overlappingShowtime) {
       throw new ConflictException('Room already has an overlapping showtime');
@@ -256,6 +264,7 @@ export class ShowtimesService {
           const endsAt = dto.endsAt ? new Date(dto.endsAt) : current.endsAt;
           const movieId = dto.movieId ?? current.movieId;
           const roomId = dto.roomId ?? current.roomId;
+          const roomChanged = roomId !== current.roomId;
 
           if (startsAt >= endsAt) {
             throw new BadRequestException(
@@ -294,21 +303,31 @@ export class ShowtimesService {
           if (!room) {
             throw new NotFoundException('Room not found');
           }
-          if (!room.seats.length) {
-            throw new BadRequestException('Room must have at least one seat');
-          }
-          if (overlappingShowtime) {
+           if (roomChanged) {
+             if (!room.seats.length) {
+               throw new BadRequestException('Room must have at least one seat');
+             }
+             try {
+               validateSeatLayout(room.seats);
+             } catch (error) {
+               throw new BadRequestException(
+                 error instanceof Error ? error.message : 'Room has an invalid seat layout',
+               );
+             }
+           }
+           if (overlappingShowtime) {
             throw new ConflictException(
               'Room already has an overlapping showtime',
             );
           }
 
-          const roomChanged = roomId !== current.roomId;
           const pricingChanged =
-            dto.basePrice !== undefined ||
-            dto.vipMultiplier !== undefined ||
-            dto.coupleMultiplier !== undefined;
-          //NOTE - nếu phòng hoặc giá thay đổi thì tính lại giá. VD phòng A giá < phòng vip
+            (dto.basePrice !== undefined &&
+              dto.basePrice !== current.basePrice?.toNumber()) ||
+            (dto.vipMultiplier !== undefined &&
+              dto.vipMultiplier !== current.vipMultiplier?.toNumber()) ||
+            (dto.coupleMultiplier !== undefined &&
+              dto.coupleMultiplier !== current.coupleMultiplier?.toNumber());
           const shouldReprice = roomChanged || pricingChanged;
           const pricing = shouldReprice
             ? this.resolvePricing(
@@ -443,9 +462,9 @@ export class ShowtimesService {
     return {
       basePrice,
       vipMultiplier:
-        values.vipMultiplier ?? current?.vipMultiplier?.toNumber() ?? 1.5,
+        values.vipMultiplier ?? current?.vipMultiplier?.toNumber() ?? 1.1,
       coupleMultiplier:
-        values.coupleMultiplier ?? current?.coupleMultiplier?.toNumber() ?? 2,
+        values.coupleMultiplier ?? current?.coupleMultiplier?.toNumber() ?? 1.2,
     };
   }
 
@@ -459,7 +478,7 @@ export class ShowtimesService {
       seatType === SeatType.VIP
         ? vipMultiplier
         : seatType === SeatType.COUPLE
-          ? coupleMultiplier
+          ? vipMultiplier * coupleMultiplier
           : 1;
     return (basePrice * multiplier).toFixed(2);
   }
