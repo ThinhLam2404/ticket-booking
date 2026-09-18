@@ -15,6 +15,7 @@ type LocationContextValue = {
   setSelectedProvinceCode: (code: number) => void;
   isPending: boolean;
   isError: boolean;
+  error: unknown;
   refetch: () => void;
 };
 
@@ -28,7 +29,7 @@ function storedProvinceCode() {
 export function LocationProvider({ children }: { children: ReactNode }) {
   const [selectedProvinceCode, setSelectedProvinceCodeState] = useState(storedProvinceCode);
   const [settledProvinceCode, setSettledProvinceCode] = useState(storedProvinceCode);
-  const { data, isPending, isError, refetch } = useQuery({
+  const { data, error, isPending, isError, refetch } = useQuery({
     queryKey: ['provinces'],
     queryFn: ({ signal }) => api.provinces(signal),
     staleTime: Infinity,
@@ -68,8 +69,9 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     setSelectedProvinceCode,
     isPending,
     isError,
+    error,
     refetch: retryProvinces,
-  }), [isError, isPending, provinces, retryProvinces, selectedProvince, setSelectedProvinceCode, settledProvinceCode, validCode]);
+  }), [error, isError, isPending, provinces, retryProvinces, selectedProvince, setSelectedProvinceCode, settledProvinceCode, validCode]);
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
 }

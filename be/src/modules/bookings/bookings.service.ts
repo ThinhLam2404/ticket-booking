@@ -44,11 +44,8 @@ export class BookingsService {
       include: { movie: true },
     });
 
-    if (!showtime || showtime.movie.status !== MovieStatus.PUBLISHED) {
+    if (!showtime) {
       throw new NotFoundException('Showtime not found');
-    }
-    if (showtime.startsAt <= new Date()) {
-      throw new ConflictException('Showtime has already started');
     }
 
     const seats = await this.prisma.showtimeSeat.findMany({
@@ -109,6 +106,13 @@ export class BookingsService {
       if (previousBooking) {
         return toPublicResponse(previousBooking);
       }
+    }
+
+    if (showtime.movie.status !== MovieStatus.PUBLISHED) {
+      throw new NotFoundException('Showtime not found');
+    }
+    if (showtime.startsAt <= new Date()) {
+      throw new ConflictException('Showtime has already started');
     }
 
     const holdToken = randomUUID();

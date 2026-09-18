@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Prisma, ShowtimeSeatStatus } from '@prisma/client';
 import { BookingsService } from './bookings.service.js';
 
@@ -116,6 +117,50 @@ describe('BookingsService Couple seat handling', () => {
       }),
     ).rejects.toThrow('Couple seat must have a valid partner');
 
+    expect(redis.setIfAbsent).not.toHaveBeenCalled();
+  });
+
+  it('returns an idempotent booking even when the showtime is no longer bookable', async () => {
+    const existingBooking = {
+      id: 'booking-1',
+      status: 'CONFIRMED',
+      showtimeId: 'showtime-1',
+      requestHash: createHash('sha256')
+        .update(JSON.stringify({ showtimeId: 'showtime-1', showtimeSeatIds: ['seat-1'] }))
+        .digest('hex'),
+    };
+    const prisma = {
+      showtime: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'showtime-1',
+          startsAt: new Date(Date.now() - 60 * 1000),
+          movie: { status: 'ARCHIVED' },
+        }),
+      },
+      showtimeSeat: {
+        findMany: vi.fn().mockResolvedValue([{
+          id: 'seat-1',
+          showtimeId: 'showtime-1',
+          price: new Prisma.Decimal(100000),
+          status: ShowtimeSeatStatus.SOLD,
+          seat: { id: 'seat-1', row: 'A', number: 1, type: 'STANDARD' },
+        }]),
+      },
+      booking: {
+        findFirst: vi.fn().mockResolvedValue(existingBooking),
+      },
+    };
+    const redis = { setIfAbsent: vi.fn(), releaseIfOwned: vi.fn() };
+    const service = new BookingsService(prisma as never, redis as never);
+
+    await expect(service.hold('user-1', {
+      showtimeId: 'showtime-1',
+      showtimeSeatIds: ['seat-1'],
+    }, 'retry-key')).resolves.toMatchObject({
+      id: existingBooking.id,
+      status: existingBooking.status,
+      showtimeId: existingBooking.showtimeId,
+    });
     expect(redis.setIfAbsent).not.toHaveBeenCalled();
   });
 });

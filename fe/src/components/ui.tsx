@@ -4,7 +4,7 @@ import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import type { FormEvent, ReactNode, RefObject } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useLocationContext } from '../auth/LocationContext';
-import type { User } from '../types';
+import type { Province, User } from '../types';
 import { errorMessage, statusLabel } from '../utils/format';
 
 export function LoadingState({ label = 'Đang tải…' }: { label?: string }) {
@@ -77,34 +77,47 @@ function useDialogFocus(open: boolean, dialogRef: RefObject<HTMLElement | null>,
 }
 
 export function LocationPicker({ className = '' }: { className?: string }) {
-  const { provinces, selectedProvince, selectedProvinceCode, setSelectedProvinceCode, isPending, isError, refetch } = useLocationContext();
+  const { provinces, selectedProvince, selectedProvinceCode, setSelectedProvinceCode, isPending, isError, error, refetch } = useLocationContext();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const dialogRef = useRef<HTMLElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
-  const filteredProvinces = provinces.filter((province) => province.name.toLowerCase().includes(search.trim().toLowerCase()));
-  useDialogFocus(open, dialogRef, () => setOpen(false), searchInput);
-
-  function chooseProvince(code: number) {
-    setSelectedProvinceCode(code);
+  const normalizeSearch = (value: string) => value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .trim();
+  const normalizedSearch = normalizeSearch(search);
+  const filteredProvinces = provinces.filter((province: Province) => {
+    const haystack = `${normalizeSearch(province.name)} ${normalizeSearch(province.codename)}`;
+    return haystack.includes(normalizedSearch);
+  });
+  function closePicker() {
     setSearch('');
     setOpen(false);
   }
+  useDialogFocus(open, dialogRef, closePicker, searchInput);
 
-  const picker = open ? <div className="location-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+  function chooseProvince(code: number) {
+    setSelectedProvinceCode(code);
+    closePicker();
+  }
+
+  const picker = open ? <div className="location-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closePicker(); }}>
     <section ref={dialogRef} className="location-picker" role="dialog" aria-modal="true" aria-labelledby="location-picker-title" tabIndex={-1}>
-      <button className="modal-close" type="button" aria-label="Đóng chọn tỉnh thành" onClick={() => setOpen(false)}>×</button>
+      <button className="modal-close" type="button" aria-label="Đóng chọn tỉnh thành" onClick={closePicker}>×</button>
       <p className="eyebrow">KHU VỰC CINEBOOK</p>
       <h2 id="location-picker-title">Bạn muốn xem phim ở đâu?</h2>
       <p className="location-picker-copy">Chọn tỉnh/thành để lọc rạp và suất chiếu gần bạn.</p>
       <label className="location-search"><span className="sr-only">Tìm tỉnh thành</span><span aria-hidden="true">⌕</span><input ref={searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tỉnh hoặc thành phố…" /></label>
       {isPending && <LoadingState label="Đang tải danh sách tỉnh thành…" />}
-      {isError && <ErrorState cause={new Error('provinces')} fallback="Không thể tải danh sách tỉnh thành." onRetry={refetch} />}
+      {isError && <ErrorState cause={error} fallback="Không thể tải danh sách tỉnh thành." onRetry={refetch} />}
       {!isPending && !isError && !filteredProvinces.length && <EmptyState>Không tìm thấy tỉnh/thành phù hợp.</EmptyState>}
       {!isPending && !isError && filteredProvinces.length > 0 && <div className="province-list" role="listbox" aria-label="Danh sách tỉnh thành">
         {filteredProvinces.map((province) => <button className={`province-option${province.code === selectedProvinceCode ? ' active' : ''}`} type="button" role="option" aria-selected={province.code === selectedProvinceCode} key={province.code} onClick={() => chooseProvince(province.code)}><span><strong>{province.name}</strong><small>{province.code === selectedProvinceCode ? 'Khu vực đang chọn' : 'Lọc rạp và suất chiếu'}</small></span>{province.code === selectedProvinceCode && <b aria-hidden="true">✓</b>}</button>)}
       </div>}
-      <div className="location-picker-footer"><span>Đã chọn: <strong>{selectedProvince?.name ?? 'TP. Hồ Chí Minh'}</strong></span><button className="secondary compact-button" type="button" onClick={() => setOpen(false)}>Đóng</button></div>
+      <div className="location-picker-footer"><span>Đã chọn: <strong>{selectedProvince?.name ?? 'TP. Hồ Chí Minh'}</strong></span><button className="secondary compact-button" type="button" onClick={closePicker}>Đóng</button></div>
     </section>
   </div> : null;
 

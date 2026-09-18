@@ -2082,12 +2082,12 @@ Tác dụng:
 
 ### 12.3. Error response
 
-Backend dùng `ApiExceptionFilter` để chuẩn hóa lỗi HTTP và lỗi Prisma:
+Backend dùng `ApiExceptionFilter` để chuẩn hóa lỗi HTTP và lỗi Prisma. `code` là mã ổn định cho frontend dịch thông báo; `message` vẫn giữ nội dung chẩn đoán tương thích:
 
 ```json
 {
   "statusCode": 409,
-  "code": "CONFLICT",
+  "code": "SEATS_HELD",
   "message": "One or more seats are being held",
   "details": [],
   "path": "/api/v1/bookings/hold",
@@ -2096,12 +2096,14 @@ Backend dùng `ApiExceptionFilter` để chuẩn hóa lỗi HTTP và lỗi Prism
 }
 ```
 
+Một số domain code thường dùng gồm `MOVIE_NOT_PUBLISHED`, `SHOWTIME_OVERLAP`, `ROOM_LAYOUT_INVALID`, `SEATS_UNAVAILABLE`, `BOOKING_NOT_PAYABLE`, `TMDB_NOT_CONFIGURED` và `TMDB_RATE_LIMITED`.
+
 Validation error:
 
 ```json
 {
   "statusCode": 400,
-  "code": "BAD_REQUEST",
+  "code": "VALIDATION_FAILED",
   "message": "Request validation failed",
   "details": ["email must be an email"],
   "path": "/api/v1/auth/register",

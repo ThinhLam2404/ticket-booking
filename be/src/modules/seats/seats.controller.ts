@@ -62,7 +62,7 @@ export class SeatsController {
 
   @Patch(':id')
   @ApiResponse({ status: 200, type: SeatResponseDto })
-  @ApiErrorResponses(400, 401, 403, 404)
+  @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)

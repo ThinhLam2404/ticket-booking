@@ -35,8 +35,9 @@ a { color: inherit; }
 .location-search { position: relative; display: flex; align-items: center; margin-bottom: 14px; }
 .location-search > span:not(.sr-only) { position: absolute; left: 13px; color: var(--muted); font-size: 1.1rem; }
 .location-search input { width: 100%; padding-left: 36px; }
-.province-list { display: grid; gap: 6px; max-height: 360px; overflow-y: auto; overflow-x: hidden; padding-right: 3px; scrollbar-width: none; -ms-overflow-style: none; }
-.province-list::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.province-list { display: grid; grid-auto-rows: max-content; align-content: start; gap: 6px; max-height: 360px; overflow-y: auto; overflow-x: hidden; padding-right: 3px; scrollbar-width: thin; scrollbar-color: var(--accent) var(--surface); }
+.province-list::-webkit-scrollbar { width: 6px; }
+.province-list::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--accent); }
 .province-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 11px 12px; border: 1px solid transparent; border-radius: 10px; background: var(--surface-low); color: var(--body); text-align: left; transition: border-color .2s, background .2s; }
 .province-option:hover { border-color: var(--accent); background: var(--surface-high); }
 .province-option.active { border-color: rgba(124,58,237,.7); background: rgba(124,58,237,.16); }
@@ -627,6 +628,7 @@ textarea { min-height: 110px; line-height: 1.55; resize: vertical; }
   .location-picker-backdrop { padding: 12px 12px calc(80px + env(safe-area-inset-bottom)); place-items: end center; }
   .trailer-modal-backdrop { padding: 12px; place-items: end center; }
   .location-picker { width: 100%; height: min(620px, calc(100vh - 92px)); max-height: calc(100vh - 92px); padding: 22px 18px; border-radius: 16px; }
+  @supports (height: 100dvh) { .location-picker { height: min(620px, calc(100dvh - 92px)); max-height: calc(100dvh - 92px); } }
   .trailer-modal { width: 100%; max-height: calc(100vh - 24px); padding: 22px 18px; border-radius: 16px; }
   .location-picker h2, .trailer-modal h2 { font-size: 1.25rem; }
   .province-list { max-height: min(46vh, 330px); }

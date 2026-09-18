@@ -52,12 +52,68 @@ export function statusLabel(status: string) {
 }
 
 const apiMessages: Record<string, string> = {
+  AUTH_INVALID_CREDENTIALS: 'Sai mật khẩu hoặc thông tin đăng nhập.',
+  AUTH_ACCESS_TOKEN_INVALID: 'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
+  AUTH_REFRESH_TOKEN_INVALID: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+  AUTH_TOKEN_REQUIRED: 'Vui lòng đăng nhập để tiếp tục.',
+  AUTH_EMAIL_EXISTS: 'Email này đã được đăng ký.',
+  USER_NOT_FOUND: 'Không tìm thấy người dùng.',
+  BOOKING_CONFIRM_FAILED: 'Không thể xác nhận booking.',
+  BOOKING_NOT_CANCELLABLE: 'Booking này không còn có thể hủy.',
+  BOOKING_NOT_FOUND: 'Không tìm thấy booking.',
+  BOOKING_NOT_PAYABLE: 'Booking không còn có thể thanh toán.',
+  BOOKING_SEATS_NOT_OWNED: 'Booking không còn sở hữu toàn bộ ghế đã chọn.',
+  COUPLE_LAYOUT_REQUIRED: 'Ghế đôi phải được quản lý theo layout hoàn chỉnh.',
+  COUPLE_PARTNER_INVALID: 'Ghế đôi không còn đủ cặp hợp lệ.',
+  CINEMA_ALREADY_EXISTS: 'Cụm rạp đã tồn tại.',
+  CINEMA_HAS_SHOWTIMES: 'Không thể xóa cụm rạp đang có suất chiếu.',
+  CINEMA_NOT_FOUND: 'Không tìm thấy cụm rạp.',
+  CONFLICT: 'Dữ liệu đang có xung đột. Vui lòng kiểm tra lại.',
+  DATABASE_CONFLICT: 'Dữ liệu đã tồn tại hoặc đang được sử dụng.',
+  FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
+  MOVIE_IMPORT_CONFLICT: 'Phim vừa được nhập bởi một thao tác khác.',
+  MOVIE_NOT_FOUND: 'Không tìm thấy phim.',
+  MOVIE_NOT_PUBLISHED: 'Chỉ phim đã phát hành mới có thể tạo suất chiếu.',
+  PAYMENT_IDEMPOTENCY_CONFLICT: 'Mã giao dịch đã được dùng cho booking khác.',
+  PAYMENT_IDEMPOTENCY_REQUIRED: 'Thiếu mã idempotency của giao dịch.',
+  PAYMENT_MOCK_DISABLED: 'Thanh toán mô phỏng hiện không khả dụng.',
+  RESOURCE_NOT_FOUND: 'Không tìm thấy dữ liệu yêu cầu.',
+  ROOM_ALREADY_EXISTS: 'Phòng chiếu đã tồn tại trong cụm rạp.',
+  ROOM_HAS_SHOWTIMES: 'Không thể xóa phòng đang có suất chiếu.',
+  ROOM_LAYOUT_INVALID: 'Sơ đồ ghế của phòng chưa hợp lệ.',
+  ROOM_NO_SEATS: 'Phòng chiếu chưa có ghế.',
+  ROOM_NOT_FOUND: 'Không tìm thấy phòng chiếu.',
+  SEAT_DUPLICATE_COORDINATE: 'Sơ đồ có vị trí ghế bị trùng.',
+  SEAT_LAYOUT_BULK_ONLY: 'Layout hoàn chỉnh chỉ được thay đổi bằng bulk layout.',
+  SEAT_LAYOUT_HAS_SHOWTIMES: 'Không thể thay layout khi phòng đã có suất chiếu.',
+  SEAT_HAS_SHOWTIMES: 'Không thể thay đổi ghế khi phòng đã có suất chiếu.',
+  SEAT_LIMIT_EXCEEDED: 'Bạn chỉ có thể chọn tối đa 10 ghế vật lý.',
+  SEAT_NOT_FOUND: 'Không tìm thấy ghế.',
+  SEAT_REQUIRED: 'Vui lòng chọn ít nhất một ghế.',
+  SEATS_HELD: 'Một hoặc nhiều ghế vừa được người khác giữ.',
+  SEATS_SALE_FAILED: 'Không thể cập nhật trạng thái ghế để phát hành vé.',
+  SEATS_UNAVAILABLE: 'Một hoặc nhiều ghế không còn trống.',
+  SHOWTIME_HAS_BOOKINGS: 'Không thể thay đổi suất chiếu đã có booking.',
+  SHOWTIME_IN_PAST: 'Suất chiếu phải bắt đầu trong tương lai.',
+  SHOWTIME_INVALID_ORDER: 'Giờ kết thúc phải sau giờ bắt đầu.',
+  SHOWTIME_NOT_FOUND: 'Không tìm thấy suất chiếu.',
+  SHOWTIME_OVERLAP: 'Phòng đã có suất chiếu trùng thời gian.',
+  SHOWTIME_STARTED: 'Suất chiếu đã bắt đầu.',
+  TICKET_NOT_FOUND: 'Không tìm thấy vé.',
+  TMDB_MOVIE_NOT_FOUND: 'Không tìm thấy phim trên TMDB.',
+  TMDB_NOT_CONFIGURED: 'TMDB chưa được cấu hình. Vui lòng liên hệ quản trị viên.',
+  TMDB_RATE_LIMITED: 'TMDB đang giới hạn lượt truy cập. Vui lòng thử lại sau.',
+  VALIDATION_FAILED: 'Dữ liệu nhập chưa hợp lệ. Vui lòng kiểm tra lại.',
+  SERVICE_UNAVAILABLE: 'Dịch vụ tạm thời chưa sẵn sàng. Vui lòng thử lại.',
+};
+
+const legacyApiMessages: Record<string, string> = {
   'Booking is no longer available for checkout': 'Booking không còn khả dụng để thanh toán.',
   'Booking is no longer payable': 'Booking không còn có thể thanh toán.',
-  'Invalid email or password': 'Sai mật khẩu.',
+  'Invalid email or password': 'Sai mật khẩu hoặc thông tin đăng nhập.',
   'Booking no longer owns all selected seats': 'Booking không còn sở hữu toàn bộ ghế đã chọn.',
   'Booking not found': 'Không tìm thấy booking.',
-  'Only pending bookings can be cancelled': 'Chỉ booking đang chờ mới có thể hủy.',
+  'Only pending bookings can be cancelled': 'Booking này không còn có thể hủy.',
   'One or more seats are being held': 'Một hoặc nhiều ghế vừa được người khác giữ.',
   'Payment idempotency key is required': 'Thiếu mã idempotency của giao dịch.',
   'Ticket not found': 'Không tìm thấy vé.',
@@ -65,10 +121,9 @@ const apiMessages: Record<string, string> = {
 
 export function errorMessage(cause: unknown, fallback: string) {
   if (cause instanceof ApiClientError) {
-    if (cause.path.endsWith('/auth/login')) return apiMessages[cause.message] ?? 'Sai mật khẩu.';
+    if (cause.path.endsWith('/auth/login')) return apiMessages.AUTH_INVALID_CREDENTIALS;
     if (cause.statusCode === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-    if (cause.statusCode === 503) return 'Dịch vụ tạm thời chưa sẵn sàng. Vui lòng thử lại.';
-    return apiMessages[cause.message] ?? cause.message;
+    return apiMessages[cause.code] ?? legacyApiMessages[cause.message] ?? fallback;
   }
-  return cause instanceof Error ? cause.message : fallback;
+  return fallback;
 }

@@ -19,6 +19,64 @@ interface ErrorResponse {
   timestamp: string;
 }
 
+const messageCodes: Record<string, string> = {
+  'Invalid email or password': 'AUTH_INVALID_CREDENTIALS',
+  'Invalid or expired access token': 'AUTH_ACCESS_TOKEN_INVALID',
+  'Invalid or expired refresh token': 'AUTH_REFRESH_TOKEN_INVALID',
+  'Bearer token is required': 'AUTH_TOKEN_REQUIRED',
+  'User is no longer available': 'USER_NOT_FOUND',
+  'Email is already registered': 'AUTH_EMAIL_EXISTS',
+  'Insufficient permissions': 'FORBIDDEN',
+  'Cinema not found': 'CINEMA_NOT_FOUND',
+  'Cinema already exists': 'CINEMA_ALREADY_EXISTS',
+  'Cinema cannot be deleted while it has active showtimes': 'CINEMA_HAS_SHOWTIMES',
+  'Room not found': 'ROOM_NOT_FOUND',
+  'Room already exists in this cinema': 'ROOM_ALREADY_EXISTS',
+  'Room cannot be deleted while it has showtimes': 'ROOM_HAS_SHOWTIMES',
+  'Movie not found': 'MOVIE_NOT_FOUND',
+  'Movie must be published before scheduling': 'MOVIE_NOT_PUBLISHED',
+  'Movie was imported concurrently': 'MOVIE_IMPORT_CONFLICT',
+  'Showtime not found': 'SHOWTIME_NOT_FOUND',
+  'Showtime end must be after its start': 'SHOWTIME_INVALID_ORDER',
+  'Showtime must start in the future': 'SHOWTIME_IN_PAST',
+  'Room already has an overlapping showtime': 'SHOWTIME_OVERLAP',
+  'Showtime seats could not be initialized': 'SHOWTIME_SEATS_INIT_FAILED',
+  'Showtime cannot be updated after bookings exist': 'SHOWTIME_HAS_BOOKINGS',
+  'Showtime cannot be deleted after bookings exist': 'SHOWTIME_HAS_BOOKINGS',
+  'Room must have at least one seat': 'ROOM_NO_SEATS',
+  'Room has an invalid seat layout': 'ROOM_LAYOUT_INVALID',
+  'Seat already exists in this room': 'SEAT_ALREADY_EXISTS',
+  'Seat not found': 'SEAT_NOT_FOUND',
+  'Seat cannot be changed while the room has showtimes': 'SEAT_HAS_SHOWTIMES',
+  'Seat cannot be deleted while it is used by a showtime': 'SEAT_HAS_SHOWTIMES',
+  'Complete seat layouts must be managed in bulk': 'SEAT_LAYOUT_BULK_ONLY',
+  'Couple seats must be managed as a complete room layout': 'COUPLE_LAYOUT_REQUIRED',
+  'Duplicate seat coordinate in layout': 'SEAT_DUPLICATE_COORDINATE',
+  'Room layout cannot be replaced while it has showtimes': 'SEAT_LAYOUT_HAS_SHOWTIMES',
+  'Room layout cannot be replaced while it is used by a showtime': 'SEAT_LAYOUT_HAS_SHOWTIMES',
+  'At least one seat is required': 'SEAT_REQUIRED',
+  'One or more showtime seats were not found': 'SEAT_NOT_FOUND',
+  'Couple seat must have a valid partner': 'COUPLE_PARTNER_INVALID',
+  'A maximum of 10 physical seats can be held': 'SEAT_LIMIT_EXCEEDED',
+  'One or more seats are being held': 'SEATS_HELD',
+  'One or more seats are no longer available': 'SEATS_UNAVAILABLE',
+  'Showtime has already started': 'SHOWTIME_STARTED',
+  'Booking not found': 'BOOKING_NOT_FOUND',
+  'Only pending bookings can be cancelled': 'BOOKING_NOT_CANCELLABLE',
+  'Booking is no longer available for checkout': 'BOOKING_NOT_PAYABLE',
+  'Booking is no longer payable': 'BOOKING_NOT_PAYABLE',
+  'Booking no longer owns all selected seats': 'BOOKING_SEATS_NOT_OWNED',
+  'Booking could not be confirmed': 'BOOKING_CONFIRM_FAILED',
+  'Selected seats could not be sold': 'SEATS_SALE_FAILED',
+  'Payment idempotency key is required': 'PAYMENT_IDEMPOTENCY_REQUIRED',
+  'Payment idempotency key is already used': 'PAYMENT_IDEMPOTENCY_CONFLICT',
+  'Mock payments are disabled': 'PAYMENT_MOCK_DISABLED',
+  'Ticket not found': 'TICKET_NOT_FOUND',
+  'TMDB movie not found': 'TMDB_MOVIE_NOT_FOUND',
+  'TMDB integration is not configured': 'TMDB_NOT_CONFIGURED',
+  'TMDB request limit reached': 'TMDB_RATE_LIMITED',
+};
+
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -47,10 +105,13 @@ export class ApiExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const statusCode = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      const { message, details } = this.resolveHttpMessage(exceptionResponse);
+      const { code, message, details } = this.resolveHttpMessage(
+        exceptionResponse,
+        statusCode,
+      );
       return {
         statusCode,
-        code: this.codeForStatus(statusCode),
+        code,
         message,
         details,
       };
@@ -102,26 +163,34 @@ export class ApiExceptionFilter implements ExceptionFilter {
     };
   }
 
-  private resolveHttpMessage(response: string | object) {
+  private resolveHttpMessage(response: string | object, statusCode: number) {
     if (typeof response === 'string') {
-      return { message: response, details: [] };
+      return {
+        code: messageCodes[response] ?? this.codeForStatus(statusCode),
+        message: response,
+        details: [],
+      };
     }
 
     const record = response as Record<string, unknown>;
     const rawMessage = record.message;
+    const explicitCode = typeof record.code === 'string' ? record.code : undefined;
     if (Array.isArray(rawMessage)) {
       return {
+        code: explicitCode ?? 'VALIDATION_FAILED',
         message: 'Request validation failed',
         details: rawMessage,
       };
     }
 
+    const message =
+      typeof rawMessage === 'string'
+        ? rawMessage
+        : 'Request could not be processed';
     return {
-      message:
-        typeof rawMessage === 'string'
-          ? rawMessage
-          : 'Request could not be processed',
-      details: [],
+      code: explicitCode ?? messageCodes[message] ?? this.codeForStatus(statusCode),
+      message,
+      details: Array.isArray(record.details) ? record.details : [],
     };
   }
 
