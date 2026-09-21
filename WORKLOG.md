@@ -51,30 +51,31 @@
 - Fix province picker: tìm không dấu/codename, reset search, lỗi API thật, layout ít kết quả và mobile viewport.
 - Deploy migration chain trên PostgreSQL integration và bổ sung regression tests.
 
-### Sprint 1 — Hold, expiry và payment correctness — ƯU TIÊN CAO NHẤT
+### Sprint 1 — Hold, expiry và payment correctness — ĐANG THỰC HIỆN
 
-- Back/“Thay đổi ghế” phải xác nhận, cancel/release hold thành công rồi mới điều hướng.
-- Làm cancel idempotent: `PENDING -> CANCELLED`; retry trên `CANCELLED/EXPIRED` trả kết quả hiện tại; `CONFIRMED` trả conflict.
-- Chính sách server: `HOLD_TTL = 10 phút`, buffer trước giờ chiếu `5 phút`; vùng direct-payment là `<= 15 phút` trước giờ chiếu.
-- Booking còn hơn 15 phút: hold tối đa 10 phút.
-- Booking còn tối đa 15 phút: không tạo hold dài hạn, dùng direct-payment flow.
-- Direct payment mock phải claim ghế và hoàn tất payment/ticket trong một transaction; thất bại không để ghế bị hold.
-- Expiry-aware seat state, tự giải phóng DB/Redis và điều hướng khi countdown hết hạn.
-- Countdown/progress thực theo `createdAt` và `expiresAt`; xóa timer giả `09:59` trước khi hold được tạo.
-- Hardening payment race/idempotency: không cho `CONFIRMED + FAILED`, lock order thống nhất, hash payload idempotency.
-- Thêm integration tests cho cancel, direct payment, expiry boundary và payment races.
+- ĐÃ LÀM: Back/“Thay đổi ghế” xác nhận, cancel/release hold thành công rồi mới điều hướng.
+- ĐÃ LÀM: Cancel idempotent: `PENDING -> CANCELLED`; retry trên `CANCELLED/EXPIRED` trả kết quả hiện tại; `CONFIRMED` trả conflict.
+- ĐÃ LÀM: Chính sách server `HOLD_TTL = 10 phút` + buffer `5 phút`; vùng purchase không hold là `<= 15 phút` trước giờ chiếu.
+- ĐÃ LÀM: Booking còn hơn 15 phút dùng hold; booking trong vùng cuối dùng atomic purchase, không tạo `HELD`.
+- ĐÃ LÀM: Atomic purchase claim ghế và hoàn tất payment/ticket trong một transaction; Couple được canonicalize.
+- ĐÃ LÀM: Seat read và purchase transaction tự normalize DB hold đã hết hạn.
+- ĐÃ LÀM: Countdown/progress checkout dùng thời gian còn lại; xóa timer giả `09:59` trên seat map.
+- ĐÃ LÀM: Integration coverage cho cancel idempotency và purchase boundary.
+- CÒN LẠI: Hardening payment race/idempotency bằng payload hash bền vững, lock order thống nhất và kiểm thử race chuyên sâu.
+- CÒN LẠI: Điều hướng tự động rõ ràng hơn khi countdown hết hạn và browser verification desktop/mobile.
 
-### Sprint 2 — Admin showtime và bulk scheduling
+### Sprint 2 — Admin showtime và bulk scheduling — ĐANG THỰC HIỆN
 
-- Chỉ cho admin chọn movie `PUBLISHED` khi tạo suất chiếu.
-- Sửa timezone `datetime-local` theo giờ Việt Nam `Asia/Ho_Chi_Minh` và test round-trip.
-- Backend tự tính `endsAt = startsAt + movie.duration`; UI hiển thị kết thúc read-only.
-- Khi đổi start/movie thì tính lại end; chỉ đổi pricing thì giữ end hiện tại.
-- Thêm bulk preview và bulk commit cho nhiều suất cùng movie/room.
-- Sinh slot tuần tự theo `firstStartsAt`, `duration`, `turnaroundMinutes`; không dùng random trong production.
-- Commit bulk atomic, conflict một slot thì rollback toàn batch.
-- Map exclusion constraint overlap thành lỗi `409 SHOWTIME_OVERLAP`.
-- Thêm integration tests concurrency, adjacency và rollback.
+- ĐÃ LÀM: Chỉ cho admin chọn movie `PUBLISHED` khi tạo/sửa suất chiếu.
+- ĐÃ LÀM: `datetime-local` được serialize theo giờ Việt Nam `Asia/Ho_Chi_Minh` với offset `+07:00`.
+- ĐÃ LÀM: Backend tự tính `endsAt = startsAt + movie.duration`; UI hiển thị kết thúc read-only.
+- ĐÃ LÀM: Khi đổi start/movie thì tính lại end; chỉ đổi pricing giữ end hiện tại.
+- ĐÃ LÀM: Thêm bulk preview và bulk commit cho nhiều suất cùng movie/room.
+- ĐÃ LÀM: Sinh slot tuần tự theo `firstStartsAt`, `duration`, `turnaroundMinutes`; không dùng random.
+- ĐÃ LÀM: Commit bulk atomic với Serializable transaction; overlap rollback toàn batch.
+- ĐÃ LÀM: Exclusion/transaction overlap trả `409 SHOWTIME_OVERLAP`.
+- ĐÃ LÀM: Unit coverage timezone/duration/preview và integration coverage bulk/rollback (chưa execute được do Docker daemon tắt).
+- CÒN LẠI: Chạy lại integration suite khi Docker Desktop hoạt động, browser verification admin bulk flow và test concurrency hai bulk request đồng thời.
 
 ### Sprint 3 — TMDB import nhiều phim và trailer
 
@@ -92,12 +93,14 @@
 
 - Hoàn thiện toàn bộ thông báo lỗi admin bằng tiếng Việt.
 - Bổ sung request ID ở vùng hỗ trợ, không hiển thị làm lỗi chính.
-- Browser verification desktop và viewport `<= 720px` cho hold/back, direct payment, countdown, bulk showtime, province search, TMDB import và trailer unavailable.
+- Browser verification desktop và viewport `<= 720px` cho hold/back, atomic purchase, countdown, bulk showtime, province search, TMDB import và trailer unavailable.
 - Chạy đầy đủ lint, typecheck, build, unit, e2e, integration, API generation/check.
 - Seed hai lần trên database development, kiểm tra counts và idempotency.
 - Cập nhật README, OpenAPI, generated frontend types và design reference nếu UI admin thay đổi lớn.
 
 ## Việc còn lại
 
+- Hoàn tất payment payload hash/race hardening và test cạnh tranh chuyên sâu.
+- Browser verification desktop và viewport `<= 720px` cho hold/back, atomic purchase, countdown và admin bulk scheduling.
+- Test concurrency hai bulk scheduling request đồng thời.
 - Chạy seed hai lần trên database development và kiểm tra counts/idempotency nếu cần môi trường dữ liệu thật.
-- Bắt đầu Sprint 1: release hold khi Back/Thay đổi ghế, direct payment trong vùng T-15, expiry-aware seat state, countdown/progress và payment race hardening.

@@ -67,6 +67,36 @@ describe('Booking flow integration', () => {
     });
   });
 
+  it('creates bulk showtimes from movie duration and rolls back on overlap', async () => {
+    const firstStartsAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const body = {
+      movieId: fixture.movieId,
+      roomId: fixture.roomId,
+      firstStartsAt,
+      count: 2,
+      turnaroundMinutes: 20,
+      basePrice: 100000,
+    };
+    const created = await request(appA.getHttpServer())
+      .post('/api/v1/showtimes/bulk')
+      .set('Authorization', `Bearer ${fixture.admin.token}`)
+      .send(body)
+      .expect(201);
+
+    expect(created.body).toHaveLength(2);
+    expect(new Date(created.body[0].endsAt).getTime() - new Date(created.body[0].startsAt).getTime()).toBe(120 * 60 * 1000);
+    expect(await adminPrisma.showtime.count({ where: { movieId: fixture.movieId } })).toBe(3);
+
+    const conflict = await request(appA.getHttpServer())
+      .post('/api/v1/showtimes/bulk')
+      .set('Authorization', `Bearer ${fixture.admin.token}`)
+      .send({ ...body, firstStartsAt: new Date(Date.now() + 49 * 60 * 60 * 1000).toISOString() })
+      .expect(409);
+
+    expect(conflict.body.code).toBe('SHOWTIME_OVERLAP');
+    expect(await adminPrisma.showtime.count({ where: { movieId: fixture.movieId } })).toBe(3);
+  });
+
   it('allows only one user to hold a seat concurrently', async () => {
     const gate = deferred<void>();
     const contenders = [
@@ -126,6 +156,29 @@ describe('Booking flow integration', () => {
     expect(await adminRedis.get(`booking:seat:${fixture.showtimeId}:${fixture.showtimeSeatIds[1]}`)).toBeNull();
   });
 
+  it('cancels a booking idempotently and releases the seat', async () => {
+    const held = await hold(appA, fixture.customerA.token, fixture.showtimeId, [fixture.showtimeSeatIds[0]], `hold-cancel-${Date.now()}`).expect(201);
+    const path = `/api/v1/bookings/${held.body.id}/cancel`;
+    const first = await request(appA.getHttpServer())
+      .post(path)
+      .set('Authorization', `Bearer ${fixture.customerA.token}`)
+      .expect(201);
+    const second = await request(appA.getHttpServer())
+      .post(path)
+      .set('Authorization', `Bearer ${fixture.customerA.token}`)
+      .expect(201);
+
+    expect(first.body.status).toBe(BookingStatus.CANCELLED);
+    expect(second.body.id).toBe(first.body.id);
+    expect(second.body.status).toBe(BookingStatus.CANCELLED);
+    expect(await adminPrisma.showtimeSeat.findUnique({ where: { id: fixture.showtimeSeatIds[0] } })).toMatchObject({
+      status: ShowtimeSeatStatus.AVAILABLE,
+      heldUntil: null,
+      heldByBookingId: null,
+    });
+    expect(await adminRedis.get(`booking:seat:${fixture.showtimeId}:${fixture.showtimeSeatIds[0]}`)).toBeNull();
+  });
+
   it('expires a booking and releases the seat for another user', async () => {
     const held = await hold(appA, fixture.customerA.token, fixture.showtimeId, [fixture.showtimeSeatIds[0]], `hold-expire-${Date.now()}`).expect(201);
     await request(appA.getHttpServer())
@@ -146,6 +199,31 @@ describe('Booking flow integration', () => {
     expect(seat).toMatchObject({ status: ShowtimeSeatStatus.AVAILABLE, heldUntil: null, heldByBookingId: null });
     expect(await adminRedis.get(`booking:seat:${fixture.showtimeId}:${fixture.showtimeSeatIds[0]}`)).toBeNull();
     await hold(appB, fixture.customerB.token, fixture.showtimeId, [fixture.showtimeSeatIds[0]], `hold-after-expire-${Date.now()}`).expect(201);
+  });
+
+  it('rejects a hold in the purchase window and completes atomic purchase', async () => {
+    const nearShowtime = await adminPrisma.showtime.update({
+      where: { id: fixture.showtimeId },
+      data: {
+        startsAt: new Date(Date.now() + 15 * 60 * 1000),
+        endsAt: new Date(Date.now() + 17 * 60 * 60 * 1000),
+      },
+    });
+    const holdResponse = await hold(appA, fixture.customerA.token, nearShowtime.id, [fixture.showtimeSeatIds[0]], `hold-direct-${Date.now()}`);
+    expect(holdResponse.status).toBe(409);
+    expect(holdResponse.body.code).toBe('PURCHASE_REQUIRED');
+
+    const response = await request(appA.getHttpServer())
+      .post('/api/v1/payments/mock/purchase')
+      .set('Authorization', `Bearer ${fixture.customerA.token}`)
+      .set('Idempotency-Key', `purchase-${Date.now()}`)
+      .send({ showtimeId: nearShowtime.id, showtimeSeatIds: [fixture.showtimeSeatIds[0]], success: true })
+      .expect(201);
+
+    expect(response.body.booking.status).toBe(BookingStatus.CONFIRMED);
+    expect(response.body.payment.status).toBe(PaymentStatus.SUCCEEDED);
+    expect(await adminPrisma.ticket.count({ where: { bookingId: response.body.booking.id } })).toBe(1);
+    expect(await adminPrisma.showtimeSeat.findUnique({ where: { id: fixture.showtimeSeatIds[0] } })).toMatchObject({ status: ShowtimeSeatStatus.SOLD });
   });
 
   it('keeps one payment and one ticket per item on successful payment retry', async () => {

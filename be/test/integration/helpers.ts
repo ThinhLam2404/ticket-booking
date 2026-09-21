@@ -9,8 +9,11 @@ import { JwtTokenService } from '../../src/modules/auth/jwt-token.service.js';
 import { BookingExpiryScheduler } from '../../src/modules/bookings/booking-expiry.scheduler.js';
 
 export interface IntegrationFixture {
+  admin: { id: string; token: string };
   customerA: { id: string; token: string };
   customerB: { id: string; token: string };
+  movieId: string;
+  roomId: string;
   showtimeId: string;
   showtimeSeatIds: string[];
 }
@@ -78,7 +81,15 @@ export async function resetIntegrationState() {
 
 export async function createFixture(app: INestApplication): Promise<IntegrationFixture> {
   const suffix = randomUUID();
-  const [customerA, customerB] = await Promise.all([
+  const [admin, customerA, customerB] = await Promise.all([
+    adminPrisma.user.create({
+      data: {
+        email: `admin-${suffix}@example.com`,
+        fullName: 'Admin',
+        passwordHash: 'integration-only',
+        role: UserRole.ADMIN,
+      },
+    }),
     adminPrisma.user.create({
       data: {
         email: `customer-a-${suffix}@example.com`,
@@ -110,10 +121,17 @@ export async function createFixture(app: INestApplication): Promise<IntegrationF
     data: { name: `Integration Room ${suffix}`, cinemaId: cinema.id },
   });
   const seats = await Promise.all(
-    ['A', 'B', 'C'].map((row, index) =>
-      adminPrisma.seat.create({
-        data: { row, number: index + 1, roomId: room.id, type: 'STANDARD' },
-      }),
+    ['A', 'B', 'C', 'D', 'E'].flatMap((row) =>
+      [1, 2].map((number) =>
+        adminPrisma.seat.create({
+          data: {
+            row,
+            number,
+            roomId: room.id,
+            type: row === 'E' ? 'COUPLE' : row === 'D' ? 'VIP' : 'STANDARD',
+          },
+        }),
+      ),
     ),
   );
   const showtime = await adminPrisma.showtime.create({
@@ -130,6 +148,12 @@ export async function createFixture(app: INestApplication): Promise<IntegrationF
   });
   const tokenService = app.get(JwtTokenService);
   return {
+    movieId: movie.id,
+    roomId: room.id,
+    admin: {
+      id: admin.id,
+      token: tokenService.createAccessToken(admin),
+    },
     customerA: {
       id: customerA.id,
       token: tokenService.createAccessToken(customerA),

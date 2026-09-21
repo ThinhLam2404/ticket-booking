@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import {
   BookingStatus,
+  MovieStatus,
   PaymentStatus,
+  Prisma,
   ShowtimeSeatStatus,
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
@@ -15,15 +17,248 @@ import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { BookingsService } from '../bookings/bookings.service.js';
-import { MockPaymentDto } from './dto/mock-payment.dto.js';
+import { RedisService } from '../redis/redis.service.js';
+import { MockPaymentDto, PurchaseSeatsDto } from './dto/mock-payment.dto.js';
+import {
+  PURCHASE_LOCK_TTL_SECONDS,
+  PURCHASE_WINDOW_SECONDS,
+} from '../bookings/booking-policy.js';
 
 @Injectable()
 export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bookingsService: BookingsService,
+    private readonly redis: RedisService,
     private readonly config: ConfigService,
   ) {}
+
+  async purchaseSeats(userId: string, dto: PurchaseSeatsDto) {
+    const nodeEnv = this.config.get<string>('NODE_ENV') ?? 'development';
+    if (nodeEnv !== 'development' && nodeEnv !== 'test') {
+      throw new ForbiddenException('Mock payments are disabled');
+    }
+    const idempotencyKey = dto.idempotencyKey?.trim();
+    if (!idempotencyKey) {
+      throw new ConflictException('Payment idempotency key is required');
+    }
+
+    const existingByKey = await this.prisma.payment.findUnique({
+      where: { idempotencyKey },
+      include: { booking: true },
+    });
+    if (existingByKey) {
+      if (existingByKey.booking.userId !== userId) {
+        throw new ConflictException('Payment idempotency key is already used');
+      }
+      return this.getPaymentResult(userId, existingByKey.bookingId);
+    }
+
+    const showtime = await this.prisma.showtime.findUnique({
+      where: { id: dto.showtimeId },
+      include: { movie: true, showtimeSeats: { include: { seat: true } } },
+    });
+    if (!showtime || showtime.movie.status !== MovieStatus.PUBLISHED) {
+      throw new NotFoundException('Showtime not found');
+    }
+    const secondsUntilShowtime = Math.floor(
+      (showtime.startsAt.getTime() - Date.now()) / 1000,
+    );
+    if (secondsUntilShowtime <= 0) {
+      throw new ConflictException('Showtime has already started');
+    }
+    if (secondsUntilShowtime > PURCHASE_WINDOW_SECONDS) {
+      throw new ConflictException(
+        'Seat purchase is only available within the final purchase window',
+      );
+    }
+
+    const seatsById = new Map(
+      showtime.showtimeSeats.map((seat) => [seat.id, seat]),
+    );
+    const seatsByCoordinate = new Map(
+      showtime.showtimeSeats.map((seat) => [
+        `${seat.seat.row}:${seat.seat.number}`,
+        seat,
+      ]),
+    );
+    const canonicalSeats = new Map<
+      string,
+      (typeof showtime.showtimeSeats)[number]
+    >();
+    for (const seatId of new Set(dto.showtimeSeatIds)) {
+      const seat = seatsById.get(seatId);
+      if (!seat) {
+        throw new NotFoundException(
+          'One or more showtime seats were not found',
+        );
+      }
+      canonicalSeats.set(seat.id, seat);
+      if (seat.seat.type === 'COUPLE') {
+        const partner = seatsByCoordinate.get(
+          `${seat.seat.row}:${seat.seat.number % 2 === 1 ? seat.seat.number + 1 : seat.seat.number - 1}`,
+        );
+        if (!partner || partner.seat.type !== 'COUPLE') {
+          throw new ConflictException('Couple seat must have a valid partner');
+        }
+        canonicalSeats.set(partner.id, partner);
+      }
+    }
+    const canonicalSeatIds = [...canonicalSeats.values()]
+      .sort(
+        (left, right) =>
+          left.seat.row.localeCompare(right.seat.row) ||
+          left.seat.number - right.seat.number,
+      )
+      .map((seat) => seat.id);
+    if (canonicalSeatIds.length > 10) {
+      throw new ConflictException('A maximum of 10 physical seats can be held');
+    }
+
+    const holdToken = randomUUID();
+    const acquiredSeatIds: string[] = [];
+    try {
+      for (const seatId of canonicalSeatIds) {
+        const acquired = await this.redis.setIfAbsent(
+          `booking:seat:${dto.showtimeId}:${seatId}`,
+          holdToken,
+          PURCHASE_LOCK_TTL_SECONDS,
+        );
+        if (acquired !== 'OK') {
+          throw new ConflictException('One or more seats are being held');
+        }
+        acquiredSeatIds.push(seatId);
+      }
+      const result = await this.prisma.$transaction(async (transaction) => {
+        //NOTE - kiểm tra ghế trạng thái HELD nhưng đã hết thời gian giữ
+        await transaction.showtimeSeat.updateMany({
+          where: {
+            id: { in: canonicalSeatIds },
+            showtimeId: dto.showtimeId,
+            status: ShowtimeSeatStatus.HELD,
+            heldUntil: { lte: new Date() },
+          },
+          data: {
+            status: ShowtimeSeatStatus.AVAILABLE,
+            heldUntil: null,
+            heldByBookingId: null,
+          },
+        });
+        const availableSeats = await transaction.showtimeSeat.findMany({
+          where: {
+            id: { in: canonicalSeatIds },
+            showtimeId: dto.showtimeId,
+            status: ShowtimeSeatStatus.AVAILABLE,
+          },
+        });
+        if (availableSeats.length !== canonicalSeatIds.length) {
+          throw new ConflictException(
+            'One or more seats are no longer available',
+          );
+        }
+        //nếu false thì tạo booking cancel, payment fail và không bán ghế
+        if (dto.success === false) {
+          const booking = await transaction.booking.create({
+            data: {
+              userId,
+              showtimeId: dto.showtimeId,
+              totalAmount: availableSeats.reduce(
+                (total, seat) => total.plus(seat.price),
+                new Prisma.Decimal(0),
+              ),
+              expiresAt: new Date(),
+              holdToken,
+              status: BookingStatus.CANCELLED,
+              items: {
+                create: availableSeats.map((seat) => ({
+                  showtimeSeatId: seat.id,
+                  price: seat.price,
+                })),
+              },
+            },
+          });
+          const payment = await transaction.payment.create({
+            data: {
+              bookingId: booking.id,
+              amount: booking.totalAmount,
+              provider: 'MOCK',
+              reference: dto.reference?.trim() || `MOCK-${randomUUID()}`,
+              idempotencyKey,
+              status: PaymentStatus.FAILED,
+            },
+          });
+          return { bookingId: booking.id, paymentId: payment.id };
+        }
+        //nếu success tạo booking confirm, showtime seat sold, payment succeed, tạo ticket
+        const booking = await transaction.booking.create({
+          data: {
+            userId,
+            showtimeId: dto.showtimeId,
+            totalAmount: availableSeats.reduce(
+              (total, seat) => total.plus(seat.price),
+              new Prisma.Decimal(0),
+            ),
+            expiresAt: new Date(),
+            holdToken,
+            status: BookingStatus.CONFIRMED,
+            items: {
+              create: availableSeats.map((seat) => ({
+                showtimeSeatId: seat.id,
+                price: seat.price,
+              })),
+            },
+          },
+          include: { items: true },
+        });
+        const soldSeats = await transaction.showtimeSeat.updateMany({
+          where: {
+            id: { in: canonicalSeatIds },
+            status: ShowtimeSeatStatus.AVAILABLE,
+          },
+          data: { status: ShowtimeSeatStatus.SOLD },
+        });
+        if (soldSeats.count !== canonicalSeatIds.length) {
+          throw new ConflictException('Selected seats could not be sold');
+        }
+        const payment = await transaction.payment.create({
+          data: {
+            bookingId: booking.id,
+            amount: booking.totalAmount,
+            provider: 'MOCK',
+            reference: dto.reference?.trim() || `MOCK-${randomUUID()}`,
+            idempotencyKey,
+            status: PaymentStatus.SUCCEEDED,
+          },
+        });
+        for (const item of booking.items) {
+          await transaction.ticket.create({
+            data: {
+              code: `TKT-${randomUUID()}`,
+              bookingId: booking.id,
+              bookingItemId: item.id,
+            },
+          });
+        }
+        return { bookingId: booking.id, paymentId: payment.id };
+      });
+
+      return this.getPaymentResult(userId, result.bookingId);
+    } catch (error) {
+      const existingPayment = await this.prisma.payment.findUnique({
+        where: { idempotencyKey },
+      });
+      if (existingPayment) {
+        return this.getPaymentResult(userId, existingPayment.bookingId);
+      }
+      throw error;
+    } finally {
+      await this.bookingsService.releaseSeatLocks(
+        dto.showtimeId,
+        acquiredSeatIds,
+        holdToken,
+      );
+    }
+  }
 
   async processMockPayment(
     userId: string,

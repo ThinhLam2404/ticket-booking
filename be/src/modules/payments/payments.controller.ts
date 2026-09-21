@@ -18,7 +18,10 @@ import { MockPaymentResponseDto } from '../../common/http/dto/response.dto.js';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
-import { MockPaymentDto } from './dto/mock-payment.dto.js';
+import {
+  MockPaymentDto,
+  PurchaseSeatsDto,
+} from './dto/mock-payment.dto.js';
 import { PaymentsService } from './payments.service.js';
 
 @ApiTags('payments')
@@ -27,6 +30,26 @@ import { PaymentsService } from './payments.service.js';
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
+
+  @Post('mock/purchase')
+  @ApiResponse({ status: 201, type: MockPaymentResponseDto })
+  @ApiHeader({
+    name: 'idempotency-key',
+    required: false,
+    description: 'Optional when idempotencyKey is provided in the request body',
+  })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
+  purchaseSeats(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: PurchaseSeatsDto,
+    @Headers('idempotency-key') headerIdempotencyKey?: string,
+  ) {
+    dto.idempotencyKey = headerIdempotencyKey?.trim() || dto.idempotencyKey;
+    if (!dto.idempotencyKey) {
+      throw new BadRequestException('Payment idempotency key is required');
+    }
+    return this.paymentsService.purchaseSeats(user.id, dto);
+  }
 
   @Post('mock/:bookingId')
   @ApiResponse({ status: 201, type: MockPaymentResponseDto })

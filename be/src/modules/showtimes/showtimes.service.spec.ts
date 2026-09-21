@@ -2,6 +2,31 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { ShowtimeSeatStatus } from '@prisma/client';
 import { ShowtimesService } from './showtimes.service.js';
 
+describe('ShowtimesService expiry lifecycle', () => {
+  it('delegates expired booking cleanup before reading a showtime', async () => {
+    const expireBookingsForShowtime = vi.fn().mockResolvedValue(undefined);
+    const showtime = {
+      id: 'showtime-1',
+      startsAt: new Date(Date.now() + 60 * 60 * 1000),
+      endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+      movie: { status: 'PUBLISHED' },
+      room: { cinema: {} },
+      showtimeSeats: [],
+    };
+    const prisma = {
+      showtime: { findUnique: vi.fn().mockResolvedValue(showtime) },
+    };
+    const service = new ShowtimesService(
+      prisma as never,
+      { expireBookingsForShowtime } as never,
+    );
+
+    await service.findOne('showtime-1');
+
+    expect(expireBookingsForShowtime).toHaveBeenCalledWith('showtime-1');
+  });
+});
+
 describe('ShowtimesService province filtering', () => {
   it('filters public showtimes through the cinema province', async () => {
     const showtimeFindMany = vi.fn().mockResolvedValue([]);
@@ -10,7 +35,7 @@ describe('ShowtimesService province filtering', () => {
       $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
       showtime: { findMany: showtimeFindMany, count: showtimeCount },
     };
-    const service = new ShowtimesService(prisma as never);
+    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
 
     await expect(service.findAll({ page: 1, pageSize: 20, provinceCode: 48 })).resolves.toMatchObject({
       data: [],
@@ -29,6 +54,106 @@ describe('ShowtimesService province filtering', () => {
   });
 });
 
+function validRoomSeats() {
+  return [
+    ...['A', 'B', 'C'].flatMap((row) =>
+      Array.from({ length: 2 }, (_, index) => ({
+        id: `${row}-${index + 1}`,
+        row,
+        number: index + 1,
+        type: 'STANDARD' as const,
+      })),
+    ),
+    ...['D'].flatMap((row) =>
+      Array.from({ length: 2 }, (_, index) => ({
+        id: `${row}-${index + 1}`,
+        row,
+        number: index + 1,
+        type: 'VIP' as const,
+      })),
+    ),
+    ...['E'].flatMap((row) =>
+      Array.from({ length: 2 }, (_, index) => ({
+        id: `${row}-${index + 1}`,
+        row,
+        number: index + 1,
+        type: 'COUPLE' as const,
+      })),
+    ),
+  ];
+}
+
+describe('ShowtimesService scheduling', () => {
+  it('requires an explicit timezone on the start time', async () => {
+    const service = new ShowtimesService({} as never, { expireBookingsForShowtime: vi.fn() } as never);
+
+    await expect(service.create({
+      movieId: 'movie-1',
+      roomId: 'room-1',
+      startsAt: '2026-10-01T19:00',
+      basePrice: 100000,
+    })).rejects.toEqual(new BadRequestException('Showtime start must include an explicit timezone offset'));
+  });
+
+  it('derives the end time from the published movie duration', async () => {
+    const seats = validRoomSeats();
+    const showtimeCreate = vi.fn().mockResolvedValue({ id: 'showtime-1' });
+    const prisma = {
+      movie: { findUnique: vi.fn().mockResolvedValue({ id: 'movie-1', duration: 120, status: 'PUBLISHED' }) },
+      room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1', seats }) },
+      showtime: { findFirst: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn(async (callback: (transaction: unknown) => unknown) => callback({
+        showtime: {
+          create: showtimeCreate,
+          findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'showtime-1' }),
+        },
+        showtimeSeat: { createMany: vi.fn().mockResolvedValue({ count: seats.length }) },
+      })),
+    };
+    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const startsAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await service.create({
+      movieId: 'movie-1',
+      roomId: 'room-1',
+      startsAt: startsAt.toISOString(),
+      basePrice: 100000,
+    });
+
+    expect(showtimeCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + 120 * 60 * 1000),
+      }),
+    }));
+  });
+
+  it('builds a bulk preview sequentially using duration and turnaround', async () => {
+    const seats = validRoomSeats();
+    const prisma = {
+      movie: { findUnique: vi.fn().mockResolvedValue({ id: 'movie-1', duration: 120, status: 'PUBLISHED' }) },
+      room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1', seats }) },
+      showtime: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const firstStartsAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    const result = await service.previewBulk({
+      movieId: 'movie-1',
+      roomId: 'room-1',
+      firstStartsAt: firstStartsAt.toISOString(),
+      count: 2,
+      turnaroundMinutes: 20,
+      basePrice: 100000,
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.slots).toHaveLength(2);
+    expect(result.slots[1]?.startsAt).toEqual(new Date(firstStartsAt.getTime() + 140 * 60 * 1000));
+    expect(result.slots[1]?.endsAt).toEqual(new Date(firstStartsAt.getTime() + 260 * 60 * 1000));
+  });
+});
+
 describe('ShowtimesService admin updates', () => {
   it('rejects malformed room layouts before creating a showtime', async () => {
     const showtimeCreate = vi.fn();
@@ -41,14 +166,13 @@ describe('ShowtimesService admin updates', () => {
       },
       showtime: { findFirst: vi.fn().mockResolvedValue(null), create: showtimeCreate },
     };
-    const service = new ShowtimesService(prisma as never);
+    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
 
     await expect(
       service.create({
         movieId: 'movie-1',
         roomId: 'room-1',
         startsAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-        endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
         basePrice: 100000,
       }),
     ).rejects.toEqual(new BadRequestException('Seat layout requires at least five rows'));
@@ -91,7 +215,7 @@ describe('ShowtimesService admin updates', () => {
         }),
       ),
     };
-    const service = new ShowtimesService(prisma as never);
+    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
 
     await expect(
       service.update('showtime-1', {
@@ -139,7 +263,7 @@ describe('ShowtimesService admin updates', () => {
         }),
       ),
     };
-    const service = new ShowtimesService(prisma as never);
+    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
 
     await service.update('showtime-1', { coupleMultiplier: 1.3 });
 
@@ -182,7 +306,7 @@ describe('ShowtimesService admin updates', () => {
         callback({ showtime: { findUnique: showtimeFindUnique } }),
       ),
     };
-    const service = new ShowtimesService(prisma as never);
+    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
 
     await expect(
       service.update('showtime-1', {

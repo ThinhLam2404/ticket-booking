@@ -33,8 +33,9 @@
 ## Frontend and visual work
 
 - For UI changes, read `DESIGN.md` and use the `design` skill configured through `opencode.json`; the source UI uses plain CSS in `fe/src/App.css`/`fe/src/index.css`, Inter, the CineNoir Violet tokens, and Vietnamese copy.
+- For new or substantially redesigned UI, use the Inspo MCP first to find relevant visual references and composition guidance, then create or update the matching reference screen in Stitch before implementing the FE code.
 - Preserve loading, empty, error, hover, focus, and disabled states. Verify visual changes in a real browser at desktop and at widths of `720px` or less; do not introduce Tailwind or a second UI library/font.
-- When creating or substantially redesigning a FE screen, create or edit its matching reference screen in Stitch project `projects/5412677534890310186` first/alongside the implementation, using CineNoir Violet asset `assets/d4cbcdab6124411596094e1c58b30526`; record the resulting screen ID in the work notes.
+- When creating or substantially redesigning a FE screen, create or edit its matching reference screen in Stitch project `projects/5412677534890310186` first/alongside the implementation, using CineNoir Violet asset `assets/d4cbcdab6124411596094e1c58b30526`; record the resulting screen ID and Inspo references in the work notes.
 - Admin routes use the standalone `/admin/login` and Admin Shell/sidebar rather than the customer `Layout`; keep the desktop sidebar stable and mobile drawer restrained, with no unnecessary animation.
 
 ## Repository investigation

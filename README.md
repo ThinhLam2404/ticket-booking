@@ -29,6 +29,7 @@ MVP hiện tại hỗ trợ:
 - Đăng ký, đăng nhập, refresh token và logout.
 - Phân quyền `CUSTOMER` và `ADMIN`.
 - CRUD phim, rạp, phòng, ghế và suất chiếu.
+- Admin tạo suất chiếu đơn hoặc lập lịch hàng loạt theo thời lượng phim, timezone Việt Nam và khoảng nghỉ giữa suất.
 - Admin tìm kiếm và nhập phim từ TMDB vào catalog nội bộ.
 - Chọn tỉnh/thành để lọc rạp, phim và suất chiếu.
 - Xem trailer YouTube chính thức trong modal an toàn.
@@ -215,7 +216,8 @@ Customer UI hiện có:
 - Catalog phim và tìm kiếm.
 - Bộ chọn tỉnh/thành dùng reference data nội bộ; popup được render ở `document.body`, khóa scroll nền khi mở và khôi phục focus/scroll khi đóng. Catalog debounce 120ms khi đổi khu vực liên tục và hủy request cũ bằng `AbortSignal`.
 - Chọn suất chiếu và sơ đồ ghế.
-- Hold tối đa 10 ghế bằng `Idempotency-Key`.
+- Hold tối đa 10 ghế bằng `Idempotency-Key` khi suất chiếu còn hơn 15 phút.
+- Atomic purchase trong vùng cuối trước suất chiếu, gồm claim ghế, payment và ticket trong một transaction; không tạo hold.
 - Checkout và mock payment success/failure.
 - Booking history và ticket history.
 - Login/register và logout; nút logout dùng màu violet ở trạng thái thường và đỏ trầm khi hover.
@@ -1564,6 +1566,23 @@ sequenceDiagram
 #### `POST /api/v1/showtimes`
 
 - Auth: Bearer JWT.
+- `startsAt` phải có timezone rõ ràng, frontend gửi giờ Việt Nam dạng `+07:00`.
+- `endsAt` không nhận từ client; backend tự tính `startsAt + Movie.duration`.
+- Chỉ movie `PUBLISHED` mới được lập lịch.
+
+#### `POST /api/v1/showtimes/bulk/preview`
+
+- Auth: Bearer JWT, role `ADMIN`.
+- Nhận movie, room, `firstStartsAt`, `count`, `turnaroundMinutes` và pricing.
+- Trả danh sách slot, thời gian kết thúc tự tính, cờ conflict và `valid`.
+- Không ghi dữ liệu.
+
+#### `POST /api/v1/showtimes/bulk`
+
+- Auth: Bearer JWT, role `ADMIN`.
+- Tạo toàn bộ slot trong một transaction Serializable.
+- Nếu có overlap hoặc lỗi khởi tạo seat, rollback toàn batch.
+- Database exclusion constraint vẫn là lớp bảo vệ cuối cùng.
 - Role: `ADMIN`.
 - Success: `201`.
 - Body:
@@ -1572,8 +1591,7 @@ sequenceDiagram
 {
   "movieId": "clx-movie-id",
   "roomId": "clx-room-id",
-  "startsAt": "2026-10-01T19:00:00.000Z",
-  "endsAt": "2026-10-01T21:49:00.000Z",
+  "startsAt": "2026-10-01T19:00:00+07:00",
   "basePrice": 100000,
   "vipMultiplier": 1.1,
   "coupleMultiplier": 1.2
@@ -1584,8 +1602,8 @@ Rules:
 
 - Movie phải tồn tại và `PUBLISHED`.
 - Room phải tồn tại và có layout hợp lệ với ít nhất 5 hàng.
-- `startsAt < endsAt`.
-- `startsAt` phải ở tương lai.
+- `endsAt = startsAt + Movie.duration`.
+- `startsAt` phải có timezone và ở tương lai.
 - Không overlap với showtime khác trong cùng room.
 - Standard price = `basePrice`.
 - VIP price = `basePrice * vipMultiplier`; default multiplier `1.1`.
@@ -1631,10 +1649,11 @@ Validation:
 
 State effect:
 
-1. Verify showtime published/chưa bắt đầu.
-2. Verify seat IDs thuộc đúng showtime.
-3. Sinh `holdToken` nội bộ.
-4. Redis `SET NX EX 600` cho từng ghế.
+1. Verify showtime published/chưa bắt đầu và còn hơn `HOLD_TTL + buffer` (15 phút).
+2. Trong vùng cuối 15 phút, request hold trả `409 PURCHASE_REQUIRED`; client chuyển sang atomic purchase không hold.
+3. Verify seat IDs thuộc đúng showtime.
+4. Sinh `holdToken` nội bộ.
+5. Redis `SET NX EX 600` cho từng ghế.
 5. Transaction kiểm tra ghế `AVAILABLE`.
 6. Tính tổng tiền từ `ShowtimeSeat.price`.
 7. Tạo `Booking(PENDING)` và `BookingItem`.
@@ -1680,7 +1699,8 @@ Errors: `400`, `401`, `404`, `409`, `503`.
 
 - Auth: Bearer JWT.
 - Success: `201`.
-- Chỉ booking `PENDING` được cancel.
+- `PENDING` chuyển thành `CANCELLED`; retry trên `CANCELLED` hoặc `EXPIRED` trả trạng thái hiện tại.
+- `CONFIRMED` không thể cancel và trả `409`.
 - State effect:
   - Booking → `CANCELLED`.
   - Payment pending → `FAILED`.
@@ -1689,6 +1709,28 @@ Errors: `400`, `401`, `404`, `409`, `503`.
 - Errors: `401`, `404`, `409`.
 
 ### 8.12. Payments API
+
+#### `POST /api/v1/payments/mock/purchase`
+
+- Auth: Bearer JWT.
+- Success: `201`.
+- Chỉ hoạt động với `NODE_ENV=development` hoặc `test`.
+- Chỉ được dùng trong vùng cuối `HOLD_TTL + buffer` (15 phút); nếu còn xa hơn, API trả `409 PURCHASE_WINDOW`.
+- Không tạo booking `PENDING` và không tạo trạng thái `HELD`: request dùng Redis lock ngắn để phân xử, sau đó trong một transaction claim ghế khả dụng, tạo booking `CONFIRMED`, payment `SUCCEEDED`, chuyển ghế sang `SOLD` và phát hành ticket.
+- Couple seat được canonicalize thành hai ghế vật lý trước khi lock và tính tiền.
+- Ai claim lock/transaction thành công trước sẽ mua được ghế; request sau nhận conflict.
+
+Body:
+
+```json
+{
+  "showtimeId": "clx-showtime-id",
+  "showtimeSeatIds": ["clx-showtime-seat-a1", "clx-showtime-seat-a2"],
+  "reference": "MOCK-PURCHASE-001",
+  "success": true,
+  "idempotencyKey": "purchase-attempt-001"
+}
+```
 
 #### `POST /api/v1/payments/mock/:bookingId`
 
@@ -2001,8 +2043,9 @@ Quy tắc:
 - `idempotencyKey` unique.
 - `reference` unique.
 - `bookingId` unique.
+- Direct payment kiểm tra lại idempotency key trước khi claim Redis lock và trả kết quả canonical cho retry cùng key.
 
-Ticket dùng `bookingItemId` unique; payment success retry sử dụng upsert để không phát hành duplicate ticket.
+Ticket dùng `bookingItemId` unique; payment success retry sử dụng upsert để không phát hành duplicate ticket. Payload hash cho cùng payment key vẫn là hardening tiếp theo của Sprint 1.
 
 ### 10.5. Các invariant database
 
@@ -2035,8 +2078,9 @@ Một số request có thể gọi expiry cho booking mục tiêu trước khi �
 - Lấy booking detail.
 - Cancel.
 - Checkout/payment flow.
+- Đọc showtime/seat map: `ShowtimesService` ủy quyền cleanup cho `BookingsService` theo showtime.
 
-Scheduler vẫn là cơ chế chính để cleanup toàn hệ thống.
+`ShowtimesService` không tự đổi `ShowtimeSeat` nữa; expiry trung tâm đồng bộ booking, payment, DB seat và Redis lock. Scheduler vẫn là cơ chế chính để cleanup toàn hệ thống.
 
 ### 11.3. Redis lifecycle
 
@@ -2179,6 +2223,8 @@ Integration test với PostgreSQL/Redis thật:
 - Retry cùng hold idempotency key, bao gồm concurrent retry.
 - Cùng idempotency key nhưng payload khác.
 - Booking expiry giải phóng seat và cho user khác hold lại.
+- Cancel retry trả kết quả canonical và giải phóng seat/Redis lock.
+- Direct payment trong vùng T-15 claim Couple/seat, tạo payment/ticket atomic và chuyển seat sang SOLD.
 - Payment success retry không tạo ticket trùng.
 - Concurrent payment retry trả canonical result.
 - Payment failure giải phóng seat và cho user khác hold lại.

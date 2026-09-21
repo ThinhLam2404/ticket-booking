@@ -420,6 +420,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/showtimes/bulk/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Showtimes_previewBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/showtimes/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Showtimes_createBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bookings/hold": {
         parameters: {
             query?: never;
@@ -494,6 +526,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["Bookings_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/mock/purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Payments_purchaseSeats"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1110,15 +1158,78 @@ export interface components {
             endsAt: string;
             seats: components["schemas"]["ShowtimeSeatResponseDto"][];
         };
+        BulkShowtimeDto: {
+            /** @example clx123movie */
+            movieId: string;
+            /** @example clx123room */
+            roomId: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-01T19:00:00+07:00
+             */
+            firstStartsAt: string;
+            /** @example 5 */
+            count: number;
+            /**
+             * @description Minutes between the end of one showtime and the start of the next
+             * @example 20
+             */
+            turnaroundMinutes: number;
+            /**
+             * @description Base price for standard seats
+             * @example 100000
+             */
+            basePrice: number;
+            /**
+             * @description VIP price multiplier, defaults to 1.1
+             * @example 1.1
+             */
+            vipMultiplier?: number;
+            /**
+             * @description Couple price multiplier applied after the VIP multiplier, defaults to 1.2
+             * @example 1.2
+             */
+            coupleMultiplier?: number;
+        };
+        BulkShowtimeSlotResponseDto: {
+            /** @example 1 */
+            index: number;
+            /**
+             * Format: date-time
+             * @example 2026-10-01T19:00:00.000Z
+             */
+            startsAt: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-01T21:00:00.000Z
+             */
+            endsAt: string;
+            /** @example true */
+            available: boolean;
+            /** @example Room already has an overlapping showtime */
+            conflict?: string;
+        };
+        BulkShowtimePreviewResponseDto: {
+            /** @example clx123movie */
+            movieId: string;
+            /** @example clx123room */
+            roomId: string;
+            /** @example 120 */
+            durationMinutes: number;
+            slots: components["schemas"]["BulkShowtimeSlotResponseDto"][];
+            /** @example true */
+            valid: boolean;
+        };
         CreateShowtimeDto: {
             /** @example clx123movie */
             movieId: string;
             /** @example clx123room */
             roomId: string;
-            /** @example 2026-10-01T19:00:00.000Z */
+            /**
+             * Format: date-time
+             * @example 2026-10-01T19:00:00+07:00
+             */
             startsAt: string;
-            /** @example 2026-10-01T21:49:00.000Z */
-            endsAt: string;
             /**
              * @description Base price for standard seats
              * @example 100000
@@ -1140,10 +1251,11 @@ export interface components {
             movieId?: string;
             /** @example clx123room */
             roomId?: string;
-            /** @example 2026-10-01T19:00:00.000Z */
+            /**
+             * Format: date-time
+             * @example 2026-10-01T19:00:00+07:00
+             */
             startsAt?: string;
-            /** @example 2026-10-01T21:49:00.000Z */
-            endsAt?: string;
             /**
              * @description Base price for standard seats
              * @example 100000
@@ -1269,6 +1381,33 @@ export interface components {
              */
             updatedAt: string;
         };
+        PurchaseSeatsDto: {
+            /** @example clx123showtime */
+            showtimeId: string;
+            /**
+             * @example [
+             *       "clx123showtimeSeatA1",
+             *       "clx123showtimeSeatA2"
+             *     ]
+             */
+            showtimeSeatIds: string[];
+            /** @example MOCK-PURCHASE-001 */
+            reference?: string;
+            /**
+             * @default true
+             * @example true
+             */
+            success: boolean;
+            /**
+             * @description Use the same key when retrying the same purchase request
+             * @example purchase-attempt-001
+             */
+            idempotencyKey?: string;
+        };
+        MockPaymentResponseDto: {
+            payment: components["schemas"]["PaymentResponseDto"];
+            booking: components["schemas"]["BookingResponseDto"];
+        };
         MockPaymentDto: {
             /** @example MOCK-PAYMENT-001 */
             reference?: string;
@@ -1282,10 +1421,6 @@ export interface components {
              * @example payment-attempt-001
              */
             idempotencyKey?: string;
-        };
-        MockPaymentResponseDto: {
-            payment: components["schemas"]["PaymentResponseDto"];
-            booking: components["schemas"]["BookingResponseDto"];
         };
         TicketBookingResponseDto: {
             /** @example clx-booking-id */
@@ -3117,6 +3252,132 @@ export interface operations {
             };
         };
     };
+    Showtimes_previewBulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkShowtimeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkShowtimePreviewResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Showtimes_createBulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkShowtimeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShowtimeResponseDto"][];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
     Bookings_hold: {
         parameters: {
             query?: never;
@@ -3312,6 +3573,72 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Payments_purchaseSeats: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional when idempotencyKey is provided in the request body */
+                "idempotency-key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseSeatsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockPaymentResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

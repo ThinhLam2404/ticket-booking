@@ -49,6 +49,7 @@ export type LoginRequest = RequestBody<'/api/v1/auth/login', 'post'>;
 export type RefreshTokenRequest = RequestBody<'/api/v1/auth/refresh', 'post'>;
 export type HoldRequest = RequestBody<'/api/v1/bookings/hold', 'post'>;
 export type MockPaymentRequest = RequestBody<'/api/v1/payments/mock/{bookingId}', 'post'>;
+export type PurchaseSeatsRequest = RequestBody<'/api/v1/payments/mock/purchase', 'post'>;
 
 export type MovieStatus = Movie['status'];
 export type SeatType = Seat['type'];
@@ -86,6 +87,9 @@ export type AdminShowtimesQuery = NonNullable<paths['/api/v1/showtimes/admin']['
 export type AdminShowtimesResponse = JsonResponse<'/api/v1/showtimes/admin', 'get'>;
 export type CreateShowtimeRequest = RequestBody<'/api/v1/showtimes', 'post'>;
 export type UpdateShowtimeRequest = RequestBody<'/api/v1/showtimes/{id}', 'patch'>;
+export type BulkShowtimeRequest = RequestBody<'/api/v1/showtimes/bulk', 'post'>;
+export type BulkShowtimePreviewResponse = JsonResponse<'/api/v1/showtimes/bulk/preview', 'post'>;
+export type BulkShowtimeResponse = JsonResponse<'/api/v1/showtimes/bulk', 'post'>;
 export type ShowtimeMutationResponse = JsonResponse<'/api/v1/showtimes', 'post'>;
 export type ShowtimeUpdateResponse = JsonResponse<'/api/v1/showtimes/{id}', 'patch'>;
 export type ShowtimeDeleteResponse = JsonResponse<'/api/v1/showtimes/{id}', 'delete'>;

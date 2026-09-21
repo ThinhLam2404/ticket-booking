@@ -24,6 +24,8 @@ import type {
   CreateMovieRequest,
   CreateRoomRequest,
   CreateSeatRequest,
+  BulkShowtimePreviewResponse,
+  BulkShowtimeRequest,
   CreateShowtimeRequest,
   Movie,
   MovieStatus,
@@ -1878,7 +1880,20 @@ type ShowtimeFormProps = {
 };
 
 function localDateTime(value?: string) {
-  return value ? new Date(value).toISOString().slice(0, 16) : "";
+  if (!value) return "";
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(value)).replace(" ", "T");
+}
+
+function vietnameseDateTime(value: string) {
+  return `${value}:00+07:00`;
 }
 
 function ShowtimeForm({
@@ -1895,7 +1910,10 @@ function ShowtimeForm({
   const [cinemaId, setCinemaId] = useState(showtime?.room.cinemaId ?? "");
   const [roomId, setRoomId] = useState(showtime?.roomId ?? "");
   const [startsAt, setStartsAt] = useState(localDateTime(showtime?.startsAt));
-  const [endsAt, setEndsAt] = useState(localDateTime(showtime?.endsAt));
+  const selectedMovie = movies.find((movie) => movie.id === movieId);
+  const calculatedEndsAt = startsAt && selectedMovie
+    ? new Date(new Date(vietnameseDateTime(startsAt)).getTime() + selectedMovie.duration * 60 * 1000).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "medium", timeStyle: "short" })
+    : "Chọn phim và giờ bắt đầu";
   const initialPricing = {
     basePrice: showtime?.basePrice != null ? Number(showtime.basePrice) : 100000,
     vipMultiplier: showtime?.vipMultiplier != null ? Number(showtime.vipMultiplier) : 1.1,
@@ -1921,8 +1939,7 @@ function ShowtimeForm({
       await onSubmit({
         movieId,
         roomId,
-        startsAt: new Date(startsAt).toISOString(),
-        endsAt: new Date(endsAt).toISOString(),
+        startsAt: vietnameseDateTime(startsAt),
         basePrice,
         vipMultiplier,
         coupleMultiplier,
@@ -1932,8 +1949,7 @@ function ShowtimeForm({
     await onSubmit({
       movieId,
       roomId,
-      startsAt: new Date(startsAt).toISOString(),
-      endsAt: new Date(endsAt).toISOString(),
+      startsAt: vietnameseDateTime(startsAt),
       ...(pricingTouched.basePrice && { basePrice }),
       ...(pricingTouched.vipMultiplier && { vipMultiplier }),
       ...(pricingTouched.coupleMultiplier && { coupleMultiplier }),
@@ -1956,7 +1972,7 @@ function ShowtimeForm({
             >
               <option value="">Chọn phim</option>
               {movies
-                .filter((movie) => movie.status !== "ARCHIVED")
+                .filter((movie) => movie.status === "PUBLISHED")
                 .map((movie) => (
                   <option key={movie.id} value={movie.id}>
                     {movie.title}
@@ -2006,13 +2022,8 @@ function ShowtimeForm({
               onChange={(event) => setStartsAt(event.target.value)}
             />
           </Field>
-          <Field label="Kết thúc">
-            <input
-              required
-              type="datetime-local"
-              value={endsAt}
-              onChange={(event) => setEndsAt(event.target.value)}
-            />
+          <Field label="Kết thúc (tự tính theo thời lượng phim)">
+            <input type="text" value={calculatedEndsAt} readOnly />
           </Field>
           <NumberField label="Giá cơ bản" min={0} step={1000} value={basePrice} onChange={(value) => { setBasePrice(value); setPricingTouched((current) => ({ ...current, basePrice: true })); }} />
           <NumberField label="Hệ số VIP" min={0} step={0.01} value={vipMultiplier} onChange={(value) => { setVipMultiplier(value); setPricingTouched((current) => ({ ...current, vipMultiplier: true })); }} />
@@ -2032,6 +2043,105 @@ function ShowtimeForm({
   );
 }
 
+type BulkShowtimeFormProps = {
+  movies: Movie[];
+  cinemas: Cinema[];
+  loading: boolean;
+  error?: string;
+  onCancel: () => void;
+  onSubmit: (body: BulkShowtimeRequest) => Promise<void>;
+};
+
+function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit }: BulkShowtimeFormProps) {
+  const [movieId, setMovieId] = useState("");
+  const [cinemaId, setCinemaId] = useState("");
+  const [roomId, setRoomId] = useState("");
+  const [firstStartsAt, setFirstStartsAt] = useState("");
+  const [count, setCount] = useState(5);
+  const [turnaroundMinutes, setTurnaroundMinutes] = useState(20);
+  const [basePrice, setBasePrice] = useState(100000);
+  const [vipMultiplier, setVipMultiplier] = useState(1.1);
+  const [coupleMultiplier, setCoupleMultiplier] = useState(1.2);
+  const [preview, setPreview] = useState<BulkShowtimePreviewResponse | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const roomsQuery = useQuery({
+    queryKey: ["admin-bulk-showtime-rooms", cinemaId],
+    queryFn: ({ signal }) => api.rooms(cinemaId, signal),
+    enabled: Boolean(cinemaId),
+  });
+  const body: BulkShowtimeRequest = {
+    movieId,
+    roomId,
+    firstStartsAt: firstStartsAt ? vietnameseDateTime(firstStartsAt) : "",
+    count,
+    turnaroundMinutes,
+    basePrice,
+    vipMultiplier,
+    coupleMultiplier,
+  };
+
+  async function previewSlots() {
+    setPreviewError("");
+    setPreview(null);
+    setPreviewLoading(true);
+    try {
+      setPreview(await api.previewBulkShowtimes(body));
+    } catch (cause) {
+      setPreviewError(mutationMessage(cause));
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!preview?.valid) {
+      await previewSlots();
+      return;
+    }
+    await onSubmit(body);
+  }
+
+  return (
+    <Modal eyebrow="LẬP LỊCH HÀNG LOẠT" title="Tạo nhiều suất chiếu" onClose={onCancel} className="bulk-showtime-modal">
+      <form className="admin-form" onSubmit={(event) => void submit(event)}>
+        <div className="admin-form-grid">
+          <Field label="Phim" wide>
+            <select required value={movieId} onChange={(event) => { setMovieId(event.target.value); setPreview(null); }}>
+              <option value="">Chọn phim đã phát hành</option>
+              {movies.filter((movie) => movie.status === "PUBLISHED").map((movie) => <option key={movie.id} value={movie.id}>{movie.title} · {movie.duration} phút</option>)}
+            </select>
+          </Field>
+          <Field label="Cụm rạp" wide>
+            <select required value={cinemaId} onChange={(event) => { setCinemaId(event.target.value); setRoomId(""); setPreview(null); }}>
+              <option value="">Chọn cụm rạp</option>
+              {cinemas.map((cinema) => <option key={cinema.id} value={cinema.id}>{cinema.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Phòng chiếu" wide>
+            <select required disabled={!cinemaId || roomsQuery.isPending} value={roomId} onChange={(event) => { setRoomId(event.target.value); setPreview(null); }}>
+              <option value="">{roomsQuery.isPending ? "Đang tải phòng…" : "Chọn phòng"}</option>
+              {(roomsQuery.data ?? []).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Suất đầu tiên (giờ Việt Nam)">
+            <input required type="datetime-local" value={firstStartsAt} onChange={(event) => { setFirstStartsAt(event.target.value); setPreview(null); }} />
+          </Field>
+          <NumberField label="Số suất" min={1} max={100} value={count} onChange={(value) => { setCount(value); setPreview(null); }} />
+          <NumberField label="Thời gian nghỉ (phút)" min={0} max={180} value={turnaroundMinutes} onChange={(value) => { setTurnaroundMinutes(value); setPreview(null); }} />
+          <NumberField label="Giá cơ bản" min={0} step={1000} value={basePrice} onChange={setBasePrice} />
+          <NumberField label="Hệ số VIP" min={0} step={0.01} value={vipMultiplier} onChange={setVipMultiplier} />
+          <NumberField label="Hệ số ghế đôi" min={0} step={0.01} value={coupleMultiplier} onChange={setCoupleMultiplier} />
+        </div>
+        {(roomsQuery.isError || previewError || error) && <p className="form-error">{previewError || error || "Không thể tải phòng chiếu."}</p>}
+        {preview && <div className={`bulk-preview ${preview.valid ? "valid" : "invalid"}`}><strong>{preview.valid ? `Có thể tạo ${preview.slots.length} suất chiếu` : "Lịch có xung đột"}</strong><div className="bulk-preview-list">{preview.slots.map((slot) => <span key={slot.index} className={slot.available ? "available" : "conflict"}>{formatTime(slot.startsAt)} – {formatTime(slot.endsAt)}{slot.conflict ? ` · ${slot.conflict}` : ""}</span>)}</div></div>}
+        <div className="form-actions"><button className="secondary" type="button" disabled={loading || previewLoading} onClick={onCancel}>Hủy</button><button className="secondary" type="button" disabled={loading || previewLoading} onClick={() => void previewSlots()}>{previewLoading ? "Đang kiểm tra…" : "Xem trước"}</button><button className="primary" disabled={loading || previewLoading || !preview?.valid}>{loading ? "Đang tạo…" : "Tạo toàn bộ suất"}</button></div>
+      </form>
+    </Modal>
+  );
+}
+
 export function AdminShowtimesPage() {
   const queryClient = useQueryClient();
   const [movieId, setMovieId] = useState("");
@@ -2042,6 +2152,7 @@ export function AdminShowtimesPage() {
     mode: FormMode;
     showtime?: Showtime;
   } | null>(null);
+  const [bulkModal, setBulkModal] = useState(false);
   const [detailId, setDetailId] = useState("");
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [mutationError, setMutationError] = useState("");
@@ -2084,6 +2195,14 @@ export function AdminShowtimesPage() {
       setMutationError("");
     },
   });
+  const bulkMutation = useMutation({
+    mutationFn: (body: BulkShowtimeRequest) => api.createBulkShowtimes(body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] });
+      setBulkModal(false);
+      setMutationError("");
+    },
+  });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.deleteShowtime(id),
     onSuccess: () => {
@@ -2106,6 +2225,16 @@ export function AdminShowtimesPage() {
     }
   }
 
+  async function createBulk(body: BulkShowtimeRequest) {
+    setMutationError("");
+    try {
+      await bulkMutation.mutateAsync(body);
+    } catch (cause) {
+      setMutationError(mutationMessage(cause));
+      throw cause;
+    }
+  }
+
   function edit(showtime: Showtime) {
     setMutationError("");
     setDetailId(showtime.id);
@@ -2123,19 +2252,24 @@ export function AdminShowtimesPage() {
   return (
     <AdminPage>
       <PageHeader eyebrow="LỊCH VẬN HÀNH" title="Suất chiếu">
-        <button
-          className="primary"
-          type="button"
-          disabled={optionsPending}
-          onClick={() => {
+        <div className="admin-page-actions">
+          <button className="secondary" type="button" disabled={optionsPending} onClick={() => { setMutationError(""); setBulkModal(true); }}>
+            + Lập lịch hàng loạt
+          </button>
+          <button
+            className="primary"
+            type="button"
+            disabled={optionsPending}
+            onClick={() => {
             setMutationError("");
             setDetailId("");
             setModal({ mode: "create" });
           }}
-        >
-          + Thêm suất chiếu
-        </button>
-      </PageHeader>
+         >
+           + Thêm suất chiếu
+         </button>
+        </div>
+       </PageHeader>
       <Toolbar>
         <select
           aria-label="Lọc phim"
@@ -2260,6 +2394,16 @@ export function AdminShowtimesPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {bulkModal && (
+        <BulkShowtimeForm
+          movies={movies}
+          cinemas={cinemas}
+          loading={bulkMutation.isPending}
+          error={mutationError}
+          onCancel={() => setBulkModal(false)}
+          onSubmit={createBulk}
+        />
       )}
       {modal && modal.mode === "create" && (
         <ShowtimeForm

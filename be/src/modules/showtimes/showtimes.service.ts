@@ -8,6 +8,7 @@ import { MovieStatus, Prisma, SeatType } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
+import { BookingsService } from '../bookings/bookings.service.js';
 import { validateSeatLayout } from '../seats/seat-layout.js';
 import { CreateShowtimeDto } from './dto/create-showtime.dto.js';
 import {
@@ -15,8 +16,19 @@ import {
   ListShowtimesDto,
 } from './dto/list-showtimes.dto.js';
 import { UpdateShowtimeDto } from './dto/update-showtime.dto.js';
+import { BulkShowtimeDto } from './dto/bulk-showtime.dto.js';
 
 type ShowtimeListQuery = ListShowtimesDto & { status?: MovieStatus };
+
+type ShowtimeContext = {
+  movie: { id: string; duration: number; status: MovieStatus };
+  room: {
+    id: string;
+    seats: Array<{ id: string; row: string; number: number; type: SeatType }>;
+  };
+};
+
+const SHOWTIME_TIMEZONE_PATTERN = /(Z|[+-]\d{2}:\d{2})$/i;
 
 type ShowtimePricing = {
   basePrice: number;
@@ -26,7 +38,10 @@ type ShowtimePricing = {
 
 @Injectable()
 export class ShowtimesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bookingsService: BookingsService,
+  ) {}
 
   async findAll(query: ListShowtimesDto) {
     return this.findShowtimes(query, {
@@ -66,7 +81,9 @@ export class ShowtimesService {
       ...((query.cinemaId || query.provinceCode) && {
         room: {
           ...(query.cinemaId && { cinemaId: query.cinemaId }),
-          ...(query.provinceCode && { cinema: { provinceCode: query.provinceCode } }),
+          ...(query.provinceCode && {
+            cinema: { provinceCode: query.provinceCode },
+          }),
         },
       }),
     };
@@ -103,6 +120,8 @@ export class ShowtimesService {
   }
 
   async findOne(id: string) {
+    //NOTE - xử lí expire cho seat, booking, payment
+    await this.bookingsService.expireBookingsForShowtime(id);
     const showtime = await this.prisma.showtime.findUnique({
       where: { id },
       include: {
@@ -132,54 +151,166 @@ export class ShowtimesService {
     });
   }
 
+  async previewBulk(dto: BulkShowtimeDto) {
+    const movie = await this.prisma.movie.findUnique({
+      where: { id: dto.movieId },
+    });
+    const room = await this.prisma.room.findUnique({
+      where: { id: dto.roomId },
+      include: { seats: true },
+    });
+    const context = this.getSchedulingContext(movie, room);
+    const { movie: validMovie } = context;
+    //NOTE - tạo các suất chiếu tuần tự endsAt = startsAt + movie.duration, slot kế tiếp bắt đầu sau endAt+turnAroundMin
+    const slots = this.buildBulkSlots(
+      this.parseStartsAt(dto.firstStartsAt),
+      validMovie.duration,
+      dto.count,
+      dto.turnaroundMinutes,
+    );
+
+    //NOTE - kiểm tra các suất chiếu tạo, có đụng với suất chiếu hiện có ko
+    const existing = await this.prisma.showtime.findMany({
+      where: {
+        roomId: dto.roomId,
+        startsAt: { lt: slots[slots.length - 1]!.endsAt },
+        endsAt: { gt: slots[0]!.startsAt },
+      },
+      select: { startsAt: true, endsAt: true },
+    });
+    const previewSlots = slots.map((slot, index) => {
+      const conflict = existing.some(
+        (candidate) =>
+          candidate.startsAt < slot.endsAt && candidate.endsAt > slot.startsAt,
+      );
+      return {
+        index: index + 1,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        available: !conflict,
+        ...(conflict && {
+          conflict: 'Room already has an overlapping showtime',
+        }),
+      };
+    });
+
+    return {
+      movieId: dto.movieId,
+      roomId: dto.roomId,
+      durationMinutes: validMovie.duration,
+      slots: previewSlots,
+      valid: previewSlots.every((slot) => slot.available),
+    };
+  }
+
+  async createBulk(dto: BulkShowtimeDto) {
+    try {
+      const created = await this.prisma.$transaction(
+        async (transaction) => {
+          const movie = await transaction.movie.findUnique({
+            where: { id: dto.movieId },
+          });
+          const room = await transaction.room.findUnique({
+            where: { id: dto.roomId },
+            include: { seats: true },
+          });
+          const context = this.getSchedulingContext(movie, room);
+          const { movie: validMovie, room: validRoom } = context;
+
+          const slots = this.buildBulkSlots(
+            this.parseStartsAt(dto.firstStartsAt),
+            validMovie.duration,
+            dto.count,
+            dto.turnaroundMinutes,
+          );
+          const existing = await transaction.showtime.findFirst({
+            where: {
+              roomId: dto.roomId,
+              startsAt: { lt: slots[slots.length - 1]!.endsAt },
+              endsAt: { gt: slots[0]!.startsAt },
+            },
+          });
+          if (existing) {
+            throw new ConflictException(
+              'Room already has an overlapping showtime',
+            );
+          }
+
+          const showtimeIds: string[] = [];
+          const pricing = this.resolvePricing({
+            basePrice: dto.basePrice,
+            vipMultiplier: dto.vipMultiplier,
+            coupleMultiplier: dto.coupleMultiplier,
+          });
+          for (const slot of slots) {
+            const showtime = await transaction.showtime.create({
+              data: {
+                movieId: dto.movieId,
+                roomId: dto.roomId,
+                startsAt: slot.startsAt,
+                endsAt: slot.endsAt,
+                basePrice: this.toDecimalString(pricing.basePrice),
+                vipMultiplier: this.toDecimalString(pricing.vipMultiplier),
+                coupleMultiplier: this.toDecimalString(
+                  pricing.coupleMultiplier,
+                ),
+              },
+            });
+            showtimeIds.push(showtime.id);
+            await transaction.showtimeSeat.createMany({
+              data: validRoom.seats.map((seat) => ({
+                showtimeId: showtime.id,
+                seatId: seat.id,
+                price: this.calculatePrice(
+                  pricing.basePrice,
+                  seat.type,
+                  pricing.vipMultiplier,
+                  pricing.coupleMultiplier,
+                ),
+              })),
+            });
+          }
+
+          return transaction.showtime.findMany({
+            where: { id: { in: showtimeIds } },
+            include: {
+              movie: true,
+              room: { include: { cinema: true } },
+              showtimeSeats: { include: { seat: true } },
+            },
+            orderBy: { startsAt: 'asc' },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+      return toPublicResponse(created);
+    } catch (error) {
+      if (this.isShowtimeOverlapError(error)) {
+        throw new ConflictException('Room already has an overlapping showtime');
+      }
+      throw error;
+    }
+  }
+
   async create(dto: CreateShowtimeDto) {
-    const startsAt = new Date(dto.startsAt);
-    const endsAt = new Date(dto.endsAt);
-
-    if (startsAt >= endsAt) {
-      throw new BadRequestException('Showtime end must be after its start');
-    }
-
-    if (startsAt <= new Date()) {
-      throw new BadRequestException('Showtime must start in the future');
-    }
-
-    const [movie, room, overlappingShowtime] = await Promise.all([
+    const startsAt = this.parseStartsAt(dto.startsAt);
+    const [movie, room] = await Promise.all([
       this.prisma.movie.findUnique({ where: { id: dto.movieId } }),
       this.prisma.room.findUnique({
         where: { id: dto.roomId },
         include: { seats: true },
       }),
-      this.prisma.showtime.findFirst({
-        where: {
-          roomId: dto.roomId,
-          startsAt: { lt: endsAt },
-          endsAt: { gt: startsAt },
-        },
-      }),
     ]);
-
-    if (!movie) {
-      throw new NotFoundException('Movie not found');
-    }
-    if (movie.status !== MovieStatus.PUBLISHED) {
-      throw new ConflictException('Movie must be published before scheduling');
-    }
-
-    if (!room) {
-      throw new NotFoundException('Room not found');
-    }
-
-    if (!room.seats.length) {
-      throw new BadRequestException('Room must have at least one seat');
-    }
-    try {
-      validateSeatLayout(room.seats);
-    } catch (error) {
-      throw new BadRequestException(
-        error instanceof Error ? error.message : 'Room has an invalid seat layout',
-      );
-    }
+    const context = this.getSchedulingContext(movie, room);
+    const { movie: validMovie, room: validRoom } = context;
+    const endsAt = this.calculateEndsAt(startsAt, validMovie.duration);
+    const overlappingShowtime = await this.prisma.showtime.findFirst({
+      where: {
+        roomId: dto.roomId,
+        startsAt: { lt: endsAt },
+        endsAt: { gt: startsAt },
+      },
+    });
 
     if (overlappingShowtime) {
       throw new ConflictException('Room already has an overlapping showtime');
@@ -206,7 +337,7 @@ export class ShowtimesService {
         });
 
         await transaction.showtimeSeat.createMany({
-          data: room.seats.map((seat) => ({
+          data: validRoom.seats.map((seat) => ({
             showtimeId: showtime.id,
             seatId: seat.id,
             price: this.calculatePrice(
@@ -229,6 +360,9 @@ export class ShowtimesService {
         return toPublicResponse(result);
       });
     } catch (error) {
+      if (this.isShowtimeOverlapError(error)) {
+        throw new ConflictException('Room already has an overlapping showtime');
+      }
       if (isUniqueConstraintError(error)) {
         throw new ConflictException('Showtime seats could not be initialized');
       }
@@ -259,39 +393,24 @@ export class ShowtimesService {
           }
 
           const startsAt = dto.startsAt
-            ? new Date(dto.startsAt)
+            ? this.parseStartsAt(dto.startsAt)
             : current.startsAt;
-          const endsAt = dto.endsAt ? new Date(dto.endsAt) : current.endsAt;
           const movieId = dto.movieId ?? current.movieId;
           const roomId = dto.roomId ?? current.roomId;
           const roomChanged = roomId !== current.roomId;
+          const movieChanged = movieId !== current.movieId;
 
-          if (startsAt >= endsAt) {
-            throw new BadRequestException(
-              'Showtime end must be after its start',
-            );
-          }
           if (startsAt <= new Date()) {
             throw new BadRequestException('Showtime must start in the future');
           }
 
-          const [movie, room, overlappingShowtime] = await Promise.all([
+          const [movie, room] = await Promise.all([
             transaction.movie.findUnique({ where: { id: movieId } }),
             transaction.room.findUnique({
               where: { id: roomId },
               include: { seats: true },
             }),
-            //NOTE - check xem có trùng suất chiếu ko: Start A < End B || End A > Start B => trùng
-            transaction.showtime.findFirst({
-              where: {
-                id: { not: id },
-                roomId,
-                startsAt: { lt: endsAt },
-                endsAt: { gt: startsAt },
-              },
-            }),
           ]);
-
           if (!movie) {
             throw new NotFoundException('Movie not found');
           }
@@ -303,19 +422,34 @@ export class ShowtimesService {
           if (!room) {
             throw new NotFoundException('Room not found');
           }
-           if (roomChanged) {
-             if (!room.seats.length) {
-               throw new BadRequestException('Room must have at least one seat');
-             }
-             try {
-               validateSeatLayout(room.seats);
-             } catch (error) {
-               throw new BadRequestException(
-                 error instanceof Error ? error.message : 'Room has an invalid seat layout',
-               );
-             }
-           }
-           if (overlappingShowtime) {
+          const validRoom = roomChanged
+            ? this.getSchedulingContext(movie, room).room
+            : room;
+          const endsAt =
+            dto.startsAt || movieChanged
+              ? this.calculateEndsAt(startsAt, movie.duration)
+              : current.endsAt;
+          const overlappingShowtime = await transaction.showtime.findFirst({
+            where: {
+              id: { not: id },
+              roomId,
+              startsAt: { lt: endsAt },
+              endsAt: { gt: startsAt },
+            },
+          });
+
+          if (roomChanged) {
+            try {
+              validateSeatLayout(validRoom.seats);
+            } catch (error) {
+              throw new BadRequestException(
+                error instanceof Error
+                  ? error.message
+                  : 'Room has an invalid seat layout',
+              );
+            }
+          }
+          if (overlappingShowtime) {
             throw new ConflictException(
               'Room already has an overlapping showtime',
             );
@@ -362,7 +496,7 @@ export class ShowtimesService {
               where: { showtimeId: id },
             });
             await transaction.showtimeSeat.createMany({
-              data: room.seats.map((seat) => ({
+              data: validRoom.seats.map((seat) => ({
                 showtimeId: id,
                 seatId: seat.id,
                 price: this.calculatePrice(
@@ -406,11 +540,97 @@ export class ShowtimesService {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
     } catch (error) {
-      if (isUniqueConstraintError(error)) {
+      if (
+        this.isShowtimeOverlapError(error) ||
+        isUniqueConstraintError(error)
+      ) {
         throw new ConflictException('Room already has an overlapping showtime');
       }
       throw error;
     }
+  }
+  //NOTE - dùng kiểm tra movie tồn tại và publish, validate seat layout
+  private getSchedulingContext(
+    movie: { id: string; duration: number; status: MovieStatus } | null,
+    room: {
+      id: string;
+      seats: Array<{ id: string; row: string; number: number; type: SeatType }>;
+    } | null,
+  ): ShowtimeContext {
+    if (!movie) {
+      throw new NotFoundException('Movie not found');
+    }
+    if (movie.status !== MovieStatus.PUBLISHED) {
+      throw new ConflictException('Movie must be published before scheduling');
+    }
+    if (!room) {
+      throw new NotFoundException('Room not found');
+    }
+    if (!room.seats.length) {
+      throw new BadRequestException('Room must have at least one seat');
+    }
+    try {
+      validateSeatLayout(room.seats);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error
+          ? error.message
+          : 'Room has an invalid seat layout',
+      );
+    }
+    return { movie, room };
+  }
+
+  private parseStartsAt(value: string): Date {
+    if (!SHOWTIME_TIMEZONE_PATTERN.test(value)) {
+      throw new BadRequestException(
+        'Showtime start must include an explicit timezone offset',
+      );
+    }
+    const startsAt = new Date(value);
+    if (Number.isNaN(startsAt.getTime())) {
+      throw new BadRequestException('Showtime start is invalid');
+    }
+    return startsAt;
+  }
+
+  private calculateEndsAt(startsAt: Date, durationMinutes: number): Date {
+    const endsAt = new Date(startsAt.getTime() + durationMinutes * 60 * 1000);
+    if (startsAt <= new Date()) {
+      throw new BadRequestException('Showtime must start in the future');
+    }
+    return endsAt;
+  }
+
+  private buildBulkSlots(
+    startsAt: Date,
+    durationMinutes: number,
+    count: number,
+    turnaroundMinutes: number,
+  ) {
+    if (startsAt <= new Date()) {
+      throw new BadRequestException('Showtime must start in the future');
+    }
+    const slots: Array<{ startsAt: Date; endsAt: Date }> = [];
+    const durationMs = durationMinutes * 60 * 1000;
+    const turnaroundMs = turnaroundMinutes * 60 * 1000;
+    for (let index = 0; index < count; index += 1) {
+      const slotStartsAt = new Date(
+        startsAt.getTime() + index * (durationMs + turnaroundMs),
+      );
+      slots.push({
+        startsAt: slotStartsAt,
+        endsAt: new Date(slotStartsAt.getTime() + durationMs),
+      });
+    }
+    return slots;
+  }
+
+  private isShowtimeOverlapError(error: unknown) {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === 'P2004' || error.code === 'P2034')
+    );
   }
 
   async remove(id: string) {

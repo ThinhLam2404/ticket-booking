@@ -15,6 +15,10 @@ import {
   ShowtimeResponseDto,
   ShowtimeSeatsResponseDto,
 } from '../../common/http/dto/response.dto.js';
+import {
+  BulkShowtimeDto,
+  BulkShowtimePreviewResponseDto,
+} from './dto/bulk-showtime.dto.js';
 import { ApiErrorResponses } from '../../common/http/swagger.decorators.js';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
@@ -62,6 +66,26 @@ export class ShowtimesController {
   @ApiErrorResponses(404)
   findSeats(@Param('id') id: string) {
     return this.showtimesService.findSeats(id);
+  }
+
+  @Post('bulk/preview')
+  @ApiResponse({ status: 200, type: BulkShowtimePreviewResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  previewBulk(@Body() dto: BulkShowtimeDto) {
+    return this.showtimesService.previewBulk(dto);
+  }
+
+  @Post('bulk')
+  @ApiResponse({ status: 201, type: ShowtimeResponseDto, isArray: true })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  createBulk(@Body() dto: BulkShowtimeDto) {
+    return this.showtimesService.createBulk(dto);
   }
 
   @Post()

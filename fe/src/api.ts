@@ -7,6 +7,7 @@ import type {
   LoginRequest,
   MockPaymentRequest,
   MockPaymentResponse,
+  PurchaseSeatsRequest,
   MovieDetails,
   MoviesResponse,
   Payment,
@@ -50,6 +51,9 @@ import type {
   AdminShowtimesResponse,
   CreateShowtimeRequest,
   UpdateShowtimeRequest,
+  BulkShowtimeRequest,
+  BulkShowtimePreviewResponse,
+  BulkShowtimeResponse,
   ShowtimeMutationResponse,
   ShowtimeUpdateResponse,
   ShowtimeDeleteResponse,
@@ -309,6 +313,12 @@ export const api = {
   updateShowtime(id: string, body: UpdateShowtimeRequest) {
     return request<ShowtimeUpdateResponse>(`/showtimes/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   },
+  previewBulkShowtimes(body: BulkShowtimeRequest) {
+    return request<BulkShowtimePreviewResponse>('/showtimes/bulk/preview', { method: 'POST', body: JSON.stringify(body) });
+  },
+  createBulkShowtimes(body: BulkShowtimeRequest) {
+    return request<BulkShowtimeResponse>('/showtimes/bulk', { method: 'POST', body: JSON.stringify(body) });
+  },
   deleteShowtime(id: string) {
     return request<ShowtimeDeleteResponse>(`/showtimes/${id}`, { method: 'DELETE' });
   },
@@ -335,6 +345,13 @@ export const api = {
   mockPayment(bookingId: string, success: boolean, idempotencyKey = `payment-${crypto.randomUUID()}`) {
     const body: MockPaymentRequest = { success };
     return request<MockPaymentResponse>(`/payments/mock/${bookingId}`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(body),
+    });
+  },
+  purchaseSeats(body: PurchaseSeatsRequest, idempotencyKey = `purchase-${crypto.randomUUID()}`) {
+    return request<MockPaymentResponse>('/payments/mock/purchase', {
       method: 'POST',
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(body),

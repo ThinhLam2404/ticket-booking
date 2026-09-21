@@ -1,0 +1,90 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsDateString,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
+
+export class BulkShowtimeDto {
+  @ApiProperty({ example: 'clx123movie' })
+  @IsString()
+  @IsNotEmpty()
+  movieId!: string;
+
+  @ApiProperty({ example: 'clx123room' })
+  @IsString()
+  @IsNotEmpty()
+  roomId!: string;
+
+  @ApiProperty({ example: '2026-10-01T19:00:00+07:00', format: 'date-time' })
+  @IsDateString()
+  firstStartsAt!: string;
+
+  @ApiProperty({ example: 5, minimum: 1, maximum: 100 })
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  count!: number;
+
+  @ApiProperty({ example: 20, minimum: 0, maximum: 180, description: 'Minutes between the end of one showtime and the start of the next' })
+  @IsInt()
+  @Min(0)
+  @Max(180)
+  turnaroundMinutes!: number;
+
+  @ApiProperty({ example: 100000, description: 'Base price for standard seats' })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  basePrice!: number;
+
+  @ApiPropertyOptional({ example: 1.1, description: 'VIP price multiplier, defaults to 1.1' })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  vipMultiplier?: number;
+
+  @ApiPropertyOptional({ example: 1.2, description: 'Couple price multiplier applied after the VIP multiplier, defaults to 1.2' })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  coupleMultiplier?: number;
+}
+
+export class BulkShowtimeSlotResponseDto {
+  @ApiProperty({ example: 1 })
+  index!: number;
+
+  @ApiProperty({ example: '2026-10-01T19:00:00.000Z', format: 'date-time' })
+  startsAt!: string;
+
+  @ApiProperty({ example: '2026-10-01T21:00:00.000Z', format: 'date-time' })
+  endsAt!: string;
+
+  @ApiProperty({ example: true })
+  available!: boolean;
+
+  @ApiPropertyOptional({ example: 'Room already has an overlapping showtime' })
+  conflict?: string;
+}
+
+export class BulkShowtimePreviewResponseDto {
+  @ApiProperty({ example: 'clx123movie' })
+  movieId!: string;
+
+  @ApiProperty({ example: 'clx123room' })
+  roomId!: string;
+
+  @ApiProperty({ example: 120 })
+  durationMinutes!: number;
+
+  @ApiProperty({ type: [BulkShowtimeSlotResponseDto] })
+  slots!: BulkShowtimeSlotResponseDto[];
+
+  @ApiProperty({ example: true })
+  valid!: boolean;
+}

@@ -29,6 +29,11 @@
       ],
       "enabled": true
     },
+    "inspo": {
+      "type": "remote",
+      "url": "https://inspomcp.dev/api/mcp",
+      "enabled": true
+    },
     "stitch": {
       "type": "local",
       "command": [

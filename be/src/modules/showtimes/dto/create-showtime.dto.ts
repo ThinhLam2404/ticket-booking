@@ -19,13 +19,9 @@ export class CreateShowtimeDto {
   @IsNotEmpty()
   roomId!: string;
 
-  @ApiProperty({ example: '2026-10-01T19:00:00.000Z' })
+  @ApiProperty({ example: '2026-10-01T19:00:00+07:00', format: 'date-time' })
   @IsDateString()
   startsAt!: string;
-
-  @ApiProperty({ example: '2026-10-01T21:49:00.000Z' })
-  @IsDateString()
-  endsAt!: string;
 
   @ApiProperty({
     example: 100000,

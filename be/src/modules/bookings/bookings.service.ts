@@ -16,8 +16,8 @@ import { isUniqueConstraintError } from '../../common/database/prisma-errors.js'
 import { PrismaService } from '../../database/prisma.service.js';
 import { RedisService } from '../redis/redis.service.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
+import { HOLD_TTL_SECONDS, PURCHASE_WINDOW_SECONDS } from './booking-policy.js';
 
-const HOLD_TTL_SECONDS = 10 * 60;
 const IDEMPOTENCY_KEY_MAX_LENGTH = 100;
 
 @Injectable()
@@ -111,8 +111,16 @@ export class BookingsService {
     if (showtime.movie.status !== MovieStatus.PUBLISHED) {
       throw new NotFoundException('Showtime not found');
     }
-    if (showtime.startsAt <= new Date()) {
+    const secondsUntilShowtime = Math.floor(
+      (showtime.startsAt.getTime() - Date.now()) / 1000,
+    );
+    if (secondsUntilShowtime <= 0) {
       throw new ConflictException('Showtime has already started');
+    }
+    if (secondsUntilShowtime <= PURCHASE_WINDOW_SECONDS) {
+      throw new ConflictException(
+        'Showtime is too close to start for a seat hold; purchase seats instead',
+      );
     }
 
     const holdToken = randomUUID();
@@ -266,10 +274,22 @@ export class BookingsService {
     await this.expireBooking(id);
     const booking = await this.prisma.booking.findFirst({
       where: { id, userId },
-      include: { items: true },
+      include: this.bookingInclude,
     });
     if (!booking) {
       throw new NotFoundException('Booking not found');
+    }
+    //NOTE - trước khi cancel thì kiểm tra xem booking đã bị cancel hay expired chưa
+    if (
+      booking.status === BookingStatus.CANCELLED ||
+      booking.status === BookingStatus.EXPIRED
+    ) {
+      await this.releaseSeatLocks(
+        booking.showtimeId,
+        booking.items.map((item) => item.showtimeSeatId),
+        booking.holdToken,
+      );
+      return toPublicResponse(booking);
     }
     if (booking.status !== BookingStatus.PENDING) {
       throw new ConflictException('Only pending bookings can be cancelled');
@@ -281,6 +301,16 @@ export class BookingsService {
         data: { status: BookingStatus.CANCELLED },
       });
       if (updatedBooking.count !== 1) {
+        const current = await transaction.booking.findUnique({
+          where: { id },
+          include: this.bookingInclude,
+        });
+        if (
+          current?.status === BookingStatus.CANCELLED ||
+          current?.status === BookingStatus.EXPIRED
+        ) {
+          return current;
+        }
         throw new ConflictException('Booking is no longer pending');
       }
 
@@ -368,6 +398,21 @@ export class BookingsService {
     const expiredBookings = await this.prisma.booking.findMany({
       where: { status: BookingStatus.PENDING, expiresAt: { lte: new Date() } },
       include: { items: true },
+    });
+
+    for (const booking of expiredBookings) {
+      await this.expireBooking(booking.id);
+    }
+  }
+
+  async expireBookingsForShowtime(showtimeId: string) {
+    const expiredBookings = await this.prisma.booking.findMany({
+      where: {
+        showtimeId,
+        status: BookingStatus.PENDING,
+        expiresAt: { lte: new Date() },
+      },
+      select: { id: true },
     });
 
     for (const booking of expiredBookings) {
