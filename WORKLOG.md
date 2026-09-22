@@ -73,8 +73,8 @@
 - ĐÃ LÀM: Couple được canonicalize khi hold; seat read và payment transaction tự normalize DB hold đã hết hạn.
 - ĐÃ LÀM: Countdown/progress checkout dùng thời gian còn lại; xóa timer giả `09:59` trên seat map.
 - ĐÃ LÀM: Integration coverage cho cancel idempotency và boundary suất chiếu quá gần.
-- CÒN LẠI: Hardening payment race/idempotency bằng payload hash bền vững, lock order thống nhất và kiểm thử race chuyên sâu.
-- CÒN LẠI: Điều hướng tự động rõ ràng hơn khi countdown hết hạn và browser verification desktop/mobile.
+- ĐÃ LÀM: Browser verification desktop/mobile cho hold, checkout, countdown và điều hướng Back/cancel.
+- Không còn áp dụng payload hash payment cũ sau khi loại bỏ mock payment; duplicate/concurrent SePay webhook đã có coverage riêng.
 
 ### Sprint 2 — Admin showtime và bulk scheduling — ĐANG THỰC HIỆN
 
@@ -86,8 +86,9 @@
 - ĐÃ LÀM: Sinh slot tuần tự theo `firstStartsAt`, `duration`, `turnaroundMinutes`; không dùng random.
 - ĐÃ LÀM: Commit bulk atomic với Serializable transaction; overlap rollback toàn batch.
 - ĐÃ LÀM: Exclusion/transaction overlap trả `409 SHOWTIME_OVERLAP`.
-- ĐÃ LÀM: Unit coverage timezone/duration/preview và integration coverage bulk/rollback (chưa execute được do Docker daemon tắt).
-- CÒN LẠI: Chạy lại integration suite khi Docker Desktop hoạt động, browser verification admin bulk flow và test concurrency hai bulk request đồng thời.
+- ĐÃ LÀM: Unit coverage timezone/duration/preview và integration coverage bulk/rollback.
+- ĐÃ LÀM: Integration coverage hai bulk request đồng thời; một request commit, request còn lại nhận `409 SHOWTIME_OVERLAP`.
+- ĐÃ LÀM: Browser verification admin bulk desktop/mobile cho free slots, conflict preview và modal không tràn ngang.
 
 ### Sprint 3 — TMDB import nhiều phim và trailer
 
@@ -105,10 +106,10 @@
 
 - Hoàn thiện toàn bộ thông báo lỗi admin bằng tiếng Việt.
 - Bổ sung request ID ở vùng hỗ trợ, không hiển thị làm lỗi chính.
-- Browser verification desktop và viewport `<= 720px` cho hold/back, checkout, countdown, bulk showtime, province search, TMDB import và trailer unavailable.
-- Chạy đầy đủ lint, typecheck, build, unit, e2e, integration, API generation/check.
-- Seed hai lần trên database development, kiểm tra counts và idempotency.
-- Cập nhật README, OpenAPI, generated frontend types và design reference nếu UI admin thay đổi lớn.
+- ĐÃ LÀM: Browser verification desktop và viewport `<= 720px` cho hold/back, checkout, countdown và admin bulk scheduling.
+- ĐÃ LÀM: Chạy đầy đủ lint, typecheck, build, unit, e2e, integration, API generation/check.
+- ĐÃ LÀM: Seed hai lần trên database development; counts giữ nguyên `3,16,50,50,3218,19,1396`, fixed movie/showtime IDs vẫn mỗi loại 1 bản ghi.
+- ĐÃ LÀM: Cập nhật README, OpenAPI, generated frontend types và WORKLOG.
 
 ## Việc còn lại
 

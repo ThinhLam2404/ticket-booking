@@ -731,10 +731,19 @@ export class ShowtimesService {
   }
 
   private isShowtimeOverlapError(error: unknown) {
-    return (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      (error.code === 'P2004' || error.code === 'P2034')
-    );
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return error.code === 'P2004' || error.code === 'P2034';
+    }
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      ((error as { code?: unknown }).code === 'P2004' ||
+        (error as { code?: unknown }).code === 'P2034')
+    ) {
+      return true;
+    }
+    return error instanceof Error && error.message.includes('23P01');
   }
 
   async remove(id: string) {

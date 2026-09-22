@@ -128,6 +128,31 @@ describe('Booking flow integration', () => {
     expect(await adminPrisma.showtime.count({ where: { movieId: fixture.movieId } })).toBe(3);
   });
 
+  it('allows only one concurrent bulk schedule request to commit', async () => {
+    const body = {
+      movieId: fixture.movieId,
+      roomId: fixture.roomId,
+      firstStartsAt: vnMorningStartsAt(3).toISOString(),
+      count: 2,
+      turnaroundMinutes: 20,
+      basePrice: 100000,
+    };
+    const responses = await Promise.all([
+      request(appA.getHttpServer())
+        .post('/api/v1/showtimes/bulk')
+        .set('Authorization', `Bearer ${fixture.admin.token}`)
+        .send(body),
+      request(appB.getHttpServer())
+        .post('/api/v1/showtimes/bulk')
+        .set('Authorization', `Bearer ${fixture.admin.token}`)
+        .send(body),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    expect(responses.find((response) => response.status === 409)?.body.code).toBe('SHOWTIME_OVERLAP');
+    expect(await adminPrisma.showtime.count({ where: { movieId: fixture.movieId } })).toBe(3);
+  });
+
   it('allows only one user to hold a seat concurrently', async () => {
     const gate = deferred<void>();
     const contenders = [
