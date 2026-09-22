@@ -64,4 +64,4 @@ Có thể chạy trực tiếp trong thư mục `be` bằng các scripts trong `
 - Swagger: `http://localhost:3000/api/docs`
 - Readiness: `http://localhost:3000/api/v1/health/ready`
 
-PostgreSQL và Redis được khai báo trong `be/docker-compose.yml`. Mock payment chỉ hoạt động ở `development` và `test`.
+PostgreSQL và Redis được khai báo trong `be/docker-compose.yml`. Thanh toán dùng SePay webhook; cấu hình `SEPAY_*` là tùy chọn ở local và bắt buộc khi bật flow thanh toán thật.

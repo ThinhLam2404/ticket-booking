@@ -5,12 +5,12 @@ import type {
   Cinema,
   HoldRequest,
   LoginRequest,
-  MockPaymentRequest,
-  MockPaymentResponse,
-  PurchaseSeatsRequest,
+  SepayCheckoutResponse,
+  SepayTransaction,
+  SepayTransactionsResponse,
+  UpdateSepayTransactionRequest,
   MovieDetails,
   MoviesResponse,
-  Payment,
   RegisterRequest,
   RefreshTokenRequest,
   ShowtimeResponse,
@@ -57,6 +57,7 @@ import type {
   ShowtimeMutationResponse,
   ShowtimeUpdateResponse,
   ShowtimeDeleteResponse,
+  FreeSlotsResponse,
   ProvincesResponse,
 } from './types';
 
@@ -322,6 +323,14 @@ export const api = {
   deleteShowtime(id: string) {
     return request<ShowtimeDeleteResponse>(`/showtimes/${id}`, { method: 'DELETE' });
   },
+  roomFreeSlots(roomId: string, query: { date: string; durationMinutes: number; turnaroundMinutes: number }, signal?: AbortSignal) {
+    const params = new URLSearchParams({
+      date: query.date,
+      durationMinutes: String(query.durationMinutes),
+      turnaroundMinutes: String(query.turnaroundMinutes),
+    });
+    return request<FreeSlotsResponse>(`/showtimes/rooms/${roomId}/free-slots?${params.toString()}`, { signal });
+  },
   showtime(id: string, signal?: AbortSignal) {
     return request<ShowtimeResponse>(`/showtimes/${id}`, { signal });
   },
@@ -340,22 +349,7 @@ export const api = {
     return request<Booking>(`/bookings/${id}`, { signal });
   },
   checkout(bookingId: string) {
-    return request<Payment>(`/bookings/${bookingId}/checkout`, { method: 'POST' });
-  },
-  mockPayment(bookingId: string, success: boolean, idempotencyKey = `payment-${crypto.randomUUID()}`) {
-    const body: MockPaymentRequest = { success };
-    return request<MockPaymentResponse>(`/payments/mock/${bookingId}`, {
-      method: 'POST',
-      headers: { 'Idempotency-Key': idempotencyKey },
-      body: JSON.stringify(body),
-    });
-  },
-  purchaseSeats(body: PurchaseSeatsRequest, idempotencyKey = `purchase-${crypto.randomUUID()}`) {
-    return request<MockPaymentResponse>('/payments/mock/purchase', {
-      method: 'POST',
-      headers: { 'Idempotency-Key': idempotencyKey },
-      body: JSON.stringify(body),
-    });
+    return request<SepayCheckoutResponse>(`/payments/bookings/${bookingId}/checkout`, { method: 'POST' });
   },
   bookings(signal?: AbortSignal) {
     return request<Booking[]>('/bookings', { signal });
@@ -369,4 +363,27 @@ export const api = {
   tickets(signal?: AbortSignal) {
     return request<Ticket[]>('/tickets', { signal });
   },
+  adminSepayTransactions(status?: string, signal?: AbortSignal) {
+    const query = status ? `?status=${status}` : '';
+    return request<SepayTransactionsResponse>(`/payments/admin/sepay/transactions${query}`, { signal });
+  },
+  adminUpdateSepayTransaction(id: string, body: UpdateSepayTransactionRequest) {
+    return request<SepayTransaction>(`/payments/admin/sepay/transactions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  },
 };
+
+export function cancelBookingKeepalive(id: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const accessToken = getAccessToken();
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  void fetch(`${API_URL}/bookings/${id}/cancel`, {
+    method: 'POST',
+    headers,
+    keepalive: true,
+  }).catch(() => undefined);
+}

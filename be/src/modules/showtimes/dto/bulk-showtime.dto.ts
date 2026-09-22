@@ -55,6 +55,21 @@ export class BulkShowtimeDto {
   coupleMultiplier?: number;
 }
 
+export class BulkShowtimeConflictDto {
+  @ApiProperty({ example: '2026-10-01T14:00:00.000Z', format: 'date-time' })
+  startsAt!: string;
+
+  @ApiProperty({ example: '2026-10-01T16:00:00.000Z', format: 'date-time' })
+  endsAt!: string;
+}
+
+export const BULK_SLOT_REASON_CODES = [
+  'SHOWTIME_OVERLAP',
+  'SHOWTIME_OUTSIDE_HOURS',
+] as const;
+
+export type BulkSlotReasonCode = (typeof BULK_SLOT_REASON_CODES)[number];
+
 export class BulkShowtimeSlotResponseDto {
   @ApiProperty({ example: 1 })
   index!: number;
@@ -68,8 +83,14 @@ export class BulkShowtimeSlotResponseDto {
   @ApiProperty({ example: true })
   available!: boolean;
 
-  @ApiPropertyOptional({ example: 'Room already has an overlapping showtime' })
-  conflict?: string;
+  @ApiPropertyOptional({
+    enum: BULK_SLOT_REASON_CODES,
+    example: 'SHOWTIME_OVERLAP',
+  })
+  reasonCode?: BulkSlotReasonCode;
+
+  @ApiPropertyOptional({ type: [BulkShowtimeConflictDto] })
+  conflicts?: BulkShowtimeConflictDto[];
 }
 
 export class BulkShowtimePreviewResponseDto {

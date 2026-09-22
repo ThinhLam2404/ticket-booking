@@ -2420,6 +2420,115 @@
         ]
       }
     },
+    "/api/v1/showtimes/rooms/{roomId}/free-slots": {
+      "get": {
+        "operationId": "Showtimes_findFreeSlots",
+        "parameters": [
+          {
+            "name": "roomId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "description": "Calendar date in Asia/Ho_Chi_Minh (YYYY-MM-DD)",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "durationMinutes",
+            "required": true,
+            "in": "query",
+            "description": "Movie duration in minutes",
+            "schema": {
+              "example": 120,
+              "type": "number"
+            }
+          },
+          {
+            "name": "turnaroundMinutes",
+            "required": false,
+            "in": "query",
+            "description": "Turnaround minutes kept clear around existing showtimes",
+            "schema": {
+              "example": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FreeSlotsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "showtimes"
+        ]
+      }
+    },
     "/api/v1/showtimes/{id}": {
       "get": {
         "operationId": "Showtimes_findOne",
@@ -3031,71 +3140,6 @@
         ]
       }
     },
-    "/api/v1/bookings/{id}/checkout": {
-      "post": {
-        "operationId": "Bookings_checkout",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PaymentResponseDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "bookings"
-        ]
-      }
-    },
     "/api/v1/bookings/{id}/cancel": {
       "post": {
         "operationId": "Bookings_cancel",
@@ -3161,62 +3205,31 @@
         ]
       }
     },
-    "/api/v1/payments/mock/purchase": {
+    "/api/v1/payments/bookings/{bookingId}/checkout": {
       "post": {
-        "operationId": "Payments_purchaseSeats",
+        "operationId": "Sepay_checkout",
         "parameters": [
           {
-            "name": "idempotency-key",
-            "required": false,
-            "in": "header",
-            "description": "Optional when idempotencyKey is provided in the request body",
+            "name": "bookingId",
+            "required": true,
+            "in": "path",
             "schema": {
               "type": "string"
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PurchaseSeatsDto"
-              }
-            }
-          }
-        },
         "responses": {
           "201": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MockPaymentResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                  "$ref": "#/components/schemas/SepayCheckoutResponseDto"
                 }
               }
             }
           },
           "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "403": {
             "description": "",
             "content": {
               "application/json": {
@@ -3257,23 +3270,102 @@
         ]
       }
     },
-    "/api/v1/payments/mock/{bookingId}": {
+    "/api/v1/payments/sepay/webhook": {
       "post": {
-        "operationId": "Payments_processMockPayment",
+        "operationId": "Sepay_handleWebhook",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SepayWebhookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/v1/payments/admin/sepay/transactions": {
+      "get": {
+        "operationId": "Sepay_findTransactions",
         "parameters": [
           {
-            "name": "bookingId",
-            "required": true,
-            "in": "path",
+            "name": "status",
+            "required": false,
+            "in": "query",
             "schema": {
+              "enum": [
+                "MATCHED",
+                "CONFIRMED",
+                "REVIEW_REQUIRED",
+                "REFUNDED"
+              ],
               "type": "string"
             }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SepayTransactionResponseDto"
+                  }
+                }
+              }
+            }
           },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
           {
-            "name": "idempotency-key",
-            "required": false,
-            "in": "header",
-            "description": "Optional when idempotencyKey is provided in the request body",
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/v1/payments/admin/sepay/transactions/{id}": {
+      "patch": {
+        "operationId": "Sepay_updateTransaction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
             "schema": {
               "type": "string"
             }
@@ -3284,28 +3376,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MockPaymentDto"
+                "$ref": "#/components/schemas/UpdateTransactionStatusDto"
               }
             }
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MockPaymentResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                  "$ref": "#/components/schemas/SepayTransactionResponseDto"
                 }
               }
             }
@@ -3331,16 +3413,6 @@
             }
           },
           "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "409": {
             "description": "",
             "content": {
               "application/json": {
@@ -4649,6 +4721,95 @@
           "meta"
         ]
       },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "FreeSlotWindowDto": {
+        "type": "object",
+        "properties": {
+          "startsAt": {
+            "type": "string",
+            "example": "2026-10-01T08:00:00.000Z",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "example": "2026-10-01T10:30:00.000Z",
+            "format": "date-time"
+          },
+          "minutes": {
+            "type": "number",
+            "example": 150,
+            "description": "Free minutes in this window"
+          }
+        },
+        "required": [
+          "startsAt",
+          "endsAt",
+          "minutes"
+        ]
+      },
+      "BusySlotDto": {
+        "type": "object",
+        "properties": {
+          "startsAt": {
+            "type": "string",
+            "example": "2026-10-01T14:00:00.000Z",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "example": "2026-10-01T16:00:00.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "FreeSlotsResponseDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "example": "clx123room"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "example": 120
+          },
+          "turnaroundMinutes": {
+            "type": "number",
+            "example": 20
+          },
+          "freeWindows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FreeSlotWindowDto"
+            }
+          },
+          "busy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BusySlotDto"
+            }
+          }
+        },
+        "required": [
+          "roomId",
+          "date",
+          "durationMinutes",
+          "turnaroundMinutes",
+          "freeWindows",
+          "busy"
+        ]
+      },
       "ShowtimeSeatsResponseDto": {
         "type": "object",
         "properties": {
@@ -4734,6 +4895,25 @@
           "basePrice"
         ]
       },
+      "BulkShowtimeConflictDto": {
+        "type": "object",
+        "properties": {
+          "startsAt": {
+            "type": "string",
+            "example": "2026-10-01T14:00:00.000Z",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "example": "2026-10-01T16:00:00.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "startsAt",
+          "endsAt"
+        ]
+      },
       "BulkShowtimeSlotResponseDto": {
         "type": "object",
         "properties": {
@@ -4755,9 +4935,19 @@
             "type": "boolean",
             "example": true
           },
-          "conflict": {
+          "reasonCode": {
             "type": "string",
-            "example": "Room already has an overlapping showtime"
+            "enum": [
+              "SHOWTIME_OVERLAP",
+              "SHOWTIME_OUTSIDE_HOURS"
+            ],
+            "example": "SHOWTIME_OVERLAP"
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkShowtimeConflictDto"
+            }
           }
         },
         "required": [
@@ -4989,11 +5179,11 @@
           },
           "provider": {
             "type": "string",
-            "example": "MOCK"
+            "example": "SEPAY"
           },
           "reference": {
             "type": "string",
-            "example": "MOCK-PAYMENT-001",
+            "example": "SEPAY-92704",
             "nullable": true
           },
           "status": {
@@ -5112,82 +5302,184 @@
           "updatedAt"
         ]
       },
-      "PurchaseSeatsDto": {
+      "SepayCheckoutResponseDto": {
         "type": "object",
         "properties": {
-          "showtimeId": {
-            "type": "string",
-            "example": "clx123showtime"
+          "intentId": {
+            "type": "string"
           },
-          "showtimeSeatIds": {
-            "example": [
-              "clx123showtimeSeatA1",
-              "clx123showtimeSeatA2"
-            ],
-            "minItems": 1,
-            "maxItems": 10,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "paymentCode": {
+            "type": "string"
           },
-          "reference": {
-            "type": "string",
-            "example": "MOCK-PURCHASE-001"
+          "amount": {
+            "type": "string"
           },
-          "success": {
-            "type": "boolean",
-            "example": true,
-            "default": true
+          "bankCode": {
+            "type": "string"
           },
-          "idempotencyKey": {
-            "type": "string",
-            "example": "purchase-attempt-001",
-            "minLength": 8,
-            "maxLength": 100,
-            "description": "Use the same key when retrying the same purchase request"
+          "accountNumber": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "qrUrl": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
           }
         },
         "required": [
-          "showtimeId",
-          "showtimeSeatIds"
+          "intentId",
+          "paymentCode",
+          "amount",
+          "bankCode",
+          "accountNumber",
+          "accountName",
+          "qrUrl",
+          "expiresAt",
+          "status"
         ]
       },
-      "MockPaymentResponseDto": {
+      "SepayWebhookDto": {
         "type": "object",
         "properties": {
-          "payment": {
-            "$ref": "#/components/schemas/PaymentResponseDto"
+          "id": {
+            "type": "number"
           },
-          "booking": {
-            "$ref": "#/components/schemas/BookingResponseDto"
+          "gateway": {
+            "type": "string"
+          },
+          "transactionDate": {
+            "type": "string"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "transferType": {
+            "type": "string"
+          },
+          "transferAmount": {
+            "type": "number"
+          },
+          "content": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "referenceCode": {
+            "type": "string"
+          },
+          "subAccount": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "accumulated": {
+            "type": "number"
           }
         },
         "required": [
-          "payment",
-          "booking"
+          "id",
+          "gateway",
+          "transactionDate",
+          "accountNumber",
+          "transferType",
+          "transferAmount"
         ]
       },
-      "MockPaymentDto": {
+      "SepayTransactionResponseDto": {
         "type": "object",
         "properties": {
-          "reference": {
-            "type": "string",
-            "example": "MOCK-PAYMENT-001"
+          "id": {
+            "type": "string"
           },
-          "success": {
-            "type": "boolean",
-            "example": true,
-            "default": true
+          "sepayId": {
+            "type": "number"
           },
-          "idempotencyKey": {
+          "gateway": {
+            "type": "string"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "transferAmount": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "referenceCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "transferType": {
+            "type": "string"
+          },
+          "transactionDate": {
+            "type": "string"
+          },
+          "status": {
             "type": "string",
-            "example": "payment-attempt-001",
-            "minLength": 8,
-            "maxLength": 100,
-            "description": "Use the same key when retrying the same payment request"
+            "enum": [
+              "MATCHED",
+              "CONFIRMED",
+              "REVIEW_REQUIRED",
+              "REFUNDED"
+            ]
+          },
+          "adminNote": {
+            "type": "object",
+            "nullable": true
+          },
+          "paymentIntentId": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
           }
-        }
+        },
+        "required": [
+          "id",
+          "sepayId",
+          "gateway",
+          "accountNumber",
+          "transferAmount",
+          "content",
+          "referenceCode",
+          "transferType",
+          "transactionDate",
+          "status",
+          "adminNote",
+          "paymentIntentId",
+          "createdAt"
+        ]
+      },
+      "UpdateTransactionStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "REVIEW_REQUIRED",
+              "REFUNDED",
+              "CONFIRMED"
+            ]
+          },
+          "adminNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
       },
       "TicketBookingResponseDto": {
         "type": "object",

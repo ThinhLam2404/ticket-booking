@@ -11,7 +11,7 @@ import { RoomsModule } from './modules/rooms/rooms.module.js';
 import { SeatsModule } from './modules/seats/seats.module.js';
 import { ShowtimesModule } from './modules/showtimes/showtimes.module.js';
 import { BookingsModule } from './modules/bookings/bookings.module.js';
-import { PaymentsModule } from './modules/payments/payments.module.js';
+import { SepayModule } from './modules/sepay/sepay.module.js';
 import { TicketsModule } from './modules/tickets/tickets.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './modules/health/health.module.js';
@@ -38,7 +38,7 @@ import { validateEnvironment } from './config/env.validation.js';
     SeatsModule,
     ShowtimesModule,
     BookingsModule,
-    PaymentsModule,
+    SepayModule,
     TicketsModule,
   ],
   controllers: [AppController],

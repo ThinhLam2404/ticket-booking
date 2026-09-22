@@ -7,6 +7,7 @@ import {
   BookingStatus,
   MovieStatus,
   PaymentStatus,
+  SepayIntentStatus,
   Prisma,
   ShowtimeSeatStatus,
 } from '@prisma/client';
@@ -16,7 +17,10 @@ import { isUniqueConstraintError } from '../../common/database/prisma-errors.js'
 import { PrismaService } from '../../database/prisma.service.js';
 import { RedisService } from '../redis/redis.service.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
-import { HOLD_TTL_SECONDS, PURCHASE_WINDOW_SECONDS } from './booking-policy.js';
+import {
+  SHOWTIME_BUFFER_SECONDS,
+  computeHoldTtl,
+} from './booking-policy.js';
 
 const IDEMPOTENCY_KEY_MAX_LENGTH = 100;
 
@@ -117,21 +121,21 @@ export class BookingsService {
     if (secondsUntilShowtime <= 0) {
       throw new ConflictException('Showtime has already started');
     }
-    if (secondsUntilShowtime <= PURCHASE_WINDOW_SECONDS) {
+    if (secondsUntilShowtime <= SHOWTIME_BUFFER_SECONDS) {
       throw new ConflictException(
-        'Showtime is too close to start for a seat hold; purchase seats instead',
+        'Showtime is too close to start for a new booking',
       );
     }
 
+    const holdTtl = computeHoldTtl(secondsUntilShowtime);
     const holdToken = randomUUID();
     const acquiredSeatIds: string[] = [];
-    //NOTE - HOlD logic
     try {
       for (const seatId of canonicalSeatIds) {
         const acquired = await this.redis.setIfAbsent(
           this.seatLockKey(dto.showtimeId, seatId),
           holdToken,
-          HOLD_TTL_SECONDS,
+          holdTtl,
         );
         if (acquired !== 'OK') {
           //NOTE - nếu ghế đã có ng đặt thì kiểm tra xem có phải ghế của người khác đặt hay là của mình (retry 5 lần)
@@ -150,7 +154,7 @@ export class BookingsService {
         acquiredSeatIds.push(seatId);
       }
 
-      const expiresAt = new Date(Date.now() + HOLD_TTL_SECONDS * 1000);
+      const expiresAt = new Date(Date.now() + holdTtl * 1000);
       const booking = await this.prisma.$transaction(async (transaction) => {
         const now = new Date();
         //NOTE - update trạng thái ghế held -> available nếu đã hết hạn
@@ -318,6 +322,10 @@ export class BookingsService {
         where: { bookingId: id, status: PaymentStatus.PENDING },
         data: { status: PaymentStatus.FAILED },
       });
+      await transaction.sepayPaymentIntent.updateMany({
+        where: { bookingId: id, status: SepayIntentStatus.PENDING },
+        data: { status: SepayIntentStatus.CANCELLED },
+      });
       await transaction.showtimeSeat.updateMany({
         where: {
           heldByBookingId: id,
@@ -343,55 +351,6 @@ export class BookingsService {
     );
 
     return toPublicResponse(cancelled);
-  }
-
-  async checkout(userId: string, id: string) {
-    await this.expireBooking(id);
-    const payment = await this.prisma.$transaction(async (transaction) => {
-      const booking = await transaction.booking.findFirst({
-        where: { id, userId },
-        include: { items: true, payment: true },
-      });
-      if (!booking) {
-        throw new NotFoundException('Booking not found');
-      }
-      if (
-        booking.status !== BookingStatus.PENDING ||
-        booking.expiresAt <= new Date()
-      ) {
-        throw new ConflictException(
-          'Booking is no longer available for checkout',
-        );
-      }
-
-      const heldSeats = await transaction.showtimeSeat.count({
-        where: {
-          id: { in: booking.items.map((item) => item.showtimeSeatId) },
-          heldByBookingId: id,
-          status: ShowtimeSeatStatus.HELD,
-        },
-      });
-      if (heldSeats !== booking.items.length) {
-        throw new ConflictException(
-          'Booking no longer owns all selected seats',
-        );
-      }
-
-      return transaction.payment.upsert({
-        where: { bookingId: booking.id },
-        create: {
-          bookingId: booking.id,
-          amount: booking.totalAmount,
-          provider: 'MOCK',
-          status: PaymentStatus.PENDING,
-        },
-        update: {
-          amount: booking.totalAmount,
-          status: PaymentStatus.PENDING,
-        },
-      });
-    });
-    return toPublicResponse(payment);
   }
 
   async expireBookings() {
@@ -464,6 +423,10 @@ export class BookingsService {
       await transaction.payment.updateMany({
         where: { bookingId: id, status: PaymentStatus.PENDING },
         data: { status: PaymentStatus.FAILED },
+      });
+      await transaction.sepayPaymentIntent.updateMany({
+        where: { bookingId: id, status: SepayIntentStatus.PENDING },
+        data: { status: SepayIntentStatus.EXPIRED },
       });
       await transaction.showtimeSeat.updateMany({
         where: {

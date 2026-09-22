@@ -16,7 +16,15 @@ import {
   ListShowtimesDto,
 } from './dto/list-showtimes.dto.js';
 import { UpdateShowtimeDto } from './dto/update-showtime.dto.js';
-import { BulkShowtimeDto } from './dto/bulk-showtime.dto.js';
+import {
+  BulkShowtimeDto,
+  BulkSlotReasonCode,
+} from './dto/bulk-showtime.dto.js';
+import { FreeSlotsQueryDto } from './dto/free-slots.dto.js';
+import {
+  dayBoundsVn,
+  isWithinOperatingHours,
+} from './showtime-policy.js';
 
 type ShowtimeListQuery = ListShowtimesDto & { status?: MovieStatus };
 
@@ -151,6 +159,75 @@ export class ShowtimesService {
     });
   }
 
+  async findFreeSlots(roomId: string, query: FreeSlotsQueryDto) {
+    const room = await this.prisma.room.findUnique({ where: { id: roomId } });
+    if (!room) {
+      throw new NotFoundException('Room not found');
+    }
+    const { openAt, closeAt } = dayBoundsVn(query.date);
+    const turnaroundMs = (query.turnaroundMinutes ?? 20) * 60 * 1000;
+    const durationMs = query.durationMinutes * 60 * 1000;
+
+    const existing = await this.prisma.showtime.findMany({
+      where: {
+        roomId,
+        startsAt: { lt: closeAt },
+        endsAt: { gt: openAt },
+      },
+      select: { startsAt: true, endsAt: true },
+      orderBy: { startsAt: 'asc' },
+    });
+
+    const busy = existing.map((candidate) => ({
+      startsAt: candidate.startsAt,
+      endsAt: candidate.endsAt,
+    }));
+
+    const blocked = existing
+      .map((candidate) => ({
+        startsAt: new Date(candidate.startsAt.getTime() - turnaroundMs),
+        endsAt: new Date(candidate.endsAt.getTime() + turnaroundMs),
+      }))
+      .sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime());
+
+    const freeWindows: Array<{ startsAt: Date; endsAt: Date; minutes: number }> =
+      [];
+    let cursor = openAt;
+    for (const slot of blocked) {
+      const windowStart = cursor > openAt ? cursor : openAt;
+      const windowEnd = slot.startsAt < closeAt ? slot.startsAt : closeAt;
+      if (windowEnd.getTime() - windowStart.getTime() >= durationMs) {
+        freeWindows.push({
+          startsAt: windowStart,
+          endsAt: windowEnd,
+          minutes: Math.floor(
+            (windowEnd.getTime() - windowStart.getTime()) / 60000,
+          ),
+        });
+      }
+      if (slot.endsAt > cursor) {
+        cursor = slot.endsAt;
+      }
+    }
+    if (closeAt.getTime() - cursor.getTime() >= durationMs) {
+      const windowStart = cursor > openAt ? cursor : openAt;
+      freeWindows.push({
+        startsAt: windowStart,
+        endsAt: closeAt,
+        minutes: Math.floor((closeAt.getTime() - windowStart.getTime()) / 60000),
+      });
+    }
+
+    return toPublicResponse({
+      roomId,
+      date: query.date,
+      durationMinutes: query.durationMinutes,
+      turnaroundMinutes: query.turnaroundMinutes ?? 20,
+      freeWindows,
+      busy,
+    });
+  }
+
   async previewBulk(dto: BulkShowtimeDto) {
     const movie = await this.prisma.movie.findUnique({
       where: { id: dto.movieId },
@@ -177,19 +254,32 @@ export class ShowtimesService {
         endsAt: { gt: slots[0]!.startsAt },
       },
       select: { startsAt: true, endsAt: true },
+      orderBy: { startsAt: 'asc' },
     });
     const previewSlots = slots.map((slot, index) => {
-      const conflict = existing.some(
+      const overlapping = existing.filter(
         (candidate) =>
           candidate.startsAt < slot.endsAt && candidate.endsAt > slot.startsAt,
       );
+      const withinHours = isWithinOperatingHours(slot.startsAt);
+      const available = overlapping.length === 0 && withinHours;
+      let reasonCode: BulkSlotReasonCode | undefined;
+      if (overlapping.length > 0) {
+        reasonCode = 'SHOWTIME_OVERLAP';
+      } else if (!withinHours) {
+        reasonCode = 'SHOWTIME_OUTSIDE_HOURS';
+      }
       return {
         index: index + 1,
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
-        available: !conflict,
-        ...(conflict && {
-          conflict: 'Room already has an overlapping showtime',
+        available,
+        ...(reasonCode && { reasonCode }),
+        ...(overlapping.length > 0 && {
+          conflicts: overlapping.map((candidate) => ({
+            startsAt: candidate.startsAt,
+            endsAt: candidate.endsAt,
+          })),
         }),
       };
     });
@@ -223,6 +313,9 @@ export class ShowtimesService {
             dto.count,
             dto.turnaroundMinutes,
           );
+          for (const slot of slots) {
+            this.assertWithinOperatingHours(slot.startsAt);
+          }
           const existing = await transaction.showtime.findFirst({
             where: {
               roomId: dto.roomId,
@@ -304,6 +397,7 @@ export class ShowtimesService {
     const context = this.getSchedulingContext(movie, room);
     const { movie: validMovie, room: validRoom } = context;
     const endsAt = this.calculateEndsAt(startsAt, validMovie.duration);
+    this.assertWithinOperatingHours(startsAt);
     const overlappingShowtime = await this.prisma.showtime.findFirst({
       where: {
         roomId: dto.roomId,
@@ -395,6 +489,9 @@ export class ShowtimesService {
           const startsAt = dto.startsAt
             ? this.parseStartsAt(dto.startsAt)
             : current.startsAt;
+          if (dto.startsAt) {
+            this.assertWithinOperatingHours(startsAt);
+          }
           const movieId = dto.movieId ?? current.movieId;
           const roomId = dto.roomId ?? current.roomId;
           const roomChanged = roomId !== current.roomId;
@@ -581,8 +678,15 @@ export class ShowtimesService {
     return { movie, room };
   }
 
-  private parseStartsAt(value: string): Date {
-    if (!SHOWTIME_TIMEZONE_PATTERN.test(value)) {
+  private assertWithinOperatingHours(startsAt: Date): void {
+    if (!isWithinOperatingHours(startsAt)) {
+      throw new ConflictException(
+        'Showtime starts outside venue operating hours',
+      );
+    }
+  }
+
+  private parseStartsAt(value: string): Date {    if (!SHOWTIME_TIMEZONE_PATTERN.test(value)) {
       throw new BadRequestException(
         'Showtime start must include an explicit timezone offset',
       );

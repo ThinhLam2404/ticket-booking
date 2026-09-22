@@ -388,6 +388,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/showtimes/rooms/{roomId}/free-slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Showtimes_findFreeSlots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/showtimes/{id}": {
         parameters: {
             query?: never;
@@ -500,22 +516,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/bookings/{id}/checkout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["Bookings_checkout"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/bookings/{id}/cancel": {
         parameters: {
             query?: never;
@@ -532,7 +532,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/payments/mock/purchase": {
+    "/api/v1/payments/bookings/{bookingId}/checkout": {
         parameters: {
             query?: never;
             header?: never;
@@ -541,14 +541,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["Payments_purchaseSeats"];
+        post: operations["Sepay_checkout"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/payments/mock/{bookingId}": {
+    "/api/v1/payments/sepay/webhook": {
         parameters: {
             query?: never;
             header?: never;
@@ -557,11 +557,43 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["Payments_processMockPayment"];
+        post: operations["Sepay_handleWebhook"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/admin/sepay/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Sepay_findTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/admin/sepay/transactions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Sepay_updateTransaction"];
         trace?: never;
     };
     "/api/v1/tickets": {
@@ -1143,6 +1175,48 @@ export interface components {
             data: components["schemas"]["ShowtimeResponseDto"][];
             meta: components["schemas"]["PaginationMetaDto"];
         };
+        Object: Record<string, never>;
+        FreeSlotWindowDto: {
+            /**
+             * Format: date-time
+             * @example 2026-10-01T08:00:00.000Z
+             */
+            startsAt: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-01T10:30:00.000Z
+             */
+            endsAt: string;
+            /**
+             * @description Free minutes in this window
+             * @example 150
+             */
+            minutes: number;
+        };
+        BusySlotDto: {
+            /**
+             * Format: date-time
+             * @example 2026-10-01T14:00:00.000Z
+             */
+            startsAt: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-01T16:00:00.000Z
+             */
+            endsAt: string;
+        };
+        FreeSlotsResponseDto: {
+            /** @example clx123room */
+            roomId: string;
+            /** @example 2026-10-01 */
+            date: string;
+            /** @example 120 */
+            durationMinutes: number;
+            /** @example 20 */
+            turnaroundMinutes: number;
+            freeWindows: components["schemas"]["FreeSlotWindowDto"][];
+            busy: components["schemas"]["BusySlotDto"][];
+        };
         ShowtimeSeatsResponseDto: {
             /** @example clx-showtime-id */
             showtimeId: string;
@@ -1191,6 +1265,18 @@ export interface components {
              */
             coupleMultiplier?: number;
         };
+        BulkShowtimeConflictDto: {
+            /**
+             * Format: date-time
+             * @example 2026-10-01T14:00:00.000Z
+             */
+            startsAt: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-01T16:00:00.000Z
+             */
+            endsAt: string;
+        };
         BulkShowtimeSlotResponseDto: {
             /** @example 1 */
             index: number;
@@ -1206,8 +1292,12 @@ export interface components {
             endsAt: string;
             /** @example true */
             available: boolean;
-            /** @example Room already has an overlapping showtime */
-            conflict?: string;
+            /**
+             * @example SHOWTIME_OVERLAP
+             * @enum {string}
+             */
+            reasonCode?: "SHOWTIME_OVERLAP" | "SHOWTIME_OUTSIDE_HOURS";
+            conflicts?: components["schemas"]["BulkShowtimeConflictDto"][];
         };
         BulkShowtimePreviewResponseDto: {
             /** @example clx123movie */
@@ -1323,9 +1413,9 @@ export interface components {
         PaymentResponseDto: {
             /** @example clx-payment-id */
             id: string;
-            /** @example MOCK */
+            /** @example SEPAY */
             provider: string;
-            /** @example MOCK-PAYMENT-001 */
+            /** @example SEPAY-92704 */
             reference?: string | null;
             /**
              * @example SUCCEEDED
@@ -1381,46 +1471,51 @@ export interface components {
              */
             updatedAt: string;
         };
-        PurchaseSeatsDto: {
-            /** @example clx123showtime */
-            showtimeId: string;
-            /**
-             * @example [
-             *       "clx123showtimeSeatA1",
-             *       "clx123showtimeSeatA2"
-             *     ]
-             */
-            showtimeSeatIds: string[];
-            /** @example MOCK-PURCHASE-001 */
-            reference?: string;
-            /**
-             * @default true
-             * @example true
-             */
-            success: boolean;
-            /**
-             * @description Use the same key when retrying the same purchase request
-             * @example purchase-attempt-001
-             */
-            idempotencyKey?: string;
+        SepayCheckoutResponseDto: {
+            intentId: string;
+            paymentCode: string;
+            amount: string;
+            bankCode: string;
+            accountNumber: string;
+            accountName: string;
+            qrUrl: string;
+            expiresAt: string;
+            status: string;
         };
-        MockPaymentResponseDto: {
-            payment: components["schemas"]["PaymentResponseDto"];
-            booking: components["schemas"]["BookingResponseDto"];
+        SepayWebhookDto: {
+            id: number;
+            gateway: string;
+            transactionDate: string;
+            accountNumber: string;
+            transferType: string;
+            transferAmount: number;
+            content?: string;
+            code?: string;
+            referenceCode?: string;
+            subAccount?: string;
+            description?: string;
+            accumulated?: number;
         };
-        MockPaymentDto: {
-            /** @example MOCK-PAYMENT-001 */
-            reference?: string;
-            /**
-             * @default true
-             * @example true
-             */
-            success: boolean;
-            /**
-             * @description Use the same key when retrying the same payment request
-             * @example payment-attempt-001
-             */
-            idempotencyKey?: string;
+        SepayTransactionResponseDto: {
+            id: string;
+            sepayId: number;
+            gateway: string;
+            accountNumber: string;
+            transferAmount: string;
+            content: string;
+            referenceCode: Record<string, never> | null;
+            transferType: string;
+            transactionDate: string;
+            /** @enum {string} */
+            status: "MATCHED" | "CONFIRMED" | "REVIEW_REQUIRED" | "REFUNDED";
+            adminNote: Record<string, never> | null;
+            paymentIntentId: Record<string, never> | null;
+            createdAt: string;
+        };
+        UpdateTransactionStatusDto: {
+            /** @enum {string} */
+            status: "REVIEW_REQUIRED" | "REFUNDED" | "CONFIRMED";
+            adminNote?: string;
         };
         TicketBookingResponseDto: {
             /** @example clx-booking-id */
@@ -3076,6 +3171,66 @@ export interface operations {
             };
         };
     };
+    Showtimes_findFreeSlots: {
+        parameters: {
+            query: {
+                /** @description Calendar date in Asia/Ho_Chi_Minh (YYYY-MM-DD) */
+                date: string;
+                /** @description Movie duration in minutes */
+                durationMinutes: number;
+                /** @description Turnaround minutes kept clear around existing showtimes */
+                turnaroundMinutes?: components["schemas"]["Object"];
+            };
+            header?: never;
+            path: {
+                roomId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreeSlotsResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
     Showtimes_findOne: {
         parameters: {
             query?: never;
@@ -3508,51 +3663,6 @@ export interface operations {
             };
         };
     };
-    Bookings_checkout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PaymentResponseDto"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorResponseDto"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorResponseDto"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorResponseDto"];
-                };
-            };
-        };
-    };
     Bookings_cancel: {
         parameters: {
             query?: never;
@@ -3598,47 +3708,26 @@ export interface operations {
             };
         };
     };
-    Payments_purchaseSeats: {
+    Sepay_checkout: {
         parameters: {
             query?: never;
-            header?: {
-                /** @description Optional when idempotencyKey is provided in the request body */
-                "idempotency-key"?: string;
+            header?: never;
+            path: {
+                bookingId: string;
             };
-            path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PurchaseSeatsDto"];
-            };
-        };
+        requestBody?: never;
         responses: {
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MockPaymentResponseDto"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                    "application/json": components["schemas"]["SepayCheckoutResponseDto"];
                 };
             };
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorResponseDto"];
-                };
-            };
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3664,21 +3753,16 @@ export interface operations {
             };
         };
     };
-    Payments_processMockPayment: {
+    Sepay_handleWebhook: {
         parameters: {
             query?: never;
-            header?: {
-                /** @description Optional when idempotencyKey is provided in the request body */
-                "idempotency-key"?: string;
-            };
-            path: {
-                bookingId: string;
-            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MockPaymentDto"];
+                "application/json": components["schemas"]["SepayWebhookDto"];
             };
         };
         responses: {
@@ -3686,16 +3770,68 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content?: never;
+            };
+        };
+    };
+    Sepay_findTransactions: {
+        parameters: {
+            query?: {
+                status?: "MATCHED" | "CONFIRMED" | "REVIEW_REQUIRED" | "REFUNDED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content: {
-                    "application/json": components["schemas"]["MockPaymentResponseDto"];
+                    "application/json": components["schemas"]["SepayTransactionResponseDto"][];
                 };
             };
-            400: {
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Sepay_updateTransaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTransactionStatusDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SepayTransactionResponseDto"];
                 };
             };
             401: {
@@ -3715,14 +3851,6 @@ export interface operations {
                 };
             };
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorResponseDto"];
-                };
-            };
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };

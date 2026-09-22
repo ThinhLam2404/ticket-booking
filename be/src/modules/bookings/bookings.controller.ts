@@ -18,7 +18,6 @@ import {
 } from '../../common/http/swagger.decorators.js';
 import {
   BookingResponseDto,
-  PaymentResponseDto,
 } from '../../common/http/dto/response.dto.js';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
@@ -61,13 +60,6 @@ export class BookingsController {
   @ApiErrorResponses(401, 404)
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.bookingsService.findOne(user.id, id);
-  }
-
-  @Post(':id/checkout')
-  @ApiResponse({ status: 201, type: PaymentResponseDto })
-  @ApiErrorResponses(401, 404, 409)
-  checkout(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.bookingsService.checkout(user.id, id);
   }
 
   @Post(':id/cancel')

@@ -16,6 +16,8 @@ const integrationEnvironment = {
     process.env.JWT_REFRESH_SECRET ?? 'integration-refresh-secret',
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
+  SEPAY_ACCOUNT_NUMBER: 'integration-account',
+  SEPAY_WEBHOOK_API_KEY: 'integration-webhook-key',
   ALLOW_INTEGRATION_DB_RESET: '1',
 };
 

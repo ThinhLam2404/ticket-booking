@@ -90,16 +90,17 @@ describe('Application (e2e)', () => {
           },
         },
       });
-    expect(response.body.paths['/api/v1/payments/mock/{bookingId}'].post.responses['201'])
+    expect(response.body.paths['/api/v1/payments/bookings/{bookingId}/checkout'].post.responses['201'])
       .toMatchObject({
         content: {
           'application/json': {
             schema: {
-              $ref: '#/components/schemas/MockPaymentResponseDto',
+              $ref: '#/components/schemas/SepayCheckoutResponseDto',
             },
           },
         },
       });
+    expect(response.body.paths['/api/v1/payments/sepay/webhook'].post.responses['201']).toBeDefined();
     expect(response.body.components.schemas.ApiErrorResponseDto).toBeDefined();
   });
 

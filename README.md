@@ -36,9 +36,8 @@ MVP hiện tại hỗ trợ:
 - Xem sơ đồ ghế theo suất chiếu.
 - Giữ ghế tạm thời bằng Redis.
 - Tạo booking và tính tiền ở server.
-- Checkout tạo payment pending.
-- Mock payment cho development/test.
-- Phát hành ticket sau payment thành công.
+- Checkout tạo payment intent SePay và mã QR chuyển khoản.
+- Nhận webhook SePay, đối soát giao dịch và phát hành ticket sau thanh toán thành công.
 - Hủy hoặc expire booking và giải phóng ghế.
 - Swagger UI để thử API.
 
@@ -49,7 +48,7 @@ Một ghế theo một suất chiếu chỉ được bán một lần. Hệ th�
 1. Redis lock có TTL để giảm tranh chấp giữa các request.
 2. PostgreSQL transaction để cập nhật booking, ghế, payment và ticket.
 3. Unique constraint và check constraint để bảo vệ invariant ở database.
-4. Idempotency key để retry request không tạo dữ liệu trùng.
+4. Idempotency key cho hold và unique SePay transaction ID để webhook retry không tạo dữ liệu trùng.
 
 ## 2. Công nghệ và infrastructure
 
@@ -193,7 +192,7 @@ Root điều phối cả hai ứng dụng bằng `package.json`; dependency và 
 | `seats`     | Ghế vật lý trong phòng                              |
 | `showtimes` | Lịch chiếu và snapshot ghế theo lịch chiếu          |
 | `bookings`  | Hold, checkout, cancel, expire booking              |
-| `payments`  | Mock payment                                        |
+| `sepay`     | SePay checkout, webhook và đối soát giao dịch      |
 | `tickets`   | Ticket đã phát hành                                 |
 | `health`    | Liveness/readiness                                  |
 | `redis`     | Redis client và lock operations                     |
@@ -216,9 +215,9 @@ Customer UI hiện có:
 - Catalog phim và tìm kiếm.
 - Bộ chọn tỉnh/thành dùng reference data nội bộ; popup được render ở `document.body`, khóa scroll nền khi mở và khôi phục focus/scroll khi đóng. Catalog debounce 120ms khi đổi khu vực liên tục và hủy request cũ bằng `AbortSignal`.
 - Chọn suất chiếu và sơ đồ ghế.
-- Hold tối đa 10 ghế bằng `Idempotency-Key` khi suất chiếu còn hơn 15 phút.
-- Atomic purchase trong vùng cuối trước suất chiếu, gồm claim ghế, payment và ticket trong một transaction; không tạo hold.
-- Checkout và mock payment success/failure.
+- Hold tối đa 10 ghế bằng `Idempotency-Key`; booking giữ ghế 10 phút khi suất còn hơn 15 phút và 2 phút khi còn từ 5 đến 15 phút.
+- Không nhận hold mới khi suất chiếu còn tối đa 5 phút; client hiển thị lỗi suất quá gần giờ chiếu.
+- Checkout SePay bằng mã QR/chuyển khoản và nhận webhook xác nhận thanh toán.
 - Booking history và ticket history.
 - Login/register và logout; nút logout dùng màu violet ở trạng thái thường và đỏ trầm khi hover.
 
@@ -269,6 +268,10 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `TMDB_ACCESS_TOKEN`      | Không    | TMDB API Read Access Token; cần nếu Admin tìm hoặc nhập phim  |
 | `SEED_ADMIN_EMAIL`       | Seed     | Email admin bootstrap, default `admin@example.com`             |
 | `SEED_ADMIN_PASSWORD`    | Seed     | Password admin bootstrap, bắt buộc khi seed                    |
+| `SEPAY_BANK_CODE`        | Không    | Mã ngân hàng SePay/VietQR (ví dụ: `MB`, `VCB`, `ACB`)          |
+| `SEPAY_ACCOUNT_NUMBER`   | Không    | Số tài khoản ngân hàng nhận tiền                              |
+| `SEPAY_ACCOUNT_NAME`     | Không    | Tên chủ tài khoản nhận tiền                                    |
+| `SEPAY_WEBHOOK_API_KEY`  | Không    | Khóa xác thực webhook từ SePay (header `Authorization: Apikey <KEY>`) |
 
 ### Security rules
 
@@ -276,7 +279,6 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 - Không lưu plaintext password hoặc refresh token.
 - Production yêu cầu mỗi JWT secret dài tối thiểu 32 ký tự.
 - Access và refresh secret phải khác nhau.
-- Mock payment chỉ được dùng ở `development` và `test`.
 - `TMDB_ACCESS_TOKEN` chỉ nằm ở backend `.env`; không truyền token sang frontend hoặc commit vào repository.
 - TMDB là nguồn dữ liệu ngoài. Chỉ phim đã được Admin nhập vào catalog nội bộ mới có thể publish, tạo showtime và booking.
 
@@ -556,9 +558,8 @@ Unique này không cấm ghế xuất hiện trong booking lịch sử khác; n�
 | Field            | Type            | Nullability | Default/constraint    | Mô tả                   |
 | ---------------- | --------------- | ----------- | --------------------- | ----------------------- |
 | `id`             | `String`        | REQ         | PK, `cuid()`          | ID payment              |
-| `provider`       | `String`        | REQ         | —                     | Hiện tại `MOCK`         |
-| `reference`      | `String?`       | OPT         | UQ                    | Reference phía provider |
-| `idempotencyKey` | `String?`       | OPT         | UQ                    | Key retry payment       |
+| `provider`      | `String`        | REQ         | —                     | Hiện tại `SEPAY`        |
+| `reference`     | `String?`       | OPT         | UQ                    | Reference phía provider |
 | `status`         | `PaymentStatus` | REQ         | `PENDING`             | Trạng thái giao dịch    |
 | `amount`         | `Decimal(10,2)` | REQ         | `>= 0`                | Số tiền thanh toán      |
 | `bookingId`      | `String`        | REQ         | UQ, FK → `Booking.id` | Booking được thanh toán |
@@ -566,7 +567,7 @@ Unique này không cấm ghế xuất hiện trong booking lịch sử khác; n�
 | `createdAt`      | `DateTime`      | REQ         | `now()`               | Thời điểm tạo           |
 | `updatedAt`      | `DateTime`      | REQ         | `@updatedAt`          | Thời điểm cập nhật      |
 
-Một booking tối đa có một Payment. Một payment idempotency key chỉ dùng một lần.
+Một booking tối đa có một Payment. Reference SePay là unique khi provider gửi reference.
 
 ### 5.14. Bảng `Ticket`
 
@@ -695,7 +696,6 @@ erDiagram
         String id PK
         String provider
         String reference UK
-        String idempotencyKey UK
         PaymentStatus status
         Decimal amount
         String bookingId FK, UK
@@ -798,7 +798,7 @@ Tạo schema ban đầu:
 - Các enum nghiệp vụ.
 - Các bảng `User`, `Movie`, `Cinema`, `Room`, `Seat`, `Showtime`, `ShowtimeSeat`, `Booking`, `BookingItem`, `Payment`, `Ticket`.
 - Primary key, relation, unique/index cơ bản.
-- Chưa có refresh token, seat state, booking hold token hoặc payment idempotency.
+- Chưa có refresh token, seat state hoặc booking hold token.
 - `BookingItem.showtimeSeatId` ban đầu có unique toàn cục.
 
 #### `20260907100000_booking_flow`
@@ -808,7 +808,8 @@ Bổ sung booking flow:
 - Enum `ShowtimeSeatStatus`.
 - `ShowtimeSeat.status`, `heldUntil`, `heldByBookingId`.
 - `Booking.holdToken`, `idempotencyKey`, `requestHash`.
-- `Payment.idempotencyKey`.
+- `Payment.reference`.
+- `SepayTransaction.sepayId`.
 - Bảng `RefreshToken`.
 - Bỏ unique toàn cục trên `BookingItem.showtimeSeatId`.
 - Thêm unique cùng booking trên `(bookingId, showtimeSeatId)`.
@@ -1569,12 +1570,20 @@ sequenceDiagram
 - `startsAt` phải có timezone rõ ràng, frontend gửi giờ Việt Nam dạng `+07:00`.
 - `endsAt` không nhận từ client; backend tự tính `startsAt + Movie.duration`.
 - Chỉ movie `PUBLISHED` mới được lập lịch.
+- Giờ vận hành rạp: suất chiếu chỉ được **bắt đầu từ 08:00 đến 23:00 hằng ngày (giờ Việt Nam)**; vi phạm trả `409 SHOWTIME_OUTSIDE_HOURS`. Suất bắt đầu đúng 23:00 được chấp nhận, phim được phép chiếu lố qua nửa đêm.
+
+#### `GET /api/v1/showtimes/rooms/:roomId/free-slots`
+
+- Auth: Bearer JWT, role `ADMIN`.
+- Query: `date=YYYY-MM-DD` (ngày giờ Việt Nam), `durationMinutes`, `turnaroundMinutes` (default `20`).
+- Trả các khung giờ trống trong `[08:00 → 23:00]` sau khi trừ suất đã chiếm và turnaround hai đầu, kèm danh sách suất bận để đối chiếu. Chỉ giữ khe đủ `durationMinutes`.
+- Dùng trong form lập lịch để chọn giờ bắt đầu còn trống.
 
 #### `POST /api/v1/showtimes/bulk/preview`
 
 - Auth: Bearer JWT, role `ADMIN`.
 - Nhận movie, room, `firstStartsAt`, `count`, `turnaroundMinutes` và pricing.
-- Trả danh sách slot, thời gian kết thúc tự tính, cờ conflict và `valid`.
+- Trả danh sách slot, thời gian kết thúc tự tính, `available`, `reasonCode` (`SHOWTIME_OVERLAP` hoặc `SHOWTIME_OUTSIDE_HOURS`) và danh sách `conflicts` (giờ các suất đang chiếm) cho slot bị trùng.
 - Không ghi dữ liệu.
 
 #### `POST /api/v1/showtimes/bulk`
@@ -1604,6 +1613,7 @@ Rules:
 - Room phải tồn tại và có layout hợp lệ với ít nhất 5 hàng.
 - `endsAt = startsAt + Movie.duration`.
 - `startsAt` phải có timezone và ở tương lai.
+- `startsAt` (giờ Việt Nam) phải trong khoảng 08:00–23:00 cùng ngày.
 - Không overlap với showtime khác trong cùng room.
 - Standard price = `basePrice`.
 - VIP price = `basePrice * vipMultiplier`; default multiplier `1.1`.
@@ -1649,9 +1659,10 @@ Validation:
 
 State effect:
 
-1. Verify showtime published/chưa bắt đầu và còn hơn `HOLD_TTL + buffer` (15 phút).
-2. Trong vùng cuối 15 phút, request hold trả `409 PURCHASE_REQUIRED`; client chuyển sang atomic purchase không hold.
-3. Verify seat IDs thuộc đúng showtime.
+1. Verify showtime published/chưa bắt đầu và còn hơn 5 phút.
+2. Tính thời gian hold: 10 phút khi suất còn hơn 15 phút; 2 phút khi suất còn từ 5 đến 15 phút.
+3. Nếu suất còn tối đa 5 phút, request hold trả `409 SHOWTIME_TOO_CLOSE`.
+4. Verify seat IDs thuộc đúng showtime.
 4. Sinh `holdToken` nội bộ.
 5. Redis `SET NX EX 600` cho từng ghế.
 5. Transaction kiểm tra ghế `AVAILABLE`.
@@ -1686,14 +1697,14 @@ Errors: `400`, `401`, `404`, `409`, `503`.
 - Không tồn tại/không thuộc user: `404`.
 - Có thể expire booking mục tiêu trước khi trả kết quả.
 
-#### `POST /api/v1/bookings/:id/checkout`
+#### `POST /api/v1/payments/bookings/:bookingId/checkout`
 
 - Auth: Bearer JWT.
 - Success: `201`.
 - Không cần body.
 - Kiểm tra booking còn `PENDING`, chưa hết hạn và còn sở hữu toàn bộ seat.
-- Transaction tạo hoặc reuse `Payment(PENDING, provider=MOCK)`.
-- Trả raw payment record.
+- Tạo hoặc reuse `SepayPaymentIntent` đang `PENDING`, kèm payment code và QR VietQR.
+- Trả thông tin ngân hàng, số tiền, mã thanh toán, QR URL và thời gian hết hạn.
 
 #### `POST /api/v1/bookings/:id/cancel`
 
@@ -1707,112 +1718,67 @@ Errors: `400`, `401`, `404`, `409`, `503`.
   - Seat hold → `AVAILABLE`.
   - Release Redis lock.
 - Errors: `401`, `404`, `409`.
+- Frontend trang thanh toán: khi booking còn `PENDING`, nút Back trình duyệt, link rời trang và đóng tab đều hỏi xác nhận rồi tự gọi cancel để nhả ghế; redirect sang vé khi `CONFIRMED` không bị chặn.
 
 ### 8.12. Payments API
 
-#### `POST /api/v1/payments/mock/purchase`
+#### `POST /api/v1/payments/bookings/:bookingId/checkout`
 
 - Auth: Bearer JWT.
 - Success: `201`.
-- Chỉ hoạt động với `NODE_ENV=development` hoặc `test`.
-- Chỉ được dùng trong vùng cuối `HOLD_TTL + buffer` (15 phút); nếu còn xa hơn, API trả `409 PURCHASE_WINDOW`.
-- Không tạo booking `PENDING` và không tạo trạng thái `HELD`: request dùng Redis lock ngắn để phân xử, sau đó trong một transaction claim ghế khả dụng, tạo booking `CONFIRMED`, payment `SUCCEEDED`, chuyển ghế sang `SOLD` và phát hành ticket.
-- Couple seat được canonicalize thành hai ghế vật lý trước khi lock và tính tiền.
-- Ai claim lock/transaction thành công trước sẽ mua được ghế; request sau nhận conflict.
+- Tạo hoặc trả lại `SepayPaymentIntent` cho booking đang `PENDING`.
+- Không gia hạn booking: `expiresAt` của intent đồng bộ với booking.
+- Trả thông tin ngân hàng, mã chuyển khoản unique (`CB...`), số tiền và URL QR VietQR (`template=compact`).
+- Lỗi: `401`, `404`, `409` (`BOOKING_NOT_PAYABLE`, `SHOWTIME_TOO_CLOSE`, `BOOKING_SEATS_NOT_OWNED`).
 
-Body:
-
-```json
-{
-  "showtimeId": "clx-showtime-id",
-  "showtimeSeatIds": ["clx-showtime-seat-a1", "clx-showtime-seat-a2"],
-  "reference": "MOCK-PURCHASE-001",
-  "success": true,
-  "idempotencyKey": "purchase-attempt-001"
-}
-```
-
-#### `POST /api/v1/payments/mock/:bookingId`
-
-- Auth: Bearer JWT.
-- Success: `201`.
-- Chỉ hoạt động với `NODE_ENV=development` hoặc `test`.
-- Idempotency key bắt buộc từ header hoặc body.
-
-Header:
-
-```http
-Idempotency-Key: payment-attempt-001
-```
-
-Body:
+Response:
 
 ```json
 {
-  "reference": "MOCK-PAYMENT-001",
-  "success": true
+  "intentId": "clx-intent-id",
+  "paymentCode": "CBA1B2C3",
+  "amount": "200000",
+  "bankCode": "MB",
+  "accountNumber": "0123456789",
+  "accountName": "CINEBOOK",
+  "qrUrl": "https://vietqr.app/img?acc=0123456789&bank=MB&amount=200000&des=CBA1B2C3&template=compact",
+  "expiresAt": "2026-09-21T14:10:00.000Z",
+  "status": "PENDING"
 }
 ```
 
-Field:
+#### `POST /api/v1/payments/sepay/webhook`
 
-| Field            | Required         | Mô tả                                        |
-| ---------------- | ---------------- | -------------------------------------------- |
-| `reference`      | Không            | Reference provider, max 100                  |
-| `success`        | Không            | Default behavior là success nếu khác `false` |
-| `idempotencyKey` | Header hoặc body | Key retry, 8-100 ký tự khi validate body     |
+- Auth: SePay API Key qua header `Authorization: Apikey <KEY>`.
+- Success: `201` với body `{ "success": true }`.
+- Validation lenient riêng cho webhook (không dùng `forbidNonWhitelisted` toàn cục): field lạ từ SePay (ví dụ `code`) được bỏ qua, chỉ reject khi thiếu/sai field bắt buộc (`id`, `gateway`, `transactionDate`, `accountNumber`, `transferType`, `transferAmount`).
+- Bỏ qua giao dịch `transferType !== 'in'` và giao dịch trùng theo `id` SePay.
+- Khớp mã thanh toán `CB...` trong nội dung và số tiền.
+- Nếu hợp lệ: chuyển booking sang `CONFIRMED`, ghế sang `SOLD`, tạo ticket và giải phóng Redis lock.
+- Nếu không khớp mã, sai số tiền hoặc booking đã hết hạn: ghi nhận `SepayTransaction` với trạng thái `REVIEW_REQUIRED` để Admin đối soát và hoàn tiền thủ công; không tự động cấp vé.
 
-Success flow:
+#### `GET /api/v1/payments/admin/sepay/transactions`
 
-1. Check environment và idempotency key.
-2. Verify booking thuộc user.
-3. Verify booking pending/chưa hết hạn.
-4. Verify booking vẫn sở hữu tất cả held seat.
-5. Payment → `SUCCEEDED`.
-6. Booking → `CONFIRMED`.
-7. Seat → `SOLD`.
-8. Upsert ticket từng booking item.
-9. Release Redis lock sau commit.
+- Auth: Bearer JWT (Role `ADMIN`).
+- Success: `200`.
+- Danh sách 100 giao dịch SePay gần nhất, hỗ trợ lọc theo query `status`.
 
-Failure flow (`success: false`):
+#### `PATCH /api/v1/payments/admin/sepay/transactions/:id`
 
-1. Payment → `FAILED`.
-2. Booking → `CANCELLED`.
-3. Seat → `AVAILABLE`.
-4. Clear hold fields.
-5. Release Redis lock.
+- Auth: Bearer JWT (Role `ADMIN`).
+- Success: `200`.
+- Cập nhật trạng thái giao dịch (ví dụ: chuyển sang `REFUNDED` sau khi hoàn tiền thủ công) kèm `adminNote`.
 
-Idempotency:
+#### Payment record sau webhook
 
-- Cùng key + cùng booking trả kết quả cũ.
-- Key đã dùng cho booking khác: `409`.
-- Reference/idempotency collision: `409`.
-- Payment success retry không tạo ticket trùng nhờ `Ticket.bookingItemId` unique và upsert.
+Khi webhook SePay khớp payment code, số tiền và intent còn hạn:
 
-#### Payment response
+1. Giao dịch được ghi nhận với trạng thái `MATCHED`, sau đó chuyển `CONFIRMED`.
+2. Payment được tạo hoặc cập nhật với `provider: "SEPAY"`, `status: "SUCCEEDED"` và reference `SEPAY-<sepayId>`.
+3. Booking chuyển sang `CONFIRMED`, ghế chuyển sang `SOLD`, ticket được upsert và Redis lock được giải phóng.
+4. Gửi lại cùng `sepayId` trả thành công idempotently nhờ unique constraint.
 
-Response có dạng:
-
-```json
-{
-  "payment": {
-    "id": "clx-payment-id",
-    "provider": "MOCK",
-    "reference": "MOCK-PAYMENT-001",
-    "idempotencyKey": "payment-attempt-001",
-    "status": "SUCCEEDED",
-    "amount": "100000.00",
-    "bookingId": "clx-booking-id",
-    "createdAt": "2026-09-07T10:00:00.000Z",
-    "updatedAt": "2026-09-07T10:00:00.000Z"
-  },
-  "booking": {
-    "id": "clx-booking-id",
-    "status": "CONFIRMED"
-  }
-}
-```
-
+Giao dịch không khớp mã, sai tiền hoặc đến sau khi intent hết hạn được lưu `REVIEW_REQUIRED`; hệ thống không tự cấp vé.
 ### 8.13. Tickets API
 
 #### `GET /api/v1/tickets`
@@ -1852,9 +1818,9 @@ GET /showtimes/:id/seats
     ↓
 POST /bookings/hold
     ↓
-POST /bookings/:id/checkout
+POST /payments/bookings/:bookingId/checkout
     ↓
-POST /payments/mock/:bookingId
+SePay chuyển khoản + POST /payments/sepay/webhook
     ↓
 GET /tickets
 ```
@@ -1950,26 +1916,24 @@ sequenceDiagram
     DB-->>API: Booking expiresAt
     API-->>C: Booking PENDING
 
-    C->>API: POST /bookings/:id/checkout
-    API->>DB: Transaction: verify booking and held seats
-    DB-->>API: Payment PENDING
-    API-->>C: Payment PENDING
+    C->>API: POST /payments/bookings/:bookingId/checkout
+    API->>DB: Verify booking and held seats
+    API->>DB: Create or reuse SepayPaymentIntent
+    API-->>C: Payment code + VietQR URL
 
-    C->>API: POST /payments/mock/:bookingId\nIdempotency-Key
-    API->>DB: Transaction: verify state and ownership
-    alt Success
-        API->>DB: Payment SUCCEEDED
+    C->>Bank: Chuyển khoản theo payment code
+    Bank->>API: POST /payments/sepay/webhook
+    API->>DB: Unique sepayId + đối soát mã và số tiền
+    alt Matched and not expired
+        API->>DB: Payment SEPAY SUCCEEDED
         API->>DB: Booking CONFIRMED
         API->>DB: Seats SOLD
         API->>DB: Upsert tickets
         API->>R: Release owned locks
-        API-->>C: Confirmed booking and tickets
-    else Failure
-        API->>DB: Payment FAILED
-        API->>DB: Booking CANCELLED
-        API->>DB: Seats AVAILABLE
-        API->>R: Release owned locks
-        API-->>C: Failed payment
+        API-->>Bank: success=true
+    else Review required
+        API->>DB: SepayTransaction REVIEW_REQUIRED
+        API-->>Bank: success=true
     end
 ```
 
@@ -2036,16 +2000,13 @@ Quy tắc:
 - Same key, different payload: `409 Conflict`.
 - Không key: vẫn có Redis/database protection cho seat, nhưng retry không có response canonical.
 
-### 10.4. Payment idempotency
+### 10.4. SePay webhook idempotency
 
-`Payment` lưu:
+`SepayTransaction.sepayId` là unique. Nếu SePay gửi lại cùng giao dịch, API trả `{ "success": true }` mà không tạo thêm transaction, payment hoặc ticket.
 
-- `idempotencyKey` unique.
-- `reference` unique.
-- `bookingId` unique.
-- Direct payment kiểm tra lại idempotency key trước khi claim Redis lock và trả kết quả canonical cho retry cùng key.
+Khi hai webhook cùng giao dịch đến đồng thời, unique constraint trên `sepayId` bảo vệ việc ghi nhận một transaction duy nhất; transaction thắng sẽ tiếp tục confirm booking trong cùng flow.
 
-Ticket dùng `bookingItemId` unique; payment success retry sử dụng upsert để không phát hành duplicate ticket. Payload hash cho cùng payment key vẫn là hardening tiếp theo của Sprint 1.
+Ticket dùng `bookingItemId` unique và được upsert; một booking không thể phát hành duplicate ticket.
 
 ### 10.5. Các invariant database
 
@@ -2068,7 +2029,8 @@ File: `be/src/modules/bookings/booking-expiry.scheduler.ts`.
 - Gọi `BookingsService.expireBookings()`.
 - Tìm booking `PENDING` hết hạn.
 - Chuyển booking thành `EXPIRED`.
-- Chuyển payment pending thành `FAILED`.
+- Chuyển payment pending thành `FAILED` nếu còn dữ liệu legacy.
+- Chuyển SePay intent pending thành `EXPIRED`.
 - Release seat và Redis lock.
 
 ### 11.2. Request-driven expiry
@@ -2077,7 +2039,7 @@ Một số request có thể gọi expiry cho booking mục tiêu trước khi �
 
 - Lấy booking detail.
 - Cancel.
-- Checkout/payment flow.
+- Checkout SePay.
 - Đọc showtime/seat map: `ShowtimesService` ủy quyền cleanup cho `BookingsService` theo showtime.
 
 `ShowtimesService` không tự đổi `ShowtimeSeat` nữa; expiry trung tâm đồng bộ booking, payment, DB seat và Redis lock. Scheduler vẫn là cơ chế chính để cleanup toàn hệ thống.
@@ -2117,7 +2079,7 @@ Tác dụng:
 |  `204` | Logout thành công, không body                                           |
 |  `400` | Validation hoặc business input sai                                      |
 |  `401` | Thiếu/sai/expired JWT hoặc refresh token                                |
-|  `403` | Không đủ role hoặc mock payment bị disable                              |
+|  `403` | Không đủ role hoặc quyền truy cập                                      |
 |  `404` | Resource không tồn tại hoặc không thuộc user                            |
 |  `409` | Duplicate, seat conflict, overlap, state conflict, idempotency conflict |
 |  `502` | TMDB upstream hoặc kết nối TMDB thất bại                              |
@@ -2140,7 +2102,7 @@ Backend dùng `ApiExceptionFilter` để chuẩn hóa lỗi HTTP và lỗi Prism
 }
 ```
 
-Một số domain code thường dùng gồm `MOVIE_NOT_PUBLISHED`, `SHOWTIME_OVERLAP`, `ROOM_LAYOUT_INVALID`, `SEATS_UNAVAILABLE`, `BOOKING_NOT_PAYABLE`, `TMDB_NOT_CONFIGURED` và `TMDB_RATE_LIMITED`.
+Một số domain code thường dùng gồm `MOVIE_NOT_PUBLISHED`, `SHOWTIME_OVERLAP`, `SHOWTIME_OUTSIDE_HOURS`, `ROOM_LAYOUT_INVALID`, `SEATS_UNAVAILABLE`, `BOOKING_NOT_PAYABLE`, `TMDB_NOT_CONFIGURED` và `TMDB_RATE_LIMITED`.
 
 Validation error:
 
@@ -2214,7 +2176,7 @@ E2E test:
 - Root route dưới `/api/v1`.
 - Health liveness.
 - Auth payload validation.
-- OpenAPI response contracts cho pagination, seat map, mock payment và error schema.
+- OpenAPI response contracts cho pagination, seat map, SePay checkout/webhook và error schema.
 
 Integration test với PostgreSQL/Redis thật:
 
@@ -2224,10 +2186,11 @@ Integration test với PostgreSQL/Redis thật:
 - Cùng idempotency key nhưng payload khác.
 - Booking expiry giải phóng seat và cho user khác hold lại.
 - Cancel retry trả kết quả canonical và giải phóng seat/Redis lock.
-- Direct payment trong vùng T-15 claim Couple/seat, tạo payment/ticket atomic và chuyển seat sang SOLD.
-- Payment success retry không tạo ticket trùng.
-- Concurrent payment retry trả canonical result.
-- Payment failure giải phóng seat và cho user khác hold lại.
+- Checkout SePay tạo intent và payment code trên booking đang giữ ghế.
+- Webhook SePay đúng mã/số tiền chuyển booking thành công và phát hành ticket.
+- Webhook SePay lặp hoặc concurrent không tạo transaction/payment/ticket trùng.
+- Webhook sai tiền vào `REVIEW_REQUIRED` và không cấp vé.
+- Booking expiry/cancel giải phóng seat và cập nhật intent.
 - TMDB response normalization và đánh dấu movie đã import.
 - TMDB import lặp lại không tạo movie duplicate.
 
@@ -2332,7 +2295,7 @@ Các màn hình MVP:
 - Showtime selection.
 - Seat map với `AVAILABLE`, `HELD`, `SOLD`.
 - Hold ghế và countdown expiry.
-- Checkout và mock payment success/failure.
+- Checkout SePay bằng mã QR/chuyển khoản và trạng thái booking sau webhook.
 - Booking history.
 - Ticket history.
 
@@ -2352,9 +2315,9 @@ Các màn hình MVP:
 12. Register/login customer.
 13. Lấy showtime seats; chọn một ghế Couple sẽ chọn cả cặp.
 14. Hold một hoặc nhiều ghế; backend canonicalize cặp Couple và giới hạn 10 ghế vật lý.
-15. Checkout booking.
-16. Gọi mock payment với `Idempotency-Key`.
-17. Lấy ticket.
+15. Checkout booking để lấy mã thanh toán và QR.
+16. Chuyển khoản theo đúng số tiền/nội dung payment code.
+17. Chờ webhook SePay xác nhận rồi lấy ticket.
 
 ### 14.5. Dữ liệu cinema seed tĩnh
 

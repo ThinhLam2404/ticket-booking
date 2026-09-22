@@ -42,14 +42,12 @@ export type MovieResponse = JsonResponse<'/api/v1/movies/{id}', 'get'>;
 export type ShowtimesResponse = JsonResponse<'/api/v1/showtimes', 'get'>;
 export type ShowtimeResponse = JsonResponse<'/api/v1/showtimes/{id}', 'get'>;
 export type ShowtimeSeatsResponse = JsonResponse<'/api/v1/showtimes/{id}/seats', 'get'>;
-export type MockPaymentResponse = JsonResponse<'/api/v1/payments/mock/{bookingId}', 'post'>;
+export type SepayCheckoutResponse = JsonResponse<'/api/v1/payments/bookings/{bookingId}/checkout', 'post'>;
 
 export type RegisterRequest = RequestBody<'/api/v1/auth/register', 'post'>;
 export type LoginRequest = RequestBody<'/api/v1/auth/login', 'post'>;
 export type RefreshTokenRequest = RequestBody<'/api/v1/auth/refresh', 'post'>;
 export type HoldRequest = RequestBody<'/api/v1/bookings/hold', 'post'>;
-export type MockPaymentRequest = RequestBody<'/api/v1/payments/mock/{bookingId}', 'post'>;
-export type PurchaseSeatsRequest = RequestBody<'/api/v1/payments/mock/purchase', 'post'>;
 
 export type MovieStatus = Movie['status'];
 export type SeatType = Seat['type'];
@@ -93,3 +91,8 @@ export type BulkShowtimeResponse = JsonResponse<'/api/v1/showtimes/bulk', 'post'
 export type ShowtimeMutationResponse = JsonResponse<'/api/v1/showtimes', 'post'>;
 export type ShowtimeUpdateResponse = JsonResponse<'/api/v1/showtimes/{id}', 'patch'>;
 export type ShowtimeDeleteResponse = JsonResponse<'/api/v1/showtimes/{id}', 'delete'>;
+export type FreeSlotsResponse = JsonResponse<'/api/v1/showtimes/rooms/{roomId}/free-slots', 'get'>;
+export type FreeSlotWindow = FreeSlotsResponse['freeWindows'][number];
+export type SepayTransactionsResponse = JsonResponse<'/api/v1/payments/admin/sepay/transactions', 'get'>;
+export type SepayTransaction = components['schemas']['SepayTransactionResponseDto'];
+export type UpdateSepayTransactionRequest = RequestBody<'/api/v1/payments/admin/sepay/transactions/{id}', 'patch'>;

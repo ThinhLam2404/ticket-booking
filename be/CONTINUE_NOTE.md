@@ -169,8 +169,8 @@ register
 → lấy seat map
 → hold seat
 → retry cùng idempotency key
-→ checkout
-→ mock payment success
+→ checkout SePay
+→ webhook xác nhận
 → ticket
 ```
 
@@ -178,16 +178,16 @@ Kết quả:
 
 - Register thành công.
 - Retry hold trả cùng booking ID.
-- Checkout tạo payment `PENDING`.
-- Payment chuyển `SUCCEEDED`.
+- Checkout tạo `SepayPaymentIntent` `PENDING` và mã thanh toán.
+- Webhook SePay khớp chuyển `Payment` sang `SUCCEEDED`.
 - Booking chuyển `CONFIRMED`.
 - Ticket được phát hành.
 
 Đã kiểm tra thêm:
 
 - Hai user hold cùng seat nhận `201` và `409`.
-- Payment failure chuyển payment `FAILED` và booking `CANCELLED`.
-- Seat sau payment failure có thể được user khác hold lại.
+- Webhook sai số tiền chuyển giao dịch sang `REVIEW_REQUIRED` và không cấp vé.
+- Cancel/expire booking cập nhật intent SePay và giải phóng seat để user khác hold lại.
 
 ### Frontend runtime
 
@@ -203,8 +203,8 @@ Flow UI đã sửa đúng thứ tự:
 
 ```text
 hold
-→ checkout
-→ mock payment
+→ checkout SePay
+→ webhook xác nhận
 ```
 
 ## Các process/service đã dùng khi kiểm tra
@@ -217,7 +217,7 @@ hold
   - Seed catalog trả movie/showtime/seat map.
   - Customer flow register → hold → retry hold → checkout → payment success → ticket pass.
   - Hai user tranh chấp cùng seat nhận `201` và `409`.
-  - Payment failure giải phóng seat để user khác hold lại.
+  - Webhook không khớp không cấp vé; cancel/expire giải phóng seat để user khác hold lại.
   - Frontend Vite từ `fe/` trả HTTP `200` tại port test.
 
 Nếu cần dừng các process app thủ công, dừng process Nest/Vite tương ứng; không cần dừng các process hệ thống khác.

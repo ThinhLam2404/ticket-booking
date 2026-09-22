@@ -19,6 +19,10 @@ import {
   BulkShowtimeDto,
   BulkShowtimePreviewResponseDto,
 } from './dto/bulk-showtime.dto.js';
+import {
+  FreeSlotsQueryDto,
+  FreeSlotsResponseDto,
+} from './dto/free-slots.dto.js';
 import { ApiErrorResponses } from '../../common/http/swagger.decorators.js';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
@@ -52,6 +56,19 @@ export class ShowtimesController {
   @Roles(UserRole.ADMIN)
   findAllAdmin(@Query() query: ListAdminShowtimesDto) {
     return this.showtimesService.findAllAdmin(query);
+  }
+
+  @Get('rooms/:roomId/free-slots')
+  @ApiResponse({ status: 200, type: FreeSlotsResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  findFreeSlots(
+    @Param('roomId') roomId: string,
+    @Query() query: FreeSlotsQueryDto,
+  ) {
+    return this.showtimesService.findFreeSlots(roomId, query);
   }
 
   @Get(':id')

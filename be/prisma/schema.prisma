@@ -44,6 +44,20 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum SepayIntentStatus {
+  PENDING
+  SUCCEEDED
+  EXPIRED
+  CANCELLED
+}
+
+enum SepayTransactionStatus {
+  MATCHED
+  CONFIRMED
+  REVIEW_REQUIRED
+  REFUNDED
+}
+
 enum TicketStatus {
   ACTIVE
   USED
@@ -181,6 +195,7 @@ model Booking {
   items          BookingItem[]
   heldSeats      ShowtimeSeat[] @relation("BookingSeatHolds")
   payment        Payment?
+  sepayIntent    SepayPaymentIntent?
   tickets        Ticket[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -207,7 +222,6 @@ model Payment {
   id             String        @id @default(cuid())
   provider       String
   reference      String?       @unique
-  idempotencyKey String?       @unique
   status         PaymentStatus @default(PENDING)
   amount         Decimal       @db.Decimal(10, 2)
   bookingId      String        @unique
@@ -226,4 +240,42 @@ model Ticket {
   bookingItem   BookingItem  @relation(fields: [bookingItemId], references: [id], onDelete: Restrict)
   createdAt     DateTime     @default(now())
   usedAt        DateTime?
+}
+
+model SepayPaymentIntent {
+  id             String            @id @default(cuid())
+  paymentCode    String            @unique
+  status         SepayIntentStatus @default(PENDING)
+  expectedAmount Decimal           @db.Decimal(10, 2)
+  expiresAt      DateTime
+  bookingId      String            @unique
+  booking        Booking           @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  userId         String
+  transactions   SepayTransaction[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([status, expiresAt])
+  @@index([paymentCode])
+}
+
+model SepayTransaction {
+  id                   String                 @id @default(cuid())
+  sepayId              Int                    @unique
+  gateway              String
+  accountNumber        String
+  transferAmount       Decimal                @db.Decimal(10, 2)
+  content              String
+  referenceCode        String?
+  transferType         String
+  transactionDate      DateTime
+  status               SepayTransactionStatus @default(MATCHED)
+  adminNote            String?
+  paymentIntentId      String?
+  paymentIntent        SepayPaymentIntent?    @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@index([paymentIntentId])
+  @@index([status])
 }

@@ -2,6 +2,23 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { ShowtimeSeatStatus } from '@prisma/client';
 import { ShowtimesService } from './showtimes.service.js';
 
+function vnDatePart(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function futureVnStartsAt(time: string): Date {
+  const candidate = new Date(`${vnDatePart(new Date())}T${time}+07:00`);
+  if (candidate.getTime() <= Date.now() + 60 * 1000) {
+    return new Date(candidate.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return candidate;
+}
+
 describe('ShowtimesService expiry lifecycle', () => {
   it('delegates expired booking cleanup before reading a showtime', async () => {
     const expireBookingsForShowtime = vi.fn().mockResolvedValue(undefined);
@@ -111,7 +128,7 @@ describe('ShowtimesService scheduling', () => {
       })),
     };
     const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
-    const startsAt = new Date(Date.now() + 60 * 60 * 1000);
+    const startsAt = futureVnStartsAt('10:00:00');
 
     await service.create({
       movieId: 'movie-1',
@@ -136,7 +153,7 @@ describe('ShowtimesService scheduling', () => {
       showtime: { findMany: vi.fn().mockResolvedValue([]) },
     };
     const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
-    const firstStartsAt = new Date(Date.now() + 60 * 60 * 1000);
+    const firstStartsAt = futureVnStartsAt('10:00:00');
 
     const result = await service.previewBulk({
       movieId: 'movie-1',
@@ -219,7 +236,7 @@ describe('ShowtimesService admin updates', () => {
 
     await expect(
       service.update('showtime-1', {
-        startsAt: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
+        startsAt: futureVnStartsAt('10:00:00').toISOString(),
       }),
     ).resolves.toEqual({ id: 'showtime-1' });
     expect(showtimeUpdate).toHaveBeenCalledWith(expect.objectContaining({
@@ -315,5 +332,189 @@ describe('ShowtimesService admin updates', () => {
     ).rejects.toEqual(
       new ConflictException('Showtime cannot be updated after bookings exist'),
     );
+  });
+});
+
+describe('ShowtimesService operating hours', () => {
+  function createService(prisma: Record<string, unknown>) {
+    return new ShowtimesService(
+      prisma as never,
+      { expireBookingsForShowtime: vi.fn() } as never,
+    );
+  }
+
+  it('rejects a showtime starting outside 08:00-23:00 VN', async () => {
+    const seats = validRoomSeats();
+    const prisma = {
+      movie: { findUnique: vi.fn().mockResolvedValue({ id: 'movie-1', duration: 120, status: 'PUBLISHED' }) },
+      room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1', seats }) },
+      showtime: { findFirst: vi.fn() },
+    };
+    const service = createService(prisma);
+
+    await expect(service.create({
+      movieId: 'movie-1',
+      roomId: 'room-1',
+      startsAt: futureVnStartsAt('02:00:00').toISOString(),
+      basePrice: 100000,
+    })).rejects.toEqual(
+      new ConflictException('Showtime starts outside venue operating hours'),
+    );
+    expect(prisma.showtime.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('accepts a showtime starting at 23:00 VN', async () => {
+    const seats = validRoomSeats();
+    const showtimeCreate = vi.fn().mockResolvedValue({ id: 'showtime-1' });
+    const prisma = {
+      movie: { findUnique: vi.fn().mockResolvedValue({ id: 'movie-1', duration: 120, status: 'PUBLISHED' }) },
+      room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1', seats }) },
+      showtime: { findFirst: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn(async (callback: (transaction: unknown) => unknown) => callback({
+        showtime: {
+          create: showtimeCreate,
+          findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'showtime-1' }),
+        },
+        showtimeSeat: { createMany: vi.fn().mockResolvedValue({ count: seats.length }) },
+      })),
+    };
+    const service = createService(prisma);
+
+    await service.create({
+      movieId: 'movie-1',
+      roomId: 'room-1',
+      startsAt: futureVnStartsAt('23:00:00').toISOString(),
+      basePrice: 100000,
+    });
+
+    expect(showtimeCreate).toHaveBeenCalled();
+  });
+
+  it('marks bulk slots with conflicts and out-of-hours reasons', async () => {
+    const seats = validRoomSeats();
+    const firstStartsAt = futureVnStartsAt('10:00:00');
+    const overlapping = {
+      startsAt: new Date(firstStartsAt.getTime() + 30 * 60 * 1000),
+      endsAt: new Date(firstStartsAt.getTime() + 90 * 60 * 1000),
+    };
+    const prisma = {
+      movie: { findUnique: vi.fn().mockResolvedValue({ id: 'movie-1', duration: 120, status: 'PUBLISHED' }) },
+      room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1', seats }) },
+      showtime: { findMany: vi.fn().mockResolvedValue([overlapping]) },
+    };
+    const service = createService(prisma);
+
+    const result = await service.previewBulk({
+      movieId: 'movie-1',
+      roomId: 'room-1',
+      firstStartsAt: firstStartsAt.toISOString(),
+      count: 2,
+      turnaroundMinutes: 20,
+      basePrice: 100000,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.slots[0]?.available).toBe(false);
+    expect(result.slots[0]?.reasonCode).toBe('SHOWTIME_OVERLAP');
+    expect(result.slots[0]?.conflicts).toEqual([
+      { startsAt: overlapping.startsAt, endsAt: overlapping.endsAt },
+    ]);
+    expect(result.slots[1]?.available).toBe(true);
+    expect(result.slots[1]?.reasonCode).toBeUndefined();
+  });
+
+  it('rejects an update that moves the start outside operating hours', async () => {
+    const current = {
+      id: 'showtime-1',
+      startsAt: futureVnStartsAt('10:00:00'),
+      endsAt: new Date(futureVnStartsAt('10:00:00').getTime() + 2 * 60 * 60 * 1000),
+      movieId: 'movie-1',
+      roomId: 'room-1',
+      _count: { bookings: 0 },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (transaction: unknown) => unknown) =>
+        callback({
+          showtime: { findUnique: vi.fn().mockResolvedValue(current) },
+        }),
+      ),
+    };
+    const service = createService(prisma);
+
+    await expect(service.update('showtime-1', {
+      startsAt: futureVnStartsAt('02:00:00').toISOString(),
+    })).rejects.toEqual(
+      new ConflictException('Showtime starts outside venue operating hours'),
+    );
+  });
+});
+
+describe('ShowtimesService free slots', () => {
+  it('returns free windows between busy showtimes with turnaround', async () => {
+    const prisma = {
+      room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1' }) },
+      showtime: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            startsAt: new Date('2026-10-05T14:00:00+07:00'),
+            endsAt: new Date('2026-10-05T16:00:00+07:00'),
+          },
+        ]),
+      },
+    };
+    const service = new ShowtimesService(
+      prisma as never,
+      { expireBookingsForShowtime: vi.fn() } as never,
+    );
+
+    const result = await service.findFreeSlots('room-1', {
+      date: '2026-10-05',
+      durationMinutes: 120,
+      turnaroundMinutes: 20,
+    });
+
+    expect(result.busy).toHaveLength(1);
+    expect(result.freeWindows[0]?.startsAt).toEqual(new Date('2026-10-05T08:00:00+07:00'));
+    expect(result.freeWindows[0]?.endsAt).toEqual(new Date('2026-10-05T13:40:00+07:00'));
+    const last = result.freeWindows[result.freeWindows.length - 1];
+    expect(last?.startsAt).toEqual(new Date('2026-10-05T16:20:00+07:00'));
+    expect(last?.endsAt).toEqual(new Date('2026-10-05T23:00:00+07:00'));
+  });
+
+  it('drops windows shorter than the requested duration', async () => {
+    const prisma = {
+      room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1' }) },
+      showtime: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const service = new ShowtimesService(
+      prisma as never,
+      { expireBookingsForShowtime: vi.fn() } as never,
+    );
+
+    const result = await service.findFreeSlots('room-1', {
+      date: '2026-10-05',
+      durationMinutes: 960,
+      turnaroundMinutes: 20,
+    });
+
+    expect(result.freeWindows).toHaveLength(0);
+  });
+
+  it('throws when the room does not exist', async () => {
+    const prisma = {
+      room: { findUnique: vi.fn().mockResolvedValue(null) },
+      showtime: { findMany: vi.fn() },
+    };
+    const service = new ShowtimesService(
+      prisma as never,
+      { expireBookingsForShowtime: vi.fn() } as never,
+    );
+
+    await expect(service.findFreeSlots('missing', {
+      date: '2026-10-05',
+      durationMinutes: 120,
+      turnaroundMinutes: 20,
+    })).rejects.toMatchObject({ message: 'Room not found' });
+    expect(prisma.showtime.findMany).not.toHaveBeenCalled();
   });
 });

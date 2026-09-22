@@ -65,6 +65,8 @@ export async function resetIntegrationState() {
       "RefreshToken",
       "Ticket",
       "Payment",
+      "SepayTransaction",
+      "SepayPaymentIntent",
       "BookingItem",
       "ShowtimeSeat",
       "Booking",

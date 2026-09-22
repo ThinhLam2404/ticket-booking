@@ -343,12 +343,12 @@ export class PaymentResponseDto {
   @ApiProperty({ example: 'clx-payment-id' })
   id!: string;
 
-  @ApiProperty({ example: 'MOCK' })
+  @ApiProperty({ example: 'SEPAY' })
   provider!: string;
 
   @ApiPropertyOptional({
     type: String,
-    example: 'MOCK-PAYMENT-001',
+    example: 'SEPAY-92704',
     nullable: true,
   })
   reference?: string | null;
@@ -509,13 +509,6 @@ export class BookingResponseDto {
   updatedAt!: string;
 }
 
-export class MockPaymentResponseDto {
-  @ApiProperty({ type: PaymentResponseDto })
-  payment!: PaymentResponseDto;
-
-  @ApiProperty({ type: BookingResponseDto })
-  booking!: BookingResponseDto;
-}
 
 export class HealthResponseDto {
   @ApiProperty({ enum: ['ok', 'degraded'], example: 'ok' })

@@ -7,7 +7,7 @@ Frontend React/Vite tối giản để test customer flow của backend:
 - Showtime selection.
 - Seat map với trạng thái `AVAILABLE`, `HELD`, `SOLD`.
 - Hold ghế bằng `Idempotency-Key`.
-- Checkout và mock payment success/failure.
+- Checkout SePay bằng mã QR/chuyển khoản và chờ webhook xác nhận.
 - Booking history.
 - Ticket history.
 

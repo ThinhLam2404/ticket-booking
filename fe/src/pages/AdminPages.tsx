@@ -27,6 +27,7 @@ import type {
   BulkShowtimePreviewResponse,
   BulkShowtimeRequest,
   CreateShowtimeRequest,
+  FreeSlotsResponse,
   Movie,
   MovieStatus,
   RoomResponse,
@@ -1896,6 +1897,41 @@ function vietnameseDateTime(value: string) {
   return `${value}:00+07:00`;
 }
 
+function isWithinVenueHours(localValue: string) {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      hour: "numeric",
+      hourCycle: "h23",
+    }).format(new Date(vietnameseDateTime(localValue))),
+  );
+  return hour >= 8 && hour <= 23;
+}
+
+function slotConflictLabel(slot: BulkShowtimePreviewResponse["slots"][number]) {
+  if (slot.available) return "";
+  if (slot.reasonCode === "SHOWTIME_OUTSIDE_HOURS") {
+    return " · Ngoài giờ vận hành (08:00–23:00)";
+  }
+  const slotDay = vnDay(slot.startsAt);
+  const ranges = (slot.conflicts ?? []).map((conflict) => {
+    const range = `${formatTime(conflict.startsAt)} – ${formatTime(conflict.endsAt)}`;
+    return vnDay(conflict.startsAt) === slotDay
+      ? range
+      : `${formatDate(conflict.startsAt)} ${range}`;
+  });
+  return ranges.length ? ` · Trùng với suất ${ranges.join(", ")}` : " · Trùng lịch chiếu";
+}
+
+function vnDay(value: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
 function ShowtimeForm({
   mode,
   showtime,
@@ -2021,6 +2057,9 @@ function ShowtimeForm({
               value={startsAt}
               onChange={(event) => setStartsAt(event.target.value)}
             />
+            {startsAt && !isWithinVenueHours(startsAt) && (
+              <small className="form-hint-warning">Suất chiếu chỉ được bắt đầu từ 08:00 đến 23:00 hằng ngày (giờ Việt Nam).</small>
+            )}
           </Field>
           <Field label="Kết thúc (tự tính theo thời lượng phim)">
             <input type="text" value={calculatedEndsAt} readOnly />
@@ -2065,6 +2104,11 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
   const [preview, setPreview] = useState<BulkShowtimePreviewResponse | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
+  const [freeDate, setFreeDate] = useState(() => localDateTime(new Date().toISOString()).slice(0, 10));
+  const [freeSlots, setFreeSlots] = useState<FreeSlotsResponse | null>(null);
+  const [freeLoading, setFreeLoading] = useState(false);
+  const [freeError, setFreeError] = useState("");
+  const selectedBulkMovie = movies.find((movie) => movie.id === movieId);
   const roomsQuery = useQuery({
     queryKey: ["admin-bulk-showtime-rooms", cinemaId],
     queryFn: ({ signal }) => api.rooms(cinemaId, signal),
@@ -2103,6 +2147,26 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
     await onSubmit(body);
   }
 
+  async function loadFreeSlots() {
+    if (!roomId || !selectedBulkMovie) return;
+    setFreeError("");
+    setFreeSlots(null);
+    setFreeLoading(true);
+    try {
+      setFreeSlots(
+        await api.roomFreeSlots(roomId, {
+          date: freeDate,
+          durationMinutes: selectedBulkMovie.duration,
+          turnaroundMinutes,
+        }),
+      );
+    } catch (cause) {
+      setFreeError(errorMessage(cause, "Không thể tải khung giờ trống."));
+    } finally {
+      setFreeLoading(false);
+    }
+  }
+
   return (
     <Modal eyebrow="LẬP LỊCH HÀNG LOẠT" title="Tạo nhiều suất chiếu" onClose={onCancel} className="bulk-showtime-modal">
       <form className="admin-form" onSubmit={(event) => void submit(event)}>
@@ -2120,7 +2184,7 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
             </select>
           </Field>
           <Field label="Phòng chiếu" wide>
-            <select required disabled={!cinemaId || roomsQuery.isPending} value={roomId} onChange={(event) => { setRoomId(event.target.value); setPreview(null); }}>
+            <select required disabled={!cinemaId || roomsQuery.isPending} value={roomId} onChange={(event) => { setRoomId(event.target.value); setPreview(null); setFreeSlots(null); }}>
               <option value="">{roomsQuery.isPending ? "Đang tải phòng…" : "Chọn phòng"}</option>
               {(roomsQuery.data ?? []).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
             </select>
@@ -2135,7 +2199,20 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
           <NumberField label="Hệ số ghế đôi" min={0} step={0.01} value={coupleMultiplier} onChange={setCoupleMultiplier} />
         </div>
         {(roomsQuery.isError || previewError || error) && <p className="form-error">{previewError || error || "Không thể tải phòng chiếu."}</p>}
-        {preview && <div className={`bulk-preview ${preview.valid ? "valid" : "invalid"}`}><strong>{preview.valid ? `Có thể tạo ${preview.slots.length} suất chiếu` : "Lịch có xung đột"}</strong><div className="bulk-preview-list">{preview.slots.map((slot) => <span key={slot.index} className={slot.available ? "available" : "conflict"}>{formatTime(slot.startsAt)} – {formatTime(slot.endsAt)}{slot.conflict ? ` · ${slot.conflict}` : ""}</span>)}</div></div>}
+        <div className="free-slots-box">
+          <div className="free-slots-head">
+            <strong>Khung giờ trống của phòng</strong>
+            <span>Rạp mở cửa 08:00 – 23:00 hằng ngày · Bấm vào khung giờ để dùng làm suất đầu tiên</span>
+          </div>
+          <div className="free-slots-controls">
+            <input type="date" aria-label="Ngày xem khung trống" value={freeDate} onChange={(event) => { setFreeDate(event.target.value); setFreeSlots(null); }} />
+            <button className="secondary" type="button" disabled={!roomId || !selectedBulkMovie || freeLoading} onClick={() => void loadFreeSlots()}>{freeLoading ? "Đang tìm…" : "Xem khung giờ trống"}</button>
+          </div>
+          {freeError && <p className="form-error">{freeError}</p>}
+          {freeSlots && (freeSlots.freeWindows.length ? <div className="free-slots-list">{freeSlots.freeWindows.map((window) => <button key={window.startsAt} type="button" className="free-slot-chip" onClick={() => { setFirstStartsAt(localDateTime(window.startsAt)); setPreview(null); }}>{formatTime(window.startsAt)} – {formatTime(window.endsAt)} · trống {window.minutes} phút</button>)}</div> : <p className="free-slots-empty">Phòng kín lịch trong ngày đã chọn.</p>)}
+          {freeSlots && freeSlots.busy.length > 0 && <p className="free-slots-busy">Đang chiếu: {freeSlots.busy.map((busy) => `${formatTime(busy.startsAt)} – ${formatTime(busy.endsAt)}`).join(", ")}</p>}
+        </div>
+        {preview && <div className={`bulk-preview ${preview.valid ? "valid" : "invalid"}`}><strong>{preview.valid ? `Có thể tạo ${preview.slots.length} suất chiếu` : "Lịch có xung đột"}</strong><div className="bulk-preview-list">{preview.slots.map((slot) => <span key={slot.index} className={slot.available ? "available" : "conflict"}>Suất {slot.index}: {formatTime(slot.startsAt)} – {formatTime(slot.endsAt)}{slotConflictLabel(slot)}</span>)}</div></div>}
         <div className="form-actions"><button className="secondary" type="button" disabled={loading || previewLoading} onClick={onCancel}>Hủy</button><button className="secondary" type="button" disabled={loading || previewLoading} onClick={() => void previewSlots()}>{previewLoading ? "Đang kiểm tra…" : "Xem trước"}</button><button className="primary" disabled={loading || previewLoading || !preview?.valid}>{loading ? "Đang tạo…" : "Tạo toàn bộ suất"}</button></div>
       </form>
     </Modal>
@@ -2470,6 +2547,92 @@ export function AdminShowtimesPage() {
           }
           onClose={() => setConfirm(null)}
         />
+      )}
+    </AdminPage>
+  );
+}
+
+export function AdminPaymentsPage() {
+  const [filterStatus, setFilterStatus] = useState<string>('');
+  const queryClient = useQueryClient();
+  const txQuery = useQuery({
+    queryKey: ['admin-sepay-transactions', filterStatus],
+    queryFn: ({ signal }) => api.adminSepayTransactions(filterStatus || undefined, signal),
+    refetchInterval: 10000,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, status, adminNote }: { id: string; status: 'CONFIRMED' | 'REVIEW_REQUIRED' | 'REFUNDED'; adminNote?: string }) =>
+      api.adminUpdateSepayTransaction(id, { status, adminNote }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-sepay-transactions'] });
+    },
+  });
+
+  const transactions = txQuery.data ?? [];
+
+  return (
+    <AdminPage>
+      <div className="admin-page-header">
+        <div>
+          <p className="eyebrow">SEPAY TRANSACTIONS</p>
+          <h1>Giao dịch chuyển khoản SePay</h1>
+        </div>
+      </div>
+      <div className="filter-tabs">
+        <button className={`tab-button ${!filterStatus ? 'active' : ''}`} onClick={() => setFilterStatus('')}>Tất cả</button>
+        <button className={`tab-button ${filterStatus === 'REVIEW_REQUIRED' ? 'active' : ''}`} onClick={() => setFilterStatus('REVIEW_REQUIRED')}>Cần xử lý / Hoàn tiền</button>
+        <button className={`tab-button ${filterStatus === 'CONFIRMED' ? 'active' : ''}`} onClick={() => setFilterStatus('CONFIRMED')}>Đã xác nhận</button>
+        <button className={`tab-button ${filterStatus === 'REFUNDED' ? 'active' : ''}`} onClick={() => setFilterStatus('REFUNDED')}>Đã hoàn tiền</button>
+      </div>
+      {txQuery.isPending && <LoadingState label="Đang tải giao dịch…" />}
+      {txQuery.isError && <ErrorState cause={txQuery.error} fallback="Không thể tải giao dịch." onRetry={() => void txQuery.refetch()} />}
+      {txQuery.isSuccess && !transactions.length && <EmptyState>Không có giao dịch nào.</EmptyState>}
+      {txQuery.isSuccess && Boolean(transactions.length) && (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>ID SePay</th>
+                <th>Cổng</th>
+                <th>Số tiền</th>
+                <th>Nội dung CK</th>
+                <th>Thời gian</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx) => (
+                <tr key={tx.id}>
+                  <td><strong>#{tx.sepayId}</strong></td>
+                  <td>{tx.gateway}</td>
+                  <td><strong>{money(tx.transferAmount)}</strong></td>
+                  <td><code className="payment-code-pill">{tx.content}</code></td>
+                  <td>{formatDate(tx.transactionDate)} {formatTime(tx.transactionDate)}</td>
+                  <td><span className={`status ${tx.status.toLowerCase()}`}>{tx.status}</span></td>
+                  <td>
+                    {tx.status === 'REVIEW_REQUIRED' && (
+                      <div className="action-button-group">
+                        <button
+                          type="button"
+                          className="secondary btn-sm"
+                          disabled={updateMutation.isPending}
+                          onClick={() => {
+                            const note = prompt('Ghi chú xử lý (tùy chọn):') ?? undefined;
+                            updateMutation.mutate({ id: tx.id, status: 'REFUNDED', adminNote: note });
+                          }}
+                        >
+                          Đánh dấu đã hoàn tiền
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </AdminPage>
   );

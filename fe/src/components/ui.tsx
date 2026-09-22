@@ -256,6 +256,7 @@ export function AdminLayout() {
         <Link className={navClass(location.pathname, '/admin/movies')} to="/admin/movies" onClick={closeSidebar}><span>▣</span><span>Phim</span></Link>
         <Link className={navClass(location.pathname, '/admin/cinemas')} to="/admin/cinemas" onClick={closeSidebar}><span>▤</span><span>Rạp & phòng</span></Link>
         <Link className={navClass(location.pathname, '/admin/showtimes')} to="/admin/showtimes" onClick={closeSidebar}><span>◷</span><span>Suất chiếu</span></Link>
+        <Link className={navClass(location.pathname, '/admin/payments')} to="/admin/payments" onClick={closeSidebar}><span>💳</span><span>Thanh toán</span></Link>
       </nav>
       <div className="admin-sidebar-footer">
         <div className="admin-operator"><span className="account-avatar">{user?.fullName.slice(0, 2).toUpperCase()}</span><div><strong>{user?.fullName}</strong><small>Quản trị viên</small></div></div>

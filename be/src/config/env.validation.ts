@@ -34,6 +34,22 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  SEPAY_BANK_CODE?: string;
+
+  @IsOptional()
+  @IsString()
+  SEPAY_ACCOUNT_NUMBER?: string;
+
+  @IsOptional()
+  @IsString()
+  SEPAY_ACCOUNT_NAME?: string;
+
+  @IsOptional()
+  @IsString()
+  SEPAY_WEBHOOK_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
   JWT_ACCESS_EXPIRES_IN = '15m';
 
   @IsOptional()
