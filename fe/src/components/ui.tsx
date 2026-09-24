@@ -144,7 +144,7 @@ export function TrailerModal({ movieTitle, trailerKey, onClose }: { movieTitle: 
 
   const directUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(trailerKey)}`;
 
-  return <div className="trailer-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return createPortal(<div className="trailer-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section ref={dialogRef} className="trailer-modal" role="dialog" aria-modal="true" aria-labelledby="trailer-modal-title" tabIndex={-1}>
       <div className="trailer-modal-heading"><div><p className="eyebrow">TRAILER CHÍNH THỨC</p><h2 id="trailer-modal-title">{movieTitle}</h2></div><button className="modal-close" type="button" aria-label="Đóng trailer" onClick={onClose}>×</button></div>
       <div className={`trailer-frame trailer-frame-${frameState}`}>
@@ -154,11 +154,24 @@ export function TrailerModal({ movieTitle, trailerKey, onClose }: { movieTitle: 
       </div>
       <div className="trailer-modal-footer"><span>Nhấn ESC hoặc chọn đóng để quay lại trang phim.</span><div className="trailer-modal-actions"><a className="secondary compact-button" href={directUrl} target="_blank" rel="noopener noreferrer">Mở trên YouTube</a><button className="secondary compact-button" type="button" onClick={onClose}>Đóng</button></div></div>
     </section>
-  </div>;
+  </div>, document.body);
 }
 
 export function Alert({ type, children, onClose }: { type: 'success' | 'error'; children: ReactNode; onClose?: () => void }) {
   return <div className={`alert ${type}`} role={type === 'error' ? 'alert' : 'status'}><span>{children}</span>{onClose && <button aria-label="Đóng thông báo" onClick={onClose}>×</button>}</div>;
+}
+
+export function NoticeDialog({ title, message, onClose }: { title: string; message: string; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(true, dialogRef, onClose);
+
+  return createPortal(<div className="modal-backdrop notice-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div ref={dialogRef} className="notice-dialog" role="alertdialog" aria-modal="true" aria-labelledby="notice-dialog-title" tabIndex={-1}>
+      <span className="notice-dialog-icon" aria-hidden="true">!</span>
+      <div><p className="eyebrow">CẬP NHẬT SƠ ĐỒ GHẾ</p><h2 id="notice-dialog-title">{title}</h2><p>{message}</p></div>
+      <button className="primary" type="button" onClick={onClose}>Chọn ghế khác</button>
+    </div>
+  </div>, document.body);
 }
 
 function navClass(pathname: string, target: string) {
@@ -216,8 +229,8 @@ export function Layout() {
     <footer className="site-footer">
       <div className="footer-grid">
         <div className="footer-brand"><Link className="brand" to="/"><span className="brand-mark">▰</span><span>Cine<span>Book</span></span></Link><p>Hệ thống đặt vé xem phim trực tuyến hiện đại. Chọn suất chiếu, giữ ghế và bước vào thế giới điện ảnh.</p><strong>Hotline hỗ trợ: 1900 6868</strong></div>
-        <div><h3>Về CineBook</h3><Link to="/cinemas">Cụm rạp toàn quốc</Link><Link to="/#now-showing">Phim đang chiếu</Link><Link to="/">Tin điện ảnh</Link></div>
-        <div><h3>Chính sách</h3><a href="#">Chính sách thanh toán</a><a href="#">Điều khoản sử dụng</a><a href="#">Bảo mật thông tin</a></div>
+         <div><h3>Về CineBook</h3><Link to="/cinemas">Cụm rạp toàn quốc</Link><Link to="/#now-showing">Phim đang chiếu</Link><a href="tel:19006868">Liên hệ hỗ trợ</a></div>
+         <div><h3>Chính sách</h3><span className="footer-link">Chính sách thanh toán</span><span className="footer-link">Điều khoản sử dụng</span><span className="footer-link">Bảo mật thông tin</span></div>
         <div><h3>Đối tác</h3><div className="partner-list"><span>IMAX</span><span>Dolby</span><span>MoMo</span><span>VNPAY</span><span>Visa</span><span>ZaloPay</span></div></div>
       </div>
       <div className="footer-bottom"><span>© 2026 CineBook Vietnam. All rights reserved.</span><span>Trải nghiệm điện ảnh trong tầm tay.</span></div><p className="tmdb-footer-attribution">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>

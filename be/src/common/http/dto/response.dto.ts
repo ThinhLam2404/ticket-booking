@@ -96,6 +96,18 @@ export class MovieResponseDto {
   })
   trailerKey?: string | null;
 
+  @ApiPropertyOptional({ type: String, example: '2024-02-27T00:00:00.000Z', format: 'date-time', nullable: true })
+  releaseDate?: string | null;
+
+  @ApiPropertyOptional({ type: Number, example: 8.7, nullable: true })
+  rating?: number | null;
+
+  @ApiProperty({ type: [String], example: ['Hành động', 'Khoa học viễn tưởng'] })
+  genres!: string[];
+
+  @ApiPropertyOptional({ type: String, example: 'T13', nullable: true })
+  ageRating?: string | null;
+
   @ApiProperty({ example: 169 })
   duration!: number;
 

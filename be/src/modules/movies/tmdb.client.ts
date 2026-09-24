@@ -37,6 +37,7 @@ export type TmdbVideo = {
 
 export type TmdbMovieDetails = TmdbMovieListItem & {
   runtime?: number | null;
+  genres?: Array<{ id: number; name: string }>;
   videos?: { results: TmdbVideo[] };
 };
 

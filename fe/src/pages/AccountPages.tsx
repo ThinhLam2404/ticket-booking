@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import QRCode from 'qrcode';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api';
@@ -7,8 +8,28 @@ import { formatDate, formatTime, money } from '../utils/format';
 import { posterStyle } from '../utils/media';
 
 function QrCode({ code }: { code: string }) {
-  const cells = Array.from({ length: 81 }, (_, index) => ((index * 17 + code.length * 7 + code.charCodeAt(index % Math.max(code.length, 1))) % 5) < 2);
-  return <div className="qr-code" aria-label={`Mã QR ${code}`}>{cells.map((filled, index) => <i className={filled ? 'filled' : ''} key={index} />)}</div>;
+  const [state, setState] = useState<{ src: string; error: boolean }>({ src: '', error: false });
+
+  useEffect(() => {
+    let active = true;
+    setState({ src: '', error: false });
+    void QRCode.toDataURL(`cinebook-ticket:v1:${code}`, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 220,
+      color: { dark: '#101820', light: '#ffffff' },
+    }).then((url) => {
+      if (active) setState({ src: url, error: false });
+    }).catch(() => {
+      if (active) setState({ src: '', error: true });
+    });
+    return () => {
+      active = false;
+    };
+  }, [code]);
+
+  if (state.src) return <img className="qr-code" src={state.src} alt={`Mã QR vé ${code}`} width={220} height={220} />;
+  return <div className={`qr-code qr-code-loading ${state.error ? 'qr-code-error' : ''}`} role="status" aria-label={state.error ? `Không thể tạo mã QR ${code}` : `Đang tạo mã QR ${code}`}>{state.error ? 'QR lỗi' : null}</div>;
 }
 
 function TicketPoster({ title, posterUrl, className = '' }: { title: string; posterUrl?: string | null; className?: string }) {
@@ -64,13 +85,12 @@ export function TicketsPage() {
     {query.isPending && <LoadingState label="Đang tải vé…" />}
     {query.isError && <ErrorState cause={query.error} fallback="Không thể tải vé." onRetry={() => void query.refetch()} />}
     {query.isSuccess && !tickets.length && <EmptyState>{search ? 'Không tìm thấy vé phù hợp.' : 'Bạn chưa có vé phù hợp. Hoàn tất thanh toán để nhận vé.'}</EmptyState>}
-    <div className="ticket-list">{tickets.map((ticket) => { const title = ticket.booking?.showtime?.movie?.title ?? 'Vé CineBook'; return <Link className={`ticket-card ${ticket.status.toLowerCase()}`} key={ticket.id} to={`/tickets/${ticket.id}`}><div className="ticket-card-info"><TicketPoster title={title} posterUrl={ticket.booking?.showtime?.movie?.posterUrl} /><div><div className="record-status"><StatusBadge status={ticket.status} /><span>Mã vé: <strong>#{ticket.code}</strong></span></div><h2>{title}</h2><p>{formatDate(ticket.booking?.showtime?.startsAt)} · {ticket.booking?.showtime?.room?.cinema?.name}</p><div className="record-details"><span>Phòng {ticket.booking?.showtime?.room?.name}</span><span>Ghế {ticket.bookingItem?.showtimeSeat?.seat?.row}{ticket.bookingItem?.showtimeSeat?.seat?.number}</span></div></div></div><div className="ticket-card-stub"><small>MÃ CHECK-IN RẠP</small><QrCode code={ticket.code} /><strong>{ticket.code}</strong><span>Xem vé & check-in →</span></div></Link>; })}</div>
+    <div className="ticket-list">{tickets.map((ticket) => { const title = ticket.booking?.showtime?.movie?.title ?? 'Vé CineBook'; return <Link className={`ticket-card ${ticket.status.toLowerCase()}`} key={ticket.id} to={`/tickets/${ticket.id}`}><div className="ticket-card-info"><TicketPoster title={title} posterUrl={ticket.booking?.showtime?.movie?.posterUrl} /><div><div className="record-status"><StatusBadge status={ticket.status} /><span>Mã vé: <strong>#{ticket.code}</strong></span></div><h2>{title}</h2><p>{formatDate(ticket.booking?.showtime?.startsAt)} · {ticket.booking?.showtime?.room?.cinema?.name}</p><div className="record-details"><span>Phòng {ticket.booking?.showtime?.room?.name}</span><span>Ghế {ticket.bookingItem?.showtimeSeat?.seat?.row}{ticket.bookingItem?.showtimeSeat?.seat?.number}</span></div></div></div><div className="ticket-card-stub"><small>MÃ SOÁT VÉ</small><QrCode code={ticket.code} /><strong>{ticket.code}</strong><span>Xem mã vé →</span></div></Link>; })}</div>
   </section>;
 }
 
 export function TicketPage() {
   const { ticketId } = useParams();
-  const [checkinOpen, setCheckinOpen] = useState(false);
   const query = useQuery({ queryKey: ['ticket', ticketId], queryFn: ({ signal }) => api.ticket(ticketId!, signal), enabled: Boolean(ticketId) });
   const ticket = query.data;
   if (query.isPending) return <LoadingState label="Đang tải vé…" />;
@@ -82,13 +102,13 @@ export function TicketPage() {
   return <section className="ticket-detail-page">
     <div className="breadcrumb"><Link to="/tickets">← Vé của tôi</Link><span>›</span><strong>Chi tiết vé</strong></div>
     <div className="ticket-detail-layout">
-      <section className={`ticket-stub-large ${checkinOpen ? 'checkin-open' : ''}`} id="ticket-checkin">
+      <section className="ticket-stub-large" id="ticket-checkin">
         <div className="ticket-stub-top"><p className="eyebrow">CINEBOOK E-TICKET</p><span className="ticket-code">{ticket.code}</span><StatusBadge status={ticket.status} /></div>
         <div className="ticket-qr-frame"><QrCode code={ticket.code} /><span className="ticket-qr-label">MÃ SOÁT VÉ: {ticket.code}</span></div>
         <div className="ticket-stub-movie"><TicketPoster title={title} posterUrl={ticket.booking.showtime.movie.posterUrl} /><div><strong>{title}</strong><span>{ticket.booking.showtime.room?.cinema?.name} · {ticket.booking.showtime.room?.name}</span></div></div>
-        {checkinOpen && <div className="checkin-message" role="status"><strong>Mã check-in đã sẵn sàng</strong><span>Đưa mã QR này cho nhân viên tại cổng kiểm soát vé.</span></div>}
+        <div className="checkin-message" role="status"><strong>Mã soát vé đã sẵn sàng</strong><span>Đưa mã QR này cho nhân viên tại cổng kiểm soát vé.</span></div>
       </section>
-      <section className="ticket-information"><PageHeader eyebrow="CHI TIẾT VÉ" title={title}><StatusBadge status={ticket.status} /></PageHeader><p className="ticket-intro">Xuất trình mã QR tại cổng kiểm soát vé để vào phòng chiếu.</p><dl><div><dt>Ngày chiếu</dt><dd>{formatDate(ticket.booking.showtime.startsAt)}</dd></div><div><dt>Thời lượng</dt><dd>{formatTime(ticket.booking.showtime.startsAt)} — {formatTime(ticket.booking.showtime.endsAt)}</dd></div><div><dt>Rạp / phòng</dt><dd>{ticket.booking.showtime.room?.cinema?.name} · {ticket.booking.showtime.room?.name}</dd></div><div><dt>Ghế</dt><dd>{seat}</dd></div><div><dt>Giá vé</dt><dd>{money(ticket.bookingItem.price)}</dd></div><div><dt>Mã booking</dt><dd>#{ticket.bookingId.slice(-8)}</dd></div></dl><div className="ticket-detail-actions"><button className="primary ticket-checkin" type="button" aria-expanded={checkinOpen} onClick={() => { setCheckinOpen((value) => !value); document.getElementById('ticket-checkin')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>{checkinOpen ? 'Đóng mã check-in' : 'Mở mã check-in'}</button><button className="secondary" type="button" onClick={() => window.print()}>In / lưu vé</button></div></section>
+      <section className="ticket-information"><PageHeader eyebrow="CHI TIẾT VÉ" title={title}><StatusBadge status={ticket.status} /></PageHeader><p className="ticket-intro">Xuất trình mã QR tại cổng kiểm soát vé để vào phòng chiếu.</p><dl><div><dt>Ngày chiếu</dt><dd>{formatDate(ticket.booking.showtime.startsAt)}</dd></div><div><dt>Thời lượng</dt><dd>{formatTime(ticket.booking.showtime.startsAt)} — {formatTime(ticket.booking.showtime.endsAt)}</dd></div><div><dt>Rạp / phòng</dt><dd>{ticket.booking.showtime.room?.cinema?.name} · {ticket.booking.showtime.room?.name}</dd></div><div><dt>Ghế</dt><dd>{seat}</dd></div><div><dt>Giá vé</dt><dd>{money(ticket.bookingItem.price)}</dd></div><div><dt>Mã booking</dt><dd>#{ticket.bookingId.slice(-8)}</dd></div></dl><div className="ticket-detail-actions"><button className="secondary" type="button" onClick={() => document.getElementById('ticket-checkin')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>Xem mã soát vé</button><button className="secondary" type="button" onClick={() => window.print()}>In / lưu vé</button></div></section>
     </div>
   </section>;
 }

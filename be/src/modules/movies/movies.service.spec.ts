@@ -46,6 +46,31 @@ describe('MoviesService TMDB import', () => {
     });
   });
 
+  it('returns Prisma Decimal ratings as numbers for admin updates', async () => {
+    const movie = {
+      id: 'movie-1',
+      title: 'Dune: Part Two',
+      rating: { toFixed: () => '8.70' },
+      genres: [],
+      duration: 166,
+      status: MovieStatus.DRAFT,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const prisma = {
+      movie: {
+        findMany: vi.fn().mockResolvedValue([movie]),
+        count: vi.fn().mockResolvedValue(1),
+      },
+      $transaction: vi.fn().mockResolvedValue([[movie], 1]),
+    };
+    const service = new MoviesService(prisma as never, {} as never);
+
+    const response = await service.findAll({ page: 1, pageSize: 10 });
+
+    expect(response.data[0].rating).toBe(8.7);
+  });
+
   it('imports the preferred official Vietnamese trailer key', async () => {
     const prisma = {
       movie: {

@@ -25,6 +25,15 @@ export function formatDay(value?: string | null) {
   }).format(new Date(value));
 }
 
+export function formatReleaseDate(value?: string | null) {
+  if (!value) return 'Chưa cập nhật';
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(value));
+}
+
 export function money(value: string | number) {
   return `${Number(value).toLocaleString('vi-VN')} đ`;
 }

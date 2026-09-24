@@ -774,6 +774,22 @@ export interface components {
              * @example Way9Dexny3w
              */
             trailerKey?: string | null;
+            /**
+             * Format: date-time
+             * @example 2024-02-27T00:00:00.000Z
+             */
+            releaseDate?: string | null;
+            /** @example 8.7 */
+            rating?: number | null;
+            /**
+             * @example [
+             *       "Hành động",
+             *       "Khoa học viễn tưởng"
+             *     ]
+             */
+            genres: string[];
+            /** @example T13 */
+            ageRating?: string | null;
             /** @example 169 */
             duration: number;
             /**
@@ -952,6 +968,22 @@ export interface components {
              * @example Way9Dexny3w
              */
             trailerKey?: string | null;
+            /**
+             * Format: date-time
+             * @example 2024-02-27T00:00:00.000Z
+             */
+            releaseDate?: string | null;
+            /** @example 8.7 */
+            rating?: number | null;
+            /**
+             * @example [
+             *       "Hành động",
+             *       "Khoa học viễn tưởng"
+             *     ]
+             */
+            genres: string[];
+            /** @example T13 */
+            ageRating?: string | null;
             /** @example 169 */
             duration: number;
             /**
@@ -992,6 +1024,22 @@ export interface components {
              */
             trailerKey?: string | null;
             /**
+             * Format: date
+             * @example 2024-02-27
+             */
+            releaseDate?: string | null;
+            /** @example 8.7 */
+            rating?: number | null;
+            /**
+             * @example [
+             *       "Hành động",
+             *       "Khoa học viễn tưởng"
+             *     ]
+             */
+            genres?: string[];
+            /** @example T13 */
+            ageRating?: string | null;
+            /**
              * @description Duration in minutes
              * @example 169
              */
@@ -1022,6 +1070,22 @@ export interface components {
              * @example Way9Dexny3w
              */
             trailerKey?: string | null;
+            /**
+             * Format: date
+             * @example 2024-02-27
+             */
+            releaseDate?: string | null;
+            /** @example 8.7 */
+            rating?: number | null;
+            /**
+             * @example [
+             *       "Hành động",
+             *       "Khoa học viễn tưởng"
+             *     ]
+             */
+            genres?: string[];
+            /** @example T13 */
+            ageRating?: string | null;
             /**
              * @description Duration in minutes
              * @example 169

@@ -3931,6 +3931,32 @@
             "nullable": true,
             "description": "YouTube trailer video key"
           },
+          "releaseDate": {
+            "type": "string",
+            "example": "2024-02-27T00:00:00.000Z",
+            "format": "date-time",
+            "nullable": true
+          },
+          "rating": {
+            "type": "number",
+            "example": 8.7,
+            "nullable": true
+          },
+          "genres": {
+            "example": [
+              "Hành động",
+              "Khoa học viễn tưởng"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ageRating": {
+            "type": "string",
+            "example": "T13",
+            "nullable": true
+          },
           "duration": {
             "type": "number",
             "example": 169
@@ -3958,6 +3984,7 @@
         "required": [
           "id",
           "title",
+          "genres",
           "duration",
           "status",
           "createdAt",
@@ -4345,6 +4372,32 @@
             "nullable": true,
             "description": "YouTube trailer video key"
           },
+          "releaseDate": {
+            "type": "string",
+            "example": "2024-02-27T00:00:00.000Z",
+            "format": "date-time",
+            "nullable": true
+          },
+          "rating": {
+            "type": "number",
+            "example": 8.7,
+            "nullable": true
+          },
+          "genres": {
+            "example": [
+              "Hành động",
+              "Khoa học viễn tưởng"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ageRating": {
+            "type": "string",
+            "example": "T13",
+            "nullable": true
+          },
           "duration": {
             "type": "number",
             "example": 169
@@ -4378,6 +4431,7 @@
         "required": [
           "id",
           "title",
+          "genres",
           "duration",
           "status",
           "createdAt",
@@ -4413,6 +4467,35 @@
             "example": "Way9Dexny3w",
             "nullable": true,
             "description": "YouTube trailer video key"
+          },
+          "releaseDate": {
+            "type": "string",
+            "example": "2024-02-27",
+            "format": "date",
+            "nullable": true
+          },
+          "rating": {
+            "type": "number",
+            "example": 8.7,
+            "minimum": 0,
+            "maximum": 10,
+            "nullable": true
+          },
+          "genres": {
+            "example": [
+              "Hành động",
+              "Khoa học viễn tưởng"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ageRating": {
+            "type": "string",
+            "example": "T13",
+            "nullable": true,
+            "maxLength": 20
           },
           "duration": {
             "type": "number",
@@ -4462,6 +4545,35 @@
             "example": "Way9Dexny3w",
             "nullable": true,
             "description": "YouTube trailer video key"
+          },
+          "releaseDate": {
+            "type": "string",
+            "example": "2024-02-27",
+            "format": "date",
+            "nullable": true
+          },
+          "rating": {
+            "type": "number",
+            "example": 8.7,
+            "minimum": 0,
+            "maximum": 10,
+            "nullable": true
+          },
+          "genres": {
+            "example": [
+              "Hành động",
+              "Khoa học viễn tưởng"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ageRating": {
+            "type": "string",
+            "example": "T13",
+            "nullable": true,
+            "maxLength": 20
           },
           "duration": {
             "type": "number",

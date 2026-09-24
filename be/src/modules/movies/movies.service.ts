@@ -13,6 +13,27 @@ import { CreateMovieDto } from './dto/create-movie.dto.js';
 import { ListAdminMoviesDto, ListMoviesDto } from './dto/list-movies.dto.js';
 import { UpdateMovieDto } from './dto/update-movie.dto.js';
 
+function normalizeMovieRatings<T>(value: T): T {
+  if (value === null || value === undefined || value instanceof Date) return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeMovieRatings(item)) as T;
+  }
+  if (typeof value !== 'object') return value;
+
+  const result = Object.fromEntries(
+    Object.entries(value).map(([key, nestedValue]) => [
+      key,
+      normalizeMovieRatings(nestedValue),
+    ]),
+  );
+  if (typeof result.rating === 'string') result.rating = Number(result.rating);
+  return result as T;
+}
+
+function toMovieResponse<T>(value: T): T {
+  return normalizeMovieRatings(toPublicResponse(value));
+}
+
 @Injectable()
 export class MoviesService {
   constructor(
@@ -67,7 +88,7 @@ export class MoviesService {
 
   async importTmdbMovie(tmdbId: number) {
     const existing = await this.prisma.movie.findUnique({ where: { tmdbId } });
-    if (existing) return { movie: toPublicResponse(existing), imported: false };
+    if (existing) return { movie: toMovieResponse(existing), imported: false };
 
     const movie = await this.tmdb.movie(tmdbId);
     const data = {
@@ -75,22 +96,25 @@ export class MoviesService {
       title: movie.title.trim(),
       description: movie.overview?.trim() || null,
       posterUrl: this.tmdb.image(movie.poster_path, 'w500'),
-      backdropUrl: this.tmdb.image(movie.backdrop_path, 'w1280'),
-      trailerKey: this.tmdb.trailerKey(movie.videos?.results),
-      duration: movie.runtime && movie.runtime > 0 ? movie.runtime : 120,
-      status: MovieStatus.DRAFT,
+       backdropUrl: this.tmdb.image(movie.backdrop_path, 'w1280'),
+       trailerKey: this.tmdb.trailerKey(movie.videos?.results),
+       releaseDate: movie.release_date ? new Date(`${movie.release_date}T00:00:00.000Z`) : null,
+       rating: movie.vote_average ?? null,
+       genres: movie.genres?.map((genre) => genre.name).filter(Boolean) ?? [],
+       duration: movie.runtime && movie.runtime > 0 ? movie.runtime : 120,
+       status: MovieStatus.DRAFT,
     };
 
     try {
       const created = await this.prisma.movie.create({ data });
-      return { movie: toPublicResponse(created), imported: true };
+      return { movie: toMovieResponse(created), imported: true };
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         const concurrent = await this.prisma.movie.findUnique({
           where: { tmdbId },
         });
         if (concurrent)
-          return { movie: toPublicResponse(concurrent), imported: false };
+          return { movie: toMovieResponse(concurrent), imported: false };
         throw new ConflictException('Movie was imported concurrently');
       }
       throw error;
@@ -110,14 +134,14 @@ export class MoviesService {
       ...(backdropUrl && { backdropUrl }),
       ...(trailerKey && { trailerKey }),
     };
-    if (!Object.keys(data).length) return toPublicResponse(existing);
+    if (!Object.keys(data).length) return toMovieResponse(existing);
 
     const updated = await this.prisma.movie.update({
       where: { id: existing.id },
       data,
     });
 
-    return toPublicResponse(updated);
+    return toMovieResponse(updated);
   }
 
   private async findMovies(
@@ -159,7 +183,7 @@ export class MoviesService {
     ]);
 
     return {
-      data: toPublicResponse(data),
+      data: toMovieResponse(data),
       meta: {
         page,
         pageSize,
@@ -188,7 +212,7 @@ export class MoviesService {
       throw new NotFoundException('Movie not found');
     }
 
-    return toPublicResponse(movie);
+    return toMovieResponse(movie);
   }
 
   async create(dto: CreateMovieDto) {
@@ -199,11 +223,15 @@ export class MoviesService {
         posterUrl: dto.posterUrl?.trim() ?? null,
         backdropUrl: dto.backdropUrl?.trim() ?? null,
         trailerKey: dto.trailerKey?.trim() ?? null,
+        releaseDate: dto.releaseDate ? new Date(dto.releaseDate) : null,
+        rating: dto.rating ?? null,
+        genres: dto.genres?.map((genre) => genre.trim()).filter(Boolean) ?? [],
+        ageRating: dto.ageRating?.trim() ?? null,
         duration: dto.duration,
         status: dto.status ?? MovieStatus.DRAFT,
       },
     });
-    return toPublicResponse(movie);
+    return toMovieResponse(movie);
   }
 
   async update(id: string, dto: UpdateMovieDto) {
@@ -225,11 +253,21 @@ export class MoviesService {
         ...(dto.trailerKey !== undefined && {
           trailerKey: dto.trailerKey?.trim() ?? null,
         }),
+        ...(dto.releaseDate !== undefined && {
+          releaseDate: dto.releaseDate ? new Date(dto.releaseDate) : null,
+        }),
+        ...(dto.rating !== undefined && { rating: dto.rating }),
+        ...(dto.genres !== undefined && {
+          genres: dto.genres.map((genre) => genre.trim()).filter(Boolean),
+        }),
+        ...(dto.ageRating !== undefined && {
+          ageRating: dto.ageRating?.trim() ?? null,
+        }),
         ...(dto.duration !== undefined && { duration: dto.duration }),
         ...(dto.status !== undefined && { status: dto.status }),
       },
     });
-    return toPublicResponse(movie);
+    return toMovieResponse(movie);
   }
 
   async archive(id: string) {
@@ -239,7 +277,7 @@ export class MoviesService {
       where: { id },
       data: { status: MovieStatus.ARCHIVED },
     });
-    return toPublicResponse(movie);
+    return toMovieResponse(movie);
   }
 
   private async getById(id: string) {

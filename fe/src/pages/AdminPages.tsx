@@ -730,6 +730,10 @@ function MovieForm({
     posterUrl: movie?.posterUrl ?? "",
     backdropUrl: movie?.backdropUrl ?? "",
     trailerKey: movie?.trailerKey ?? "",
+    releaseDate: movie?.releaseDate?.slice(0, 10) ?? null,
+    rating: movie?.rating ?? null,
+    genres: movie?.genres ?? [],
+    ageRating: movie?.ageRating ?? "",
     duration: movie?.duration ?? 120,
     status: movie?.status ?? "DRAFT",
   });
@@ -742,6 +746,7 @@ function MovieForm({
       posterUrl: form.posterUrl || null,
       backdropUrl: form.backdropUrl || null,
       trailerKey: trailer ?? (form.trailerKey?.trim() || null),
+      rating: form.rating == null ? null : Number(form.rating),
     });
   }
 
@@ -802,6 +807,36 @@ function MovieForm({
                 setForm({ ...form, backdropUrl: event.target.value })
               }
               placeholder="https://…"
+            />
+          </Field>
+          <Field label="Ngày khởi chiếu">
+            <input
+              type="date"
+              value={form.releaseDate ?? ""}
+              onChange={(event) => setForm({ ...form, releaseDate: event.target.value || null })}
+            />
+          </Field>
+          <NumberField
+            label="Điểm TMDB"
+            min={0}
+            max={10}
+            step={0.1}
+            value={Number(form.rating ?? 0)}
+            onChange={(rating) => setForm({ ...form, rating })}
+          />
+          <Field label="Phân loại độ tuổi">
+            <input
+              maxLength={20}
+              value={form.ageRating ?? ""}
+              onChange={(event) => setForm({ ...form, ageRating: event.target.value || null })}
+              placeholder="Ví dụ: T13"
+            />
+          </Field>
+          <Field label="Thể loại" wide>
+            <input
+              value={(form.genres ?? []).join(", ")}
+              onChange={(event) => setForm({ ...form, genres: event.target.value.split(",").map((genre) => genre.trim()).filter(Boolean) })}
+              placeholder="Ví dụ: Hành động, Khoa học viễn tưởng"
             />
           </Field>
           <Field label="Trailer YouTube" wide>
@@ -1122,9 +1157,12 @@ export function AdminCinemasPage() {
   } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [mutationError, setMutationError] = useState("");
+  const [search, setSearch] = useState("");
+  const [provinceCode, setProvinceCode] = useState<number | "">("");
+  const { provinces, isPending: provincesPending, isError: provincesError, refetch: refetchProvinces } = useLocationContext();
   const query = useQuery({
-    queryKey: ["admin-cinemas"],
-    queryFn: ({ signal }) => api.cinemas(undefined, signal),
+    queryKey: ["admin-cinemas", provinceCode],
+    queryFn: ({ signal }) => api.cinemas(provinceCode === "" ? undefined : provinceCode, signal),
   });
   const saveMutation = useMutation({
     mutationFn: ({ id, body }: { id?: string; body: CreateCinemaRequest }) =>
@@ -1145,6 +1183,7 @@ export function AdminCinemasPage() {
     },
   });
   const cinemas = query.data ?? [];
+  const filteredCinemas = cinemas.filter((cinema) => `${cinema.name} ${cinema.address} ${cinema.province?.name ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()));
 
   async function save(body: CreateCinemaRequest) {
     setMutationError("");
@@ -1188,57 +1227,29 @@ export function AdminCinemasPage() {
       {query.isSuccess && !cinemas.length && (
         <EmptyState>Chưa có cụm rạp. Hãy tạo cụm rạp đầu tiên.</EmptyState>
       )}
-      {cinemas.length > 0 && (
+      <div className="admin-toolbar admin-cinema-toolbar">
+        <input aria-label="Tìm cụm rạp" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên cụm rạp hoặc địa chỉ…" />
+        <select aria-label="Lọc tỉnh thành" value={provinceCode} disabled={provincesPending} onChange={(event) => setProvinceCode(event.target.value ? Number(event.target.value) : "")}>
+          <option value="">Tất cả tỉnh/thành</option>
+          {provinces.map((province) => <option key={province.code} value={province.code}>{province.name}</option>)}
+        </select>
+        <span className="admin-toolbar-result">{filteredCinemas.length} cụm rạp</span>
+      </div>
+      {provincesError && <ErrorState cause={new Error("Province list unavailable")} fallback="Không thể tải bộ lọc tỉnh/thành." onRetry={() => void refetchProvinces()} />}
+      {query.isSuccess && !filteredCinemas.length && <EmptyState>{search || provinceCode !== "" ? "Không tìm thấy cụm rạp phù hợp." : "Chưa có cụm rạp. Hãy tạo cụm rạp đầu tiên."}</EmptyState>}
+      {filteredCinemas.length > 0 && (
         <div className="admin-card-grid">
-          {cinemas.map((cinema, index) => (
+          {filteredCinemas.map((cinema, index) => (
             <article className="admin-entity-card" key={cinema.id}>
-              <div className={`admin-card-mark admin-card-mark-${index % 3}`}>
-                {cinema.name.slice(0, 1)}
-              </div>
+              <div className="admin-card-mark">{cinema.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase()}</div>
               <div className="admin-entity-content">
                 <div className="admin-card-heading">
-                  <div>
-                    <p className="eyebrow">
-                      CỤM RẠP {String(index + 1).padStart(2, "0")}
-                    </p>
-                    <h2>{cinema.name}</h2>
-                  </div>
-                  <span className="admin-count">
-                    {cinema.roomCount ?? 0} phòng
-                  </span>
+                  <div><p className="eyebrow">CỤM RẠP {String(index + 1).padStart(2, "0")}</p><h2>{cinema.name}</h2></div>
+                  <span className="admin-count">{cinema.roomCount ?? 0} phòng</span>
                 </div>
-                <p className="admin-address">
-                  ⌖ {cinema.address}
-                  <small>
-                    {cinema.province?.name ?? `Mã tỉnh: ${cinema.provinceCode}`}
-                  </small>
-                </p>
-                <div className="admin-card-footer">
-                  <Link
-                    className="primary"
-                    to={`/admin/cinemas/${cinema.id}/rooms`}
-                  >
-                    Quản lý phòng
-                  </Link>
-                  <button
-                    className="secondary"
-                    type="button"
-                    onClick={() => {
-                      setMutationError("");
-                      setModal({ mode: "edit", cinema });
-                    }}
-                  >
-                    Sửa
-                  </button>
-                  <button
-                    className="danger"
-                    type="button"
-                    disabled={deleteMutation.isPending}
-                    onClick={() => askDelete(cinema)}
-                  >
-                    Xóa
-                  </button>
-                </div>
+                <div className="admin-card-tags"><span>{cinema.province?.name ?? `Mã tỉnh ${cinema.provinceCode}`}</span><span className="admin-card-status">Đang quản lý</span></div>
+                <p className="admin-address">⌖ {cinema.address}</p>
+                <div className="admin-card-footer"><Link className="primary" to={`/admin/cinemas/${cinema.id}/rooms`}>Quản lý phòng</Link><button className="secondary" type="button" onClick={() => { setMutationError(""); setModal({ mode: "edit", cinema }); }}>Sửa</button><button className="danger" type="button" disabled={deleteMutation.isPending} onClick={() => askDelete(cinema)}>Xóa</button></div>
               </div>
             </article>
           ))}

@@ -218,6 +218,7 @@ Customer UI hiện có:
 - Bộ chọn tỉnh/thành dùng reference data nội bộ; popup được render ở `document.body`, khóa scroll nền khi mở và khôi phục focus/scroll khi đóng. Catalog debounce 120ms khi đổi khu vực liên tục và hủy request cũ bằng `AbortSignal`.
 - Chọn suất chiếu và sơ đồ ghế.
 - Hold tối đa 10 ghế bằng `Idempotency-Key`; booking giữ ghế 10 phút khi suất còn hơn 15 phút và 2 phút khi còn từ 5 đến 15 phút.
+- Khi server xác nhận booking đã `EXPIRED`, frontend nhả cache booking/sơ đồ ghế và dùng điều hướng thay thế về đúng sơ đồ ghế để người dùng chọn lại; trang ghế hiển thị thông báo phiên giữ ghế đã hết hạn một lần.
 - Không nhận hold mới khi suất chiếu còn tối đa 5 phút; client hiển thị lỗi suất quá gần giờ chiếu.
 - Checkout SePay bằng mã QR/chuyển khoản và nhận webhook xác nhận thanh toán.
 - Booking history và ticket history.
@@ -385,6 +386,10 @@ Nguồn: `be/prisma/schema.prisma`, model `User`.
 | `posterUrl`   | `String?`     | OPT         | —                  | URL poster phim         |
 | `backdropUrl` | `String?`     | OPT         | —                  | URL backdrop phim         |
 | `trailerKey`  | `String?`     | OPT         | —                  | YouTube video key         |
+| `releaseDate` | `DateTime?`   | OPT         | —                  | Ngày khởi chiếu           |
+| `rating`      | `Decimal?`    | OPT         | `0..10`, 1 chữ số thập phân | Điểm TMDB               |
+| `genres`      | `String[]`    | REQ         | `[]`                  | Danh sách thể loại         |
+| `ageRating`   | `String?`     | OPT         | —                     | Phân loại độ tuổi          |
 | `duration`    | `Int`         | REQ         | —                  | Thời lượng, đơn vị phút |
 | `status`      | `MovieStatus` | REQ         | `DRAFT`            | Lifecycle phim          |
 | `showtimes`   | `Showtime[]`  | Relation    | —                  | Các suất chiếu          |
@@ -586,6 +591,8 @@ Một booking tối đa có một Payment. Reference SePay là unique khi provid
 | `usedAt`        | `DateTime?`    | OPT         | —                         | Thời điểm sử dụng |
 
 Hiện schema có `USED`/`CANCELLED`, nhưng chưa có API consume/cancel ticket.
+
+Frontend tạo QR vé cục bộ từ chuỗi versioned `cinebook-ticket:v1:<ticket.code>` bằng thư viện QR chuẩn. QR luôn hiển thị trong chi tiết vé để khách xuất trình tại rạp; hệ thống hiện chưa có camera scanner, endpoint consume hoặc luồng check-in Admin. Nút “Xem mã soát vé” chỉ cuộn tới QR, không thay đổi trạng thái vé.
 
 ### 5.15. ERD
 
@@ -1321,6 +1328,9 @@ sequenceDiagram
 | `overview`       | `description`           |
 | `poster_path`    | `posterUrl` với size `w500` |
 | `backdrop_path`  | `backdropUrl` với size `w1280` |
+| `release_date`   | `releaseDate`           |
+| `vote_average`   | `rating`                |
+| `genres[].name`  | `genres`                |
 | Video YouTube official `Trailer` | `trailerKey`; ưu tiên tiếng Việt, sau đó tiếng Anh |
 | `runtime`        | `duration`; fallback `120` phút nếu thiếu/không hợp lệ |
 | —                | `status = DRAFT`        |
@@ -1344,6 +1354,7 @@ sequenceDiagram
 }
 ```
 
+- `ageRating` không có nguồn thống nhất trong TMDB detail hiện tại nên Admin nhập/chỉnh sửa trường này trong Movie form.
 - Phim mới nhập chưa xuất hiện trên public catalog. Admin phải cập nhật `status` thành `PUBLISHED`, sau đó tạo showtime thì customer mới có thể đặt vé.
 - Errors: `400`, `401`, `403`, `404` TMDB movie không tồn tại, `409` conflict, `502/504` TMDB connection, `503` cấu hình/rate limit.
 
