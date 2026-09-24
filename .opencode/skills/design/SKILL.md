@@ -1,6 +1,6 @@
 ---
 name: design
-description: Use when building, changing, polishing, or reviewing UI in this repo (fe/src, components, pages, App.css, index.css) — landing pages, dashboards, ticket/booking screens, modals, screenshot-to-UI, or any visual/web design task. Enforces the CineBook CineNoir Violet brand (one violet accent, one typeface, token-consistent plain CSS) and rejects generic "AI slop".
+description: Use when building, changing, polishing, or reviewing UI in this repo (fe/src, components, pages, App.css, index.css) — landing pages, dashboards, ticket/booking screens, modals, screenshot-to-UI, or any visual/web design task. Enforces the CineBook Cobalt Editorial brand (one electric cobalt accent, Space Grotesk + Inter, token-consistent plain CSS) and rejects generic "AI slop".
 ---
 
 # CineBook design skill
@@ -13,10 +13,8 @@ commit to a direction before building. Never fall back to a generic look.
 
 - Read `DESIGN.md` and skim `fe/src/App.css` + `fe/src/index.css` before any
   design edit. Cite the token names you reuse.
-- **One accent** (`#7c3aed`), **one typeface** (Inter), **≤28px radius**,
-  restrained motion (0.2s ease, ≤3px lift). Use the Stitch CTA gradient
-  (`#7c3aed` → `#6d28d9`) only for primary actions; no gradient text or
-  glassmorphism.
+- **One accent** (electric cobalt), **Space Grotesk + Inter**, **≤24px radius**,
+  restrained motion (0.2s ease, ≤3px lift). Use solid cobalt or a restrained cobalt-to-deep-cobalt treatment only for primary actions; no gradient text or glassmorphism.
 - All UI copy **Vietnamese** — reuse the existing vocabulary in
   `fe/src/utils/format` (`errorMessage`, `statusLabel`). No placeholder copy.
 - Prefer reusing existing `App.css` classes over writing new CSS. Add rules

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,6 +17,7 @@ import {
   LoadingState,
   PageHeader,
   StatusBadge,
+  useDialogFocus,
 } from "../components/ui";
 import type {
   Cinema,
@@ -30,6 +31,7 @@ import type {
   FreeSlotsResponse,
   Movie,
   MovieStatus,
+  TmdbMovieResponse,
   RoomResponse,
   Seat,
   SeatType,
@@ -40,6 +42,8 @@ import type {
 } from "../types";
 import { errorMessage, formatDate, formatTime, money } from "../utils/format";
 import { buildSeatLayout, isCompleteSeatLayout, validateSeatPreset } from "../utils/seat-layout";
+import { ThemeSwitch } from "../components/ThemeToggle";
+import { patchTmdbMovieCaches, runTmdbImportQueue, TMDB_IMPORT_LIMIT } from "../utils/tmdb-import";
 
 type FormMode = "create" | "edit";
 
@@ -103,6 +107,7 @@ export function AdminLoginPage() {
 
   return (
     <div className="admin-login-page">
+      <div className="admin-login-theme"><ThemeSwitch /></div>
       <div className="admin-login-brand">
         <Link className="brand" to="/">
           <span className="brand-mark">▰</span>
@@ -205,6 +210,9 @@ function Modal({
   children: ReactNode;
   className?: string;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(true, dialogRef, onClose);
+
   return (
     <div
       className="modal-backdrop"
@@ -214,10 +222,12 @@ function Modal({
       }}
     >
       <div
+        ref={dialogRef}
         className={`admin-modal ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-modal-title"
+        tabIndex={-1}
       >
         <button
           className="modal-close"
@@ -246,9 +256,13 @@ function ConfirmDialog({
   error?: string;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(true, dialogRef, onClose);
+
   return (
     <div className="modal-backdrop" role="presentation">
       <div
+        ref={dialogRef}
         className="admin-modal confirm-modal"
         role="alertdialog"
         aria-modal="true"
@@ -427,6 +441,15 @@ function youtubeKey(value: string | null | undefined) {
   }
 }
 
+function dashboardShowtimeStatus(showtime: Showtime) {
+  const now = Date.now();
+  const startsAt = new Date(showtime.startsAt).getTime();
+  const endsAt = new Date(showtime.endsAt).getTime();
+  if (now >= startsAt && now < endsAt) return { label: "Đang diễn ra", tone: "live" };
+  if (startsAt > now && startsAt - now <= 30 * 60 * 1000) return { label: "Sắp diễn ra", tone: "soon" };
+  return { label: "Đã lên lịch", tone: "scheduled" };
+}
+
 export function AdminDashboardPage() {
   const moviesQuery = useQuery({
     queryKey: ["admin-movies", "dashboard"],
@@ -444,121 +467,26 @@ export function AdminDashboardPage() {
   const isPending =
     moviesQuery.isPending || cinemasQuery.isPending || showtimesQuery.isPending;
   const error = moviesQuery.error ?? cinemasQuery.error ?? showtimesQuery.error;
-
   const showtimes = showtimesQuery.data?.data ?? [];
+  const liveShowtimes = showtimes.filter((showtime) => dashboardShowtimeStatus(showtime).tone === "live").length;
 
   return (
     <AdminPage>
-      <div className="admin-breadcrumb">
-        <Link to="/admin">CineBook Admin</Link>
-        <span>›</span>
-        <strong>Tổng quan</strong>
-      </div>
-      <PageHeader eyebrow="CINEBOOK CONTROL" title="Tổng quan vận hành">
-        <Link className="primary" to="/admin/showtimes">
-          Quản lý suất chiếu <span>→</span>
-        </Link>
-      </PageHeader>
-      <p className="admin-lead">
-        Không gian quản trị nội dung, cụm rạp và lịch chiếu của CineBook.
-      </p>
+      <div className="admin-breadcrumb"><Link to="/admin">CineBook Admin</Link><span>›</span><strong>Tổng quan</strong></div>
+      <div className="admin-dashboard-heading"><div><p className="eyebrow">CINEBOOK CONTROL</p><h1 className="page-title">Tổng quan vận hành</h1><p className="admin-lead">Theo dõi nội dung, cụm rạp và lịch chiếu từ một không gian vận hành tập trung.</p></div><div className="admin-dashboard-actions"><button className="secondary" type="button" onClick={() => { void moviesQuery.refetch(); void cinemasQuery.refetch(); void showtimesQuery.refetch(); }}>↻ Làm mới dữ liệu</button><Link className="primary" to="/admin/showtimes">+ Tạo suất chiếu</Link></div></div>
       {isPending && <LoadingState label="Đang tổng hợp dữ liệu…" />}
-      {error && !isPending && (
-        <ErrorState
-          cause={error}
-          fallback="Không thể tải tổng quan."
-          onRetry={() => {
-            void moviesQuery.refetch();
-            void cinemasQuery.refetch();
-            void showtimesQuery.refetch();
-          }}
-        />
-      )}
-      {!isPending && !error && (
-        <>
-          <div className="admin-stat-grid">
-            <Link className="admin-stat-card" to="/admin/movies">
-              <span className="admin-stat-label">Phim trong hệ thống</span>
-              <strong>{moviesQuery.data?.meta.total ?? 0}</strong>
-              <span>Quản lý nội dung →</span>
-            </Link>
-            <Link className="admin-stat-card" to="/admin/cinemas">
-              <span className="admin-stat-label">Cụm rạp</span>
-              <strong>{cinemasQuery.data?.length ?? 0}</strong>
-              <span>Quản lý phòng chiếu →</span>
-            </Link>
-            <Link className="admin-stat-card" to="/admin/showtimes">
-              <span className="admin-stat-label">Suất chiếu</span>
-              <strong>{showtimesQuery.data?.meta.total ?? 0}</strong>
-              <span>Xem lịch vận hành →</span>
-            </Link>
-          </div>
-          <div className="admin-dashboard-grid">
-            <section className="admin-panel">
-              <div className="admin-panel-heading">
-                <div>
-                  <p className="eyebrow">LỊCH VẬN HÀNH</p>
-                  <h2>Suất chiếu gần đây</h2>
-                </div>
-                <Link to="/admin/showtimes">Xem tất cả →</Link>
-              </div>
-              {showtimes.length === 0 ? (
-                <EmptyState>Chưa có suất chiếu để hiển thị.</EmptyState>
-              ) : (
-                <div className="admin-recent-list">
-                  {showtimes.slice(0, 5).map((showtime) => (
-                    <Link
-                      className="admin-recent-row"
-                      key={showtime.id}
-                      to="/admin/showtimes"
-                    >
-                      <span className="admin-recent-time">
-                        {formatTime(showtime.startsAt)}
-                      </span>
-                      <span>
-                        <strong>{showtime.movie.title}</strong>
-                        <small>
-                          {showtime.room.cinema?.name ?? "Cụm rạp"} ·{" "}
-                          {showtime.room.name}
-                        </small>
-                      </span>
-                      <span className="admin-recent-date">
-                        {formatDate(showtime.startsAt)}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-            <section className="admin-panel admin-quick-panel">
-              <div className="admin-panel-heading">
-                <div>
-                  <p className="eyebrow">TÁC VỤ NHANH</p>
-                  <h2>Quản lý hệ thống</h2>
-                </div>
-                <span>Điều hướng</span>
-              </div>
-              <div className="admin-quick-links">
-                <Link to="/admin/movies">
-                  <span>▣</span>
-                  <strong>Quản lý phim</strong>
-                  <small>Cập nhật nội dung và trạng thái phát hành</small>
-                </Link>
-                <Link to="/admin/cinemas">
-                  <span>▤</span>
-                  <strong>Quản lý rạp & phòng</strong>
-                  <small>Kiểm tra phòng chiếu và sơ đồ ghế</small>
-                </Link>
-                <Link to="/admin/showtimes">
-                  <span>◷</span>
-                  <strong>Quản lý suất chiếu</strong>
-                  <small>Tạo và cập nhật lịch vận hành</small>
-                </Link>
-              </div>
-            </section>
-          </div>
-        </>
-      )}
+      {error && !isPending && <ErrorState cause={error} fallback="Không thể tải tổng quan." onRetry={() => { void moviesQuery.refetch(); void cinemasQuery.refetch(); void showtimesQuery.refetch(); }} />}
+      {!isPending && !error && <>
+        <div className="admin-stat-grid">
+          <Link className="admin-stat-card admin-stat-card-cobalt" to="/admin/movies"><div className="admin-stat-top"><span className="admin-stat-label">Phim trong hệ thống</span><span className="admin-stat-icon">▣</span></div><strong>{moviesQuery.data?.meta.total ?? 0}</strong><span>Quản lý nội dung <b>→</b></span></Link>
+          <Link className="admin-stat-card admin-stat-card-neutral" to="/admin/cinemas"><div className="admin-stat-top"><span className="admin-stat-label">Cụm rạp đang quản lý</span><span className="admin-stat-icon">▤</span></div><strong>{cinemasQuery.data?.length ?? 0}</strong><span>Rạp và phòng chiếu <b>→</b></span></Link>
+          <Link className="admin-stat-card admin-stat-card-live" to="/admin/showtimes"><div className="admin-stat-top"><span className="admin-stat-label">Suất chiếu đã tải</span><span className="admin-stat-icon">◷</span></div><strong>{showtimesQuery.data?.meta.total ?? 0}</strong><span><i /> {liveShowtimes} suất đang diễn ra</span></Link>
+        </div>
+        <div className="admin-dashboard-grid">
+          <section className="admin-panel admin-operations-panel"><div className="admin-panel-heading"><div><p className="eyebrow">LỊCH VẬN HÀNH</p><h2>Suất chiếu gần đây</h2><small>Trạng thái được tính theo giờ thực tế của suất chiếu.</small></div><Link to="/admin/showtimes">Xem toàn bộ →</Link></div>{showtimes.length === 0 ? <EmptyState>Chưa có suất chiếu để hiển thị.</EmptyState> : <div className="admin-recent-list">{showtimes.slice(0, 6).map((showtime) => { const status = dashboardShowtimeStatus(showtime); return <Link className="admin-recent-row" key={showtime.id} to="/admin/showtimes"><span className="admin-recent-time">{formatTime(showtime.startsAt)}</span><span><strong>{showtime.movie.title}</strong><small>{showtime.room.cinema?.name ?? "Cụm rạp"} · {showtime.room.name}</small></span><span className="admin-recent-date">{formatDate(showtime.startsAt)}</span><span className={`admin-operation-status ${status.tone}`}><i />{status.label}</span></Link>; })}</div>}</section>
+          <section className="admin-panel admin-quick-panel"><div className="admin-panel-heading"><div><p className="eyebrow">TÁC VỤ NHANH</p><h2>Không gian điều hành</h2></div><span>{cinemasQuery.data?.length ?? 0} cụm rạp</span></div><div className="admin-quick-links"><Link to="/admin/movies"><span>▣</span><strong>Nội dung phim</strong><small>Quản lý trạng thái phát hành, poster và trailer.</small><b>→</b></Link><Link to="/admin/cinemas"><span>▤</span><strong>Rạp & phòng chiếu</strong><small>Kiểm tra phòng, layout ghế và sức chứa.</small><b>→</b></Link><Link to="/admin/showtimes"><span>◷</span><strong>Lịch vận hành</strong><small>Tạo suất lẻ, bulk schedule và khung giờ trống.</small><b>→</b></Link><Link to="/admin/payments"><span>₫</span><strong>Thanh toán SePay</strong><small>Rà soát giao dịch cần xử lý và hoàn tiền.</small><b>→</b></Link></div></section>
+        </div>
+      </>}
     </AdminPage>
   );
 }
@@ -572,111 +500,217 @@ type MovieFormProps = {
   onSubmit: (body: CreateMovieRequest) => Promise<void>;
 };
 
-function TmdbMovieModal({
-  onClose,
-  onImported,
-}: {
-  onClose: () => void;
-  onImported: () => void;
-}) {
-  const [search, setSearch] = useState("");
-  const [importError, setImportError] = useState("");
+type TmdbOperation = {
+  kind: "import" | "resync";
+  state: "pending" | "success" | "error";
+  error?: string;
+};
+
+type TmdbSelection = TmdbMovieResponse;
+
+function TmdbMovieModal({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [searchInput, setSearchInput] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Map<number, TmdbSelection>>(new Map());
+  const [operations, setOperations] = useState<Map<number, TmdbOperation>>(new Map());
+  const [batch, setBatch] = useState<{ success: number; failed: number } | null>(null);
+  const [failedIds, setFailedIds] = useState<number[]>([]);
+  const [queuePending, setQueuePending] = useState(false);
   const query = useQuery({
-    queryKey: ["tmdb-movies", search],
+    queryKey: ["tmdb-movies", submittedSearch, page],
     queryFn: ({ signal }) =>
-      api.tmdbMovies({ search: search || undefined }, signal),
-  });
-  const importMutation = useMutation({
-    mutationFn: (tmdbId: number) => api.importTmdbMovie(tmdbId),
-    onSuccess: () => onImported(),
-    onError: (cause) => setImportError(mutationMessage(cause)),
+      api.tmdbMovies({ search: submittedSearch || undefined, page }, signal),
+    placeholderData: (previous) => previous,
   });
   const movies = query.data?.data ?? [];
+  const totalPages = Math.min(query.data?.meta.totalPages ?? 1, 20);
+  const selectedIds = [...selected.keys()];
+  const currentEligible = movies.filter((movie) => {
+    const operation = operations.get(movie.tmdbId);
+    return !movie.imported && operation?.state !== "pending";
+  });
+  const currentSelected = currentEligible.filter((movie) => selected.has(movie.tmdbId));
+  const allCurrentSelected = currentEligible.length > 0 && currentSelected.length === currentEligible.length;
+  const hasPending = queuePending || [...operations.values()].some((operation) => operation.state === "pending");
+
+  function updateOperation(tmdbId: number, operation: TmdbOperation) {
+    setOperations((current) => new Map(current).set(tmdbId, operation));
+  }
+
+  function patchImport(response: Awaited<ReturnType<typeof api.importTmdbMovie>>, tmdbId: number) {
+    patchTmdbMovieCaches(queryClient, tmdbId, response.movie.id);
+    setSelected((current) => {
+      const next = new Map(current);
+      next.delete(tmdbId);
+      return next;
+    });
+    void queryClient.invalidateQueries({ queryKey: ["admin-movies"] });
+  }
+
+  async function importOne(tmdbId: number) {
+    updateOperation(tmdbId, { kind: "import", state: "pending" });
+    try {
+      const response = await api.importTmdbMovie(tmdbId);
+      patchImport(response, tmdbId);
+      updateOperation(tmdbId, { kind: "import", state: "success" });
+      return response;
+    } catch (cause) {
+      updateOperation(tmdbId, { kind: "import", state: "error", error: mutationMessage(cause) });
+      throw cause;
+    }
+  }
+
+  async function resync(tmdbId: number) {
+    updateOperation(tmdbId, { kind: "resync", state: "pending" });
+    try {
+      await api.resyncTmdbMovie(tmdbId);
+      updateOperation(tmdbId, { kind: "resync", state: "success" });
+      await queryClient.invalidateQueries({ queryKey: ["admin-movies"] });
+      await queryClient.invalidateQueries({ queryKey: ["movies"] });
+    } catch (cause) {
+      updateOperation(tmdbId, { kind: "resync", state: "error", error: mutationMessage(cause) });
+    }
+  }
+
+  async function runBatch(ids: number[]) {
+    if (!ids.length || hasPending) return;
+    setQueuePending(true);
+    setBatch(null);
+    setFailedIds([]);
+    const results = await runTmdbImportQueue(ids, importOne);
+    const failed = results.filter((result) => !result.ok).map((result) => result.tmdbId);
+    setFailedIds(failed);
+    setBatch({ success: results.length - failed.length, failed: failed.length });
+    setQueuePending(false);
+    await queryClient.invalidateQueries({ queryKey: ["tmdb-movies"] });
+  }
+
+
+  function submitSearch() {
+    setSubmittedSearch(searchInput.trim());
+    setPage(1);
+    setSelected(new Map());
+    setBatch(null);
+    setFailedIds([]);
+  }
+
+  function toggleSelection(movie: TmdbMovieResponse) {
+    if (movie.imported || operations.get(movie.tmdbId)?.state === "pending") return;
+    setSelected((current) => {
+      const next = new Map(current);
+      if (next.has(movie.tmdbId)) next.delete(movie.tmdbId);
+      else if (next.size < TMDB_IMPORT_LIMIT) next.set(movie.tmdbId, movie);
+      return next;
+    });
+  }
+
+  function toggleCurrentPage() {
+    if (allCurrentSelected) {
+      setSelected((current) => {
+        const next = new Map(current);
+        currentEligible.forEach((movie) => next.delete(movie.tmdbId));
+        return next;
+      });
+      return;
+    }
+    setSelected((current) => {
+      const next = new Map(current);
+      for (const movie of currentEligible) {
+        if (next.size >= TMDB_IMPORT_LIMIT) break;
+        next.set(movie.tmdbId, movie);
+      }
+      return next;
+    });
+  }
 
   return (
-    <Modal eyebrow="THƯ VIỆN TMDB" title="Nhập phim từ TMDB" onClose={onClose} className="tmdb-admin-modal">
+    <Modal
+      eyebrow="THƯ VIỆN TMDB"
+      title="Nhập phim từ TMDB"
+      onClose={hasPending ? () => undefined : onClose}
+      className="tmdb-admin-modal"
+    >
       <div className="tmdb-modal">
         <p className="admin-copy">
-          Tìm phim đang chiếu hoặc theo tên, sau đó nhập vào hệ thống dưới trạng
-          thái bản nháp để kiểm tra trước khi phát hành.
+          Tìm phim đang chiếu hoặc theo tên, sau đó nhập vào hệ thống dưới trạng thái bản nháp để kiểm tra trước khi phát hành.
         </p>
-        <div className="tmdb-search">
+        <form className="tmdb-search" onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>
           <input
             aria-label="Tìm phim TMDB"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
             placeholder="Tìm tên phim…"
           />
-          <button
-            className="secondary compact-button"
-            type="button"
-            onClick={() => void query.refetch()}
-          >
-            Tìm kiếm
+          <button className="secondary compact-button" type="submit">Tìm kiếm</button>
+        </form>
+        <div className="tmdb-bulk-toolbar">
+          <label className="admin-checkbox">
+            <input type="checkbox" checked={allCurrentSelected} onChange={toggleCurrentPage} disabled={!currentEligible.length || hasPending} />
+            Chọn trang
+          </label>
+          <strong>{selectedIds.length} / {TMDB_IMPORT_LIMIT} phim đã chọn</strong>
+          <small>Tối đa {TMDB_IMPORT_LIMIT} phim / lần nhập</small>
+          <button className="primary compact-button" type="button" disabled={!selectedIds.length || hasPending} onClick={() => void runBatch(selectedIds)}>
+            Nhập các phim đã chọn
           </button>
         </div>
-        {query.isPending && <LoadingState label="Đang tải danh sách TMDB…" />}
-        {query.isError && (
-          <ErrorState
-            cause={query.error}
-            fallback="Không thể tải danh sách TMDB."
-            onRetry={() => void query.refetch()}
-          />
-        )}
-        {importError && (
-          <p className="form-error" role="alert">
-            {importError}
-          </p>
-        )}
-        {query.isSuccess && !movies.length && (
-          <EmptyState>Không tìm thấy phim trên TMDB.</EmptyState>
-        )}
-        {movies.length > 0 && (
-          <div className="tmdb-results">
-            {movies.map((movie) => (
-              <article className="tmdb-result" key={movie.tmdbId}>
-                <div
-                  className="tmdb-poster"
-                  style={
-                    movie.posterUrl
-                      ? { backgroundImage: `url("${movie.posterUrl}")` }
-                      : undefined
-                  }
-                >
-                  {movie.posterUrl ? null : movie.title.slice(0, 1)}
-                </div>
-                <div className="tmdb-result-copy">
-                  <strong>{movie.title}</strong>
-                  <small>
-                    {movie.releaseDate || "Chưa có ngày phát hành"} · Điểm{" "}
-                    {movie.rating?.toFixed(1) ?? "—"}
-                  </small>
-                  <p>{movie.description || "Chưa có mô tả."}</p>
-                </div>
-                <button
-                  className={
-                    movie.imported
-                      ? "secondary compact-button"
-                      : "primary compact-button"
-                  }
-                  type="button"
-                  disabled={movie.imported || importMutation.isPending}
-                  onClick={() => importMutation.mutate(movie.tmdbId)}
-                >
-                  {movie.imported
-                    ? "Đã nhập"
-                    : importMutation.isPending
-                      ? "Đang nhập…"
-                      : "Nhập phim"}
-                </button>
-              </article>
-            ))}
+        {batch && (
+          <div className={`tmdb-batch-summary${batch.failed ? " has-error" : ""}`} role="status">
+            <span>Tiến độ nhập: {batch.success} thành công, {batch.failed} lỗi.</span>
+            {batch.failed > 0 && <button className="secondary compact-button" type="button" onClick={() => void runBatch(failedIds)}>Thử lại phim lỗi</button>}
           </div>
         )}
-        <small className="tmdb-attribution">
-          Dữ liệu và hình ảnh phim cung cấp bởi TMDB. CineBook không được TMDB
-          chứng nhận hoặc xác thực.
-        </small>
+        {query.isPending && <LoadingState label="Đang tải danh sách TMDB…" />}
+        {query.isError && <ErrorState cause={query.error} fallback="Không thể tải danh sách TMDB." onRetry={() => void query.refetch()} />}
+        {query.isSuccess && !movies.length && <EmptyState>Không tìm thấy phim trên TMDB.</EmptyState>}
+        {movies.length > 0 && (
+          <div className="tmdb-results">
+            {movies.map((movie) => {
+              const operation = operations.get(movie.tmdbId);
+              const isSelected = selected.has(movie.tmdbId);
+              const isPending = operation?.state === "pending";
+              return (
+                <article className={`tmdb-result${isSelected ? " selected" : ""}`} key={movie.tmdbId}>
+                  <label className="tmdb-select" aria-label={`Chọn ${movie.title}`}>
+                    <input type="checkbox" checked={isSelected} disabled={movie.imported || isPending || (!isSelected && selected.size >= TMDB_IMPORT_LIMIT)} onChange={() => toggleSelection(movie)} />
+                  </label>
+                  <div className="tmdb-poster" style={movie.posterUrl ? { backgroundImage: `url("${movie.posterUrl}")` } : undefined}>
+                    {movie.posterUrl ? null : movie.title.slice(0, 1)}
+                  </div>
+                  <div className="tmdb-result-copy">
+                    <strong>{movie.title}</strong>
+                    <small>{movie.releaseDate || "Chưa có ngày phát hành"} · Điểm {movie.rating?.toFixed(1) ?? "—"}</small>
+                    <p>{movie.description || "Chưa có mô tả."}</p>
+                    {operation?.state === "error" && <span className="tmdb-row-error" role="alert">{operation.error}</span>}
+                    {operation?.state === "success" && operation.kind === "resync" && <span className="tmdb-row-success">Đã đồng bộ trailer.</span>}
+                  </div>
+                  <div className="tmdb-row-action">
+                    {movie.imported ? (
+                      <>
+                        <span className="tmdb-status success">Đã nhập</span>
+                        <button className="secondary compact-button" type="button" disabled={isPending || hasPending && operation?.state !== "pending"} onClick={() => void resync(movie.tmdbId)}>
+                          {isPending ? "Đang đồng bộ…" : "Đồng bộ trailer"}
+                        </button>
+                      </>
+                    ) : (
+                      <button className="primary compact-button" type="button" disabled={isPending || hasPending} onClick={() => void runBatch([movie.tmdbId])}>
+                        {isPending ? "Đang nhập…" : operation?.state === "error" ? "Thử lại" : "Nhập phim"}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+        <div className="tmdb-pagination">
+          <button className="secondary compact-button" type="button" disabled={page <= 1 || query.isFetching || hasPending} onClick={() => setPage((current) => current - 1)}>Trước</button>
+          <strong>Trang {page} / {totalPages}</strong>
+          <button className="secondary compact-button" type="button" disabled={page >= totalPages || query.isFetching || hasPending} onClick={() => setPage((current) => current + 1)}>Sau</button>
+        </div>
+        <small className="tmdb-attribution">Dữ liệu và hình ảnh phim cung cấp bởi TMDB. CineBook không được TMDB chứng nhận hoặc xác thực.</small>
       </div>
     </Modal>
   );
@@ -849,11 +883,6 @@ export function AdminMoviesPage() {
     }
   }
 
-  function handleTmdbImported() {
-    setTmdbOpen(false);
-    void queryClient.invalidateQueries({ queryKey: ["admin-movies"] });
-  }
-
   function askArchive(movie: Movie) {
     setConfirm({
       title: "Lưu trữ phim?",
@@ -975,12 +1004,7 @@ export function AdminMoviesPage() {
           </table>
         </div>
       )}
-      {tmdbOpen && (
-        <TmdbMovieModal
-          onClose={() => setTmdbOpen(false)}
-          onImported={handleTmdbImported}
-        />
-      )}
+      {tmdbOpen && <TmdbMovieModal onClose={() => setTmdbOpen(false)} />}
       {modal && (
         <MovieForm
           mode={modal.mode}

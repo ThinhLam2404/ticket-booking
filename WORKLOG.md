@@ -90,17 +90,19 @@
 - ĐÃ LÀM: Integration coverage hai bulk request đồng thời; một request commit, request còn lại nhận `409 SHOWTIME_OVERLAP`.
 - ĐÃ LÀM: Browser verification admin bulk desktop/mobile cho free slots, conflict preview và modal không tràn ngang.
 
-### Sprint 3 — TMDB import nhiều phim và trailer
+### Sprint 3 — TMDB import nhiều phim và trailer (ĐÃ HOÀN TẤT)
 
-- Sau import patch/invalidate toàn bộ cache `tmdb-movies`; row đổi ngay thành `Đã nhập`.
-- Pending state theo từng `tmdbId`, không khóa/đổi text toàn bộ danh sách.
-- Giữ modal mở sau import để nhập tiếp nhiều phim.
-- Thêm pagination, checkbox, chọn nhiều phim và bounded queue concurrency 2–3.
-- Bulk import tối đa khoảng 20 phim, partial success, retry riêng item thất bại.
-- Đồng bộ trailer TMDB theo thứ tự `vi-VN -> en-US`, ưu tiên official trailer rồi trailer/teaser.
-- Cho phép resync movie đã import để cập nhật trailer mới.
-- Trailer modal có loading, lỗi phát, và link mở trực tiếp trên YouTube.
-- Thêm tests cache synchronization, bulk partial failure và trailer fallback.
+- ĐÃ LÀM: Tạo Stitch reference desktop `989cd32409cb42ff9f480572762407ba` và mobile `396a64b32fae4fe48574a6779ca1b88e` theo CineNoir Violet; Inspo study dùng hướng component-playground/dark technical.
+- ĐÃ LÀM: Sau import patch mọi cache có prefix `tmdb-movies`; row đổi ngay thành `Đã nhập`, sau đó invalidate catalog.
+- ĐÃ LÀM: Pending state theo từng `tmdbId`, modal giữ mở sau import và chặn đóng khi queue còn chạy.
+- ĐÃ LÀM: Pagination tối đa 20 trang, checkbox chọn xuyên trang, giới hạn chính xác 20 phim mỗi batch.
+- ĐÃ LÀM: Bounded queue concurrency chính xác 3, partial success và retry riêng item lỗi.
+- ĐÃ LÀM: TMDB detail lấy tiếng Việt trước; nếu chưa có video phù hợp mới fallback video tiếng Anh; ưu tiên ngôn ngữ rồi official Trailer, Trailer, Teaser.
+- ĐÃ LÀM: `PUT /movies/admin/tmdb/:tmdbId/resync` chỉ cập nhật poster/backdrop/trailer có giá trị mới, giữ nguyên trường biên tập và status.
+- ĐÃ LÀM: Trailer modal có loading, timeout/error, retry remount và link mở trực tiếp trên YouTube.
+- ĐÃ LÀM: Thêm Vitest helper coverage cho concurrency, partial failure, giới hạn 20 và cache synchronization.
+- ĐÃ LÀM: Full verification — lint, typecheck, build, 56 backend unit, 3 frontend helper tests, 6 e2e, 13 integration, API check và diff check đều pass.
+- ĐÃ LÀM: Browser kiểm tra modal ở viewport 375px; layout search/bulk/row/pagination không tràn ngang. Flow API live cần đăng nhập lại Admin vì phiên browser hiện trả `401`.
 
 ### Sprint 4 — UX polish, browser verification và vận hành
 
@@ -157,3 +159,42 @@
 - Endpoint admin mới `GET /showtimes/rooms/:roomId/free-slots` gợi ý khung trống trong `[08:00 → 23:00]` sau khi trừ suất bận và turnaround hai đầu; UI bulk modal và form lẻ có nút xem khung trống, chip khung trống và hint cảnh báo ngoài giờ.
 - Cố định giờ VN trong unit/integration spec bulk (`10:00 VN`) để không flaky theo giờ chạy; thêm 7 unit test mới (giờ vận hành, conflicts, free slots).
 - Đồng bộ README, OpenAPI và generated frontend types.
+
+## 2026-09-22 — Ghi chú tiếp tục plan redesign FE light/dark
+
+- Mục tiêu tiếp theo: làm UI CineBook bắt mắt hơn và hỗ trợ chuyển giữa `light` / `dark` mode.
+- Hướng reference đã chọn: Admin theo Elastic Cloud + Highlight Explore + Hex; User theo Standard Hotels + M+ Museum. Admin ưu tiên dashboard/table/filter rõ ràng; User ưu tiên cinematic/editorial, hình ảnh lớn, catalogue và CTA đặt vé rõ.
+- Đã dùng Inspo để khảo sát các reference: `elastic-co--cloud`, `highlight-xyz--explore-trending`, `hex-tech`, `standardhotels-com`, `mplus-org-hk`, `palaisdetokyo-com--tarifs`.
+- Khi tiếp tục: hoàn thiện plan full FE redesign trước, sau đó cập nhật `DESIGN.md` để mô tả semantic tokens hai theme, layout Admin/User, typography, surface, contrast, responsive và theme switch.
+- Sau khi cập nhật design direction: tạo/cập nhật Stitch screens trong project `5412677534890310186` cho customer home/catalog, movie detail/booking, admin dashboard/list và light/dark + mobile variants; ghi screen IDs vào worklog.
+- Sau Stitch mới bắt đầu sửa FE theo phase: theme runtime/persistence + pre-paint bootstrap; semantic CSS tokens; shared primitives/dialogs; customer/admin shells; customer screens; admin screens; booking/checkout sau cùng.
+- Theme preference dự kiến lưu `system | light | dark` ở `localStorage` key `ticket_booking_theme`; áp dụng `data-theme` lên `html`, hỗ trợ `prefers-color-scheme`, `color-scheme`, `theme-color`, cross-tab sync và không flash sai theme.
+- Scope redesign ban đầu chỉ đổi visual/theme/accessibility; không đổi API, query key, booking timing, seat rules, payment polling hoặc route paths.
+- Cần kiểm tra browser các viewport `320`, `390`, `720`, `721`, `1024`, `1280`, `1440` ở cả hai theme; giữ loading/error/empty/disabled/focus, seat map, QR và ticket print.
+- ĐÃ LÀM: Chốt direction Cobalt điện, Space Grotesk + Inter, mặc định theo hệ thống.
+- ĐÃ LÀM: Cập nhật `DESIGN.md` và `AGENTS.md` sang CineBook Cobalt Editorial với semantic light/dark tokens, customer/admin layout rules và theme runtime contract.
+- ĐÃ LÀM: Bắt đầu FE theme foundation: pre-paint bootstrap, `ThemeProvider`, preference `system/light/dark`, localStorage/cross-tab/system sync, `data-theme`, `color-scheme`, `theme-color`, theme selector ở customer/admin/admin login, font variable dependencies.
+- ĐÃ LÀM: Tạo lớp `cobalt-editorial.css` cho customer/admin shell, hero, catalogue cards, panels, tables và mobile hierarchy; không đổi JSX/API/booking behavior.
+- ĐÃ LÀM: Auth modal dùng shared focus trap, Escape, scroll lock và focus restoration; theme selector có ở customer desktop/mobile, admin sidebar/mobile header và admin login.
+- ĐÃ LÀM: FE verification sau redesign foundation — lint, typecheck, 6 frontend tests, build và diff check đều pass.
+- ĐÃ LÀM: Stitch MCP đã hoạt động trở lại; tạo design system mới `assets/16369739445538399432` với tên CineBook Cobalt Editorial, Space Grotesk + Inter, light/dark semantic tokens và hướng customer/admin riêng.
+- ĐÃ LÀM: Tạo Stitch canonical desktop Admin Dashboard Cobalt Editorial `f48e9fba552a4c76a6fb5ad08d81c912`, gồm sidebar ổn định, metrics, chart, lịch chiếu và bảng giao dịch.
+- ĐÃ GHI NHẬN: Yêu cầu tạo Stitch customer Home/Catalogue đã timeout hai lần và chưa xuất hiện screen; không giả lập ID. Các screen customer cũ vẫn là `93da427d5e094571bc9fbfc8549663da` (desktop tone tím) và `2320f094c2d6490dab49c90ef7e70edd` (mobile).
+- ĐÃ LÀM: Bắt đầu migrate customer Home/Catalogue theo Stitch Cobalt Editorial; dùng desktop `70ec68912dc24a2abbfa1173ba8a160c` và mobile `2320f094c2d6490dab49c90ef7e70edd`, chuyển composition hero/quick booking/catalogue/promotion sang React + plain CSS với dữ liệu API thật, thay customer theme select bằng direct `ThemeSwitch`.
+- ĐÃ LÀM: Browser kiểm tra Home desktop `1440px` và mobile `390px`; xác nhận hero/quick booking, dark toggle, localStorage và không còn overflow header mobile.
+- ĐÃ LÀM: Migrate CinemaPage theo Stitch desktop `b865a8655e9f40a1ab3d55eff47abd26` và mobile `85b8f29177844aff9fbd3287790b936b`; chuyển sang hero/stats, directory search, responsive cinema cards, price summary và CTA bằng React + plain CSS, chỉ dùng dữ liệu cinema/roomCount thật.
+- ĐÃ LÀM: Browser kiểm tra Cinema desktop `1440px` và mobile `390px`; card mobile chuyển thành một cột, desktop dùng grid responsive, không còn overflow. Lỗi console khi kiểm tra là API backend chưa chạy (`ERR_CONNECTION_REFUSED`), không phải lỗi build/runtime frontend.
+- ĐÃ LÀM: Tạo Stitch canonical desktop Movie Detail Cobalt Editorial `d7d4e1bc57374b40933e7d471272ab12` bằng design system `assets/16369739445538399432`, đọc HTML reference và migrate `MoviePage` theo poster/info/showtime directory composition bằng React + plain CSS.
+- ĐÃ LÀM: Movie Detail chỉ hiển thị dữ liệu có thật từ API/fallback (poster, backdrop, title, description, duration, status, showtime count, cinema/room); không giữ đạo diễn, diễn viên, ngày phát hành, review hoặc số ghế demo không có trong contract. Giữ nguyên trailer modal, filters, date selection và link chọn ghế.
+- ĐÃ LÀM: Browser kiểm tra Movie Detail desktop `1440px` và mobile `390px`; hero/poster/showtime toolbar xếp đúng và không overflow. Lỗi console là API backend chưa chạy (`ERR_CONNECTION_REFUSED`). FE lint, typecheck và build pass sau batch.
+- ĐÃ LÀM: Dùng Checkout SePay Cobalt desktop `1770a4bffa004d9ab0a92ddb9138d181`; job tạo Seats desktop bị timeout và không xuất hiện, không retry tạo trùng, dùng mobile seat reference hiện có `46f906538e2a41aea242298d064ee68c` để đối chiếu cấu trúc.
+- ĐÃ LÀM: Migrate visual Seats/Checkout bằng `BookingSteps`, token Cobalt, seat map/legend/summary, countdown/pending/expired/success/error states và SePay QR card; giữ nguyên Couple pair, tối đa 10 ghế, hold/cancel guard, QR copy, payment polling và route/API behavior.
+- ĐÃ LÀM: FE lint, typecheck, build pass; browser kiểm tra route seat error state mobile `390px`, không overflow. Console là API backend chưa chạy (`ERR_CONNECTION_REFUSED`).
+- ĐÃ LÀM: Đối chiếu Stitch Admin Dashboard Cobalt desktop `f48e9fba552a4c76a6fb5ad08d81c912` và mobile `df37f134bf4640878c4d52a7aaa5ae37`; migrate `AdminDashboardPage` theo sidebar/dashboard operations composition.
+- ĐÃ LÀM: Dashboard dùng dữ liệu thật phim/rạp/suất chiếu; metric cards, recent operations rows, status `Đang diễn ra/Sắp diễn ra/Đã lên lịch`, quick actions và responsive admin CSS. Không thêm doanh thu, chart, tỷ lệ lấp đầy, uptime hoặc số ghế demo vì API hiện chưa cung cấp.
+- ĐÃ LÀM: FE lint, typecheck, build pass; browser kiểm tra admin redirect/login mobile `390px`, không overflow. Console chỉ là locations API chưa chạy.
+- ĐÃ GHI NHẬN: Job tạo Stitch Account/Ticket Cobalt desktop bị timeout và không xuất hiện screen, không retry tạo trùng.
+- ĐÃ LÀM: Polish `BookingsPage`, `TicketsPage`, `TicketPage` theo Cobalt account/ticket hierarchy bằng primitives hiện có: index/filter/search, booking/ticket cards, QR check-in stub, ticket detail split layout, print/check-in actions và mobile stacking; giữ nguyên query, cancel, QR và route behavior.
+- ĐÃ LÀM: Hoàn thiện visual layer Cobalt cho Admin management Movies/TMDB, Cinemas/Rooms/Seats, Showtimes/bulk scheduling và Payments bằng plain CSS: bảng density cao, filter/toolbars, card cụm rạp, room/seat map, TMDB queue, free-slot/bulk preview, SePay tabs và responsive mobile; giữ nguyên API, mutation, modal và mọi loading/error/empty/pending state.
+- ĐÃ LÀM: Admin management lint, typecheck, build, FE tests và diff check pass; browser login desktop `1440px`/mobile `390px` không overflow. Live route checks bị chặn do chưa có Admin session và backend `localhost:3000` chưa chạy (`ERR_CONNECTION_REFUSED`).
+- CÒN LẠI: Browser verification live các route Admin sau khi bật backend/đăng nhập; integration test full stack nếu cần; review screenshot/state references còn thiếu.

@@ -208,6 +208,8 @@ Root điều phối cả hai ứng dụng bằng `package.json`; dependency và 
 
 Frontend là React SPA được build và serve bởi Vite. `fe/src/api.ts` là HTTP client dùng Fetch API, tự gắn Bearer access token, thử refresh một lần khi nhận `401`, hủy các query đọc dữ liệu cũ bằng `AbortSignal` khi điều hướng, filter hoặc location đổi liên tục, rồi xóa session nếu refresh thất bại. Access token, refresh token và user hiện tại được giữ trong `sessionStorage`.
 
+Frontend theme dùng `system | light | dark`, lưu preference ở localStorage key `ticket_booking_theme`, áp dụng `data-theme` trên `<html>`, theo dõi `prefers-color-scheme` và cập nhật `theme-color`. Design direction là CineBook Cobalt Editorial với Space Grotesk cho display và Inter cho body/data; semantic tokens được định nghĩa trong `DESIGN.md` và `fe/src/App.css`.
+
 Admin UI có modal nhập phim từ TMDB trong màn quản lý phim. Modal gọi API backend, không gọi TMDB trực tiếp và không biết `TMDB_ACCESS_TOKEN`.
 
 Customer UI hiện có:
@@ -1271,6 +1273,7 @@ sequenceDiagram
 
 - Backend gọi TMDB v3 với Bearer `TMDB_ACCESS_TOKEN`, `language=vi-VN`, `region=VN`, `include_adult=false`.
 - Khi lỗi transport tạm thời với `vi-VN`, client thử lại với `language=en-US`.
+- Khi lấy detail phim, API chỉ gọi detail video `en-US` nếu detail `vi-VN` không có video YouTube phù hợp; metadata tiếng Việt vẫn được giữ lại.
 - Response được chuẩn hóa, không trả raw TMDB:
 
 ```json
@@ -1343,6 +1346,15 @@ sequenceDiagram
 
 - Phim mới nhập chưa xuất hiện trên public catalog. Admin phải cập nhật `status` thành `PUBLISHED`, sau đó tạo showtime thì customer mới có thể đặt vé.
 - Errors: `400`, `401`, `403`, `404` TMDB movie không tồn tại, `409` conflict, `502/504` TMDB connection, `503` cấu hình/rate limit.
+
+#### `PUT /api/v1/movies/admin/tmdb/:tmdbId/resync`
+
+- Auth: Bearer JWT, role `ADMIN`; không có request body.
+- Chỉ dành cho movie nội bộ đã tồn tại theo `Movie.tmdbId`.
+- Lấy media/trailer mới từ TMDB và chỉ cập nhật các giá trị có sẵn: `posterUrl`, `backdropUrl`, `trailerKey`.
+- Nếu TMDB thiếu poster, backdrop hoặc trailer phù hợp, giá trị hiện tại không bị xóa.
+- Không thay đổi `title`, `description`, `duration`, `status` hoặc `tmdbId` đã biên tập trong CineBook.
+- Response là `MovieResponseDto`; lỗi gồm `400`, `401`, `403`, `404`, `502`, `503`, `504`.
 
 ### 8.7. Cinemas API
 
@@ -1872,12 +1884,22 @@ sequenceDiagram
         DB-->>API: Movie hiện tại
         API-->>A: imported=false
     else Chưa import
-        API->>T: GET /3/movie/:tmdbId
-        T-->>API: Movie detail/runtime
+        API->>T: GET /3/movie/:tmdbId?language=vi-VN
+        alt Không có trailer phù hợp
+            API->>T: GET /3/movie/:tmdbId?language=en-US (video fallback)
+        end
+        T-->>API: Movie detail/runtime/media
         API->>DB: Tạo Movie với status DRAFT
         DB-->>API: Movie nội bộ
         API-->>A: imported=true
     end
+
+    A->>API: PUT /movies/admin/tmdb/:tmdbId/resync
+    API->>DB: Tìm Movie.tmdbId
+    API->>T: Lấy media/trailer mới
+    API->>DB: Chỉ cập nhật poster/backdrop/trailer có giá trị
+    DB-->>API: Movie giữ nguyên trường biên tập
+    API-->>A: MovieResponseDto
 
     A->>API: PATCH /movies/:id với status=PUBLISHED
     A->>API: POST /showtimes
@@ -1886,12 +1908,14 @@ sequenceDiagram
 
 Quy tắc của flow:
 
-- Chỉ Admin có JWT hợp lệ mới được gọi hai endpoint TMDB.
+- Chỉ Admin có JWT hợp lệ mới được gọi ba endpoint TMDB.
 - API key/token TMDB chỉ được backend sử dụng; frontend không gọi TMDB trực tiếp.
 - Search/list TMDB không ghi database.
 - Import lấy detail TMDB để lấy `runtime`; duration thiếu thì dùng `120` phút.
 - Import không tự publish và không tự tạo cinema, room, seat hoặc showtime.
+- Modal Admin hỗ trợ phân trang tối đa 20 trang, chọn xuyên trang tối đa 20 phim, queue concurrency 3, partial success và retry riêng item lỗi; modal không đóng sau import.
 - `Movie.tmdbId` unique giúp thao tác import lặp lại an toàn.
+- Resync chỉ cập nhật media/trailer có giá trị mới và không xóa media hiện tại khi TMDB thiếu dữ liệu.
 - Public `GET /movies` và `GET /movies/:id` chỉ dùng movie nội bộ `PUBLISHED`.
 - Không được dùng trực tiếp TMDB ID làm `movieId` trong showtime hoặc booking.
 
@@ -2193,6 +2217,12 @@ Integration test với PostgreSQL/Redis thật:
 - Booking expiry/cancel giải phóng seat và cập nhật intent.
 - TMDB response normalization và đánh dấu movie đã import.
 - TMDB import lặp lại không tạo movie duplicate.
+- TMDB detail ưu tiên video tiếng Việt, fallback video tiếng Anh khi thiếu candidate phù hợp.
+- TMDB resync chỉ cập nhật media/trailer có giá trị và giữ nguyên trường biên tập.
+
+Frontend test:
+
+- `npm run test:fe` chạy Vitest cho bounded queue concurrency 3, partial failure, giới hạn 20 và patch toàn bộ cache `tmdb-movies`.
 
 Test chưa có trong Sprint 1:
 

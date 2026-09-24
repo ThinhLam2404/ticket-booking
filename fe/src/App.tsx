@@ -3,6 +3,7 @@ import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext';
 import { LocationProvider } from './auth/LocationContext';
 import { AdminLayout, Layout, RequireAdmin, RequireAuth } from './components/ui';
+import { ThemeProvider } from './theme/ThemeContext';
 import { BookingPage, SeatsPage } from './pages/BookingPages';
 import { BookingsPage, TicketPage, TicketsPage } from './pages/AccountPages';
 import { CinemaPage, HomePage, MoviePage } from './pages/CatalogPages';
@@ -10,6 +11,7 @@ import { AdminCinemasPage, AdminDashboardPage, AdminLoginPage,   AdminMoviesPage
   AdminPaymentsPage,
   AdminRoomsPage, AdminSeatsPage, AdminShowtimesPage } from './pages/AdminPages';
 import './App.css';
+import './cobalt-editorial.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,11 +65,13 @@ const router = createBrowserRouter([
 
 function App() {
   return <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <LocationProvider>
-        <RouterProvider router={router} />
-      </LocationProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <LocationProvider>
+          <RouterProvider router={router} />
+        </LocationProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </QueryClientProvider>;
 }
 

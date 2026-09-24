@@ -3,7 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#11100f" />
+    <meta name="theme-color" content="#08101f" />
+    <script>
+      (() => {
+        try {
+          const key = 'ticket_booking_theme';
+          const stored = localStorage.getItem(key);
+          const preference = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+          const theme = preference === 'system' ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : preference;
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', theme === 'light' ? '#f6f8fb' : '#08101f');
+        } catch {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
     <link rel="icon" href="/favicon.svg" />
     <title>CineBook — Movie Ticket Booking</title>
   </head>

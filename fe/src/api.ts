@@ -23,6 +23,7 @@ import type {
   TmdbMoviesQuery,
   TmdbMoviesResponse,
   TmdbMovieImportResponse,
+  TmdbMovieResyncResponse,
   CreateMovieRequest,
   UpdateMovieRequest,
   MovieMutationResponse,
@@ -231,6 +232,9 @@ export const api = {
   },
   importTmdbMovie(tmdbId: number) {
     return request<TmdbMovieImportResponse>(`/movies/admin/tmdb/${tmdbId}/import`, { method: 'PUT' });
+  },
+  resyncTmdbMovie(tmdbId: number) {
+    return request<TmdbMovieResyncResponse>(`/movies/admin/tmdb/${tmdbId}/resync`, { method: 'PUT' });
   },
   createMovie(body: CreateMovieRequest) {
     return request<MovieMutationResponse>('/movies', { method: 'POST', body: JSON.stringify(body) });

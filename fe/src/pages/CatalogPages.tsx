@@ -43,21 +43,28 @@ function MovieCard({ movie, showtimes = [] }: { movie: Movie; showtimes?: Showti
 
 function CinemaCard({ cinema, index }: { cinema: Cinema; index: number }) {
   return <article className="cinema-card">
-    <div className={`cinema-card-art cinema-art-${index % 3}`}><span className="cinema-art-letter">{cinema.name.slice(0, 1)}</span><div><span className="format-chip">LASER 4K</span><span className="format-chip">DOLBY ATMOS</span></div></div>
+    <div className={`cinema-card-art cinema-art-${index % 3}`}>
+      <div className="cinema-art-mark" aria-hidden="true">{initials(cinema.name)}</div>
+      <div className="cinema-art-badges"><span className="format-chip">LASER 4K</span><span className="format-chip">DOLBY ATMOS</span></div>
+      <span className="cinema-room-count">{cinema.roomCount ?? 0} phòng chiếu</span>
+    </div>
     <div className="cinema-card-body">
-      <div className="cinema-card-heading"><div><p className="eyebrow">CINEBOOK NETWORK</p><h2>{cinema.name}</h2></div><span className="rating-badge">4.8</span></div>
-      <p className="cinema-address">⌖ {cinema.address}</p>
-      <div className="cinema-meta"><span>{cinema.roomCount ?? 0} phòng chiếu</span><span>08:00 – 23:30</span></div>
+      <div className="cinema-card-heading"><div><p className="eyebrow">CINEBOOK NETWORK</p><h2>{cinema.name}</h2></div><span className="cinema-open-status"><span aria-hidden="true" /> Đang mở cửa</span></div>
+      <p className="cinema-address"><span aria-hidden="true">⌖</span><span>{cinema.address}</span></p>
+      <div className="cinema-meta"><span>⌂ {cinema.roomCount ?? 0} phòng chiếu</span><span>◷ 08:00 – 23:00</span></div>
       <div className="price-list"><div><span>2D tiêu chuẩn</span><strong>{cinemaPriceLabel(0)}</strong></div><div><span>3D kỹ thuật số</span><strong>{cinemaPriceLabel(1)}</strong></div><div><span>IMAX Laser</span><strong>{cinemaPriceLabel(2)}</strong></div></div>
-      <div className="cinema-actions"><button className="secondary" type="button">Chỉ đường</button><Link className="primary" to={`/?cinemaId=${cinema.id}`}>Xem lịch chiếu</Link></div>
+      <div className="cinema-actions"><button className="secondary" type="button">Chỉ đường</button><Link className="primary" to={`/?cinemaId=${encodeURIComponent(cinema.id)}#quick-booking`}>Xem lịch chiếu</Link></div>
     </div>
   </article>;
 }
 
 function PromotionSection() {
   return <section className="promotion-section">
-    <div className="section-heading"><div><p className="eyebrow">CINECLUB</p><h2>Ưu đãi & thành viên</h2></div><a href="#">Xem tất cả ưu đãi →</a></div>
-    <div className="promotion-grid"><article className="promotion-card promotion-large"><span className="promotion-tag">ĐẶC QUYỀN HỌC SINH - SINH VIÊN</span><h3>Đồng giá vé chỉ từ 45.000đ</h3><p>Áp dụng từ thứ 2 đến thứ 6 khi xuất trình thẻ học sinh, sinh viên hoặc xác thực tài khoản CineClub.</p><button className="primary" type="button">Nhận ưu đãi ngay</button><strong className="promotion-price">45K</strong></article><article className="promotion-card"><span className="promotion-tag">CINEHAPPY TUESDAY</span><h3>Thứ Ba Vui Vẻ</h3><p>Vé chỉ 50K cho mọi định dạng ghế tiêu chuẩn và tặng bắp ngọt khi mua combo đôi.</p><strong className="promotion-total">50.000 VNĐ</strong></article></div>
+    <article className="promotion-banner">
+      <div className="promotion-banner-icon" aria-hidden="true">▣</div>
+      <div className="promotion-banner-copy"><span className="promotion-tag">CHƯƠNG TRÌNH ĐẶC BIỆT</span><h2>Thứ Ba Vui Vẻ – đồng giá vé 45.000đ toàn hệ thống</h2><p>Áp dụng cho tất cả định dạng 2D tiêu chuẩn tại mọi cụm rạp CineBook trên toàn quốc.</p></div>
+      <button className="secondary" type="button">Xem chi tiết <span>→</span></button>
+    </article>
   </section>;
 }
 
@@ -109,11 +116,32 @@ export function CinemaPage() {
   const displayCinemas = query.isError && selectedProvinceCode === 79 ? fallbackCinemas : cinemas;
   const filteredCinemas = displayCinemas.filter((cinema) => `${cinema.name} ${cinema.address}`.toLowerCase().includes(search.toLowerCase()));
 
-  return <section className="cinemas-page"><div className="cinemas-hero"><PageHeader eyebrow="CINEBOOK NETWORK" title="Rạp & Giá Vé"><span className="network-count">{displayCinemas.length} cụm rạp</span></PageHeader><p>Chọn không gian phù hợp cho buổi chiếu tiếp theo tại <strong>{selectedProvince?.name ?? 'TP. Hồ Chí Minh'}</strong>. Từ phòng chiếu tiêu chuẩn đến trải nghiệm IMAX Laser.</p><div className="cinema-page-location"><LocationPicker /><span>Đang hiển thị rạp trong khu vực đã chọn</span></div><label className="cinema-search"><span className="sr-only">Tìm rạp</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo tên rạp hoặc địa chỉ…" /></label></div>{query.isPending && <LoadingState label="Đang tải danh sách rạp…" />}{query.isError && <ErrorState cause={query.error} fallback="Không thể tải danh sách rạp." onRetry={() => void query.refetch()} />}{query.isSuccess && !filteredCinemas.length && <EmptyState>Không tìm thấy rạp phù hợp tại khu vực này.</EmptyState>}{filteredCinemas.length > 0 && <div className="cinema-grid">{filteredCinemas.map((cinema, index) => <CinemaCard key={cinema.id} cinema={cinema} index={index} />)}</div>}</section>;
+  const totalRooms = displayCinemas.reduce((total, cinema) => total + (cinema.roomCount ?? 0), 0);
+
+  return <section className="cinemas-page">
+    <section className="cinemas-hero">
+      <div className="cinemas-hero-inner">
+        <div className="cinemas-hero-status"><span className="status-dot" /> HỆ THỐNG RẠP TOÀN QUỐC <span>•</span> {displayCinemas.length} cụm rạp đang hiển thị</div>
+        <PageHeader eyebrow="CINEBOOK NETWORK" title="Rạp & Giá Vé" />
+        <p>Không gian điện ảnh chuẩn quốc tế với phòng chiếu Laser 4K, IMAX và hệ thống âm thanh vòm Dolby Atmos tại <strong>{selectedProvince?.name ?? 'TP. Hồ Chí Minh'}</strong>.</p>
+        <div className="cinema-hero-stats"><div><strong>{displayCinemas.length}</strong><span>Cụm rạp</span></div><div><strong>{totalRooms || '—'}</strong><span>Phòng chiếu</span></div><div><strong>08:00–23:00</strong><span>Giờ vận hành</span></div></div>
+      </div>
+    </section>
+    <section className="cinema-directory" id="cum-rap">
+      <div className="cinema-directory-toolbar"><div><p className="eyebrow">MẠNG LƯỚI CHIẾU PHIM HIỆN ĐẠI</p><h2>Khám phá cụm rạp gần bạn</h2></div><LocationPicker /></div>
+      <label className="cinema-search"><span className="sr-only">Tìm rạp</span><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo tên rạp, đường hoặc quận…" /></label>
+      <p className="cinema-directory-note">Đang lọc tại <strong>{selectedProvince?.name ?? 'TP. Hồ Chí Minh'}</strong>. Chọn rạp để xem lịch chiếu và giá vé.</p>
+      {query.isPending && <LoadingState label="Đang tải danh sách rạp…" />}{query.isError && <ErrorState cause={query.error} fallback="Không thể tải danh sách rạp." onRetry={() => void query.refetch()} />}{query.isSuccess && !filteredCinemas.length && <EmptyState>Không tìm thấy rạp phù hợp tại khu vực này.</EmptyState>}{filteredCinemas.length > 0 && <div className="cinema-grid">{filteredCinemas.map((cinema, index) => <CinemaCard key={cinema.id} cinema={cinema} index={index} />)}</div>}
+    </section>
+  </section>;
 }
 
 function showtimeGroups(movie: MovieDetails, cinemaId: string, date: string) {
-  return movie.showtimes.filter((showtime) => (!cinemaId || showtime.room.cinemaId === cinemaId) && (!date || showtime.startsAt.startsWith(date))).reduce<Record<string, typeof movie.showtimes>>((groups, showtime) => { const day = new Date(showtime.startsAt).toISOString().slice(0, 10); groups[day] = [...(groups[day] ?? []), showtime]; return groups; }, {});
+  return movie.showtimes.filter((showtime) => (!cinemaId || showtime.room.cinemaId === cinemaId) && (!date || showtime.startsAt.startsWith(date))).reduce<Record<string, typeof movie.showtimes>>((groups, showtime) => {
+    const cinemaName = showtime.room.cinema?.name ?? 'Cụm rạp CineBook';
+    groups[cinemaName] = [...(groups[cinemaName] ?? []), showtime];
+    return groups;
+  }, {});
 }
 
 export function MoviePage() {
@@ -139,5 +167,32 @@ export function MoviePage() {
   const dates = [...new Set(movie.showtimes.map((showtime) => new Date(showtime.startsAt).toISOString().slice(0, 10)))];
   const groups = showtimeGroups(movie, cinemaId, date);
 
-  return <><div className="breadcrumb"><Link to="/">Trang chủ</Link><span>›</span><span>Phim</span><span>›</span><strong>{movie.title}</strong></div><section className="movie-detail-hero" style={backdropStyle(movie.title, movie.backdropUrl) as CSSProperties}><div className="detail-hero-shade" /><div className="movie-detail-grid"><div><div className="detail-poster-wrap"><Poster title={movie.title} posterUrl={movie.posterUrl} className="detail-poster" /><div className="movie-badges"><span className="age-badge">{visual.age}</span><span className="format-badge">{visual.format}</span></div><span className="rating-badge poster-rating">★ {visual.rating} /10</span></div><div className="poster-meta">◉ Trailer chính thức <button type="button">↗ Chia sẻ phim</button></div></div><div className="detail-copy"><div className="metadata-row"><span>{visual.age} - Khán giả trên 18 tuổi</span><span>{visual.genre.split(', ')[0]}</span><span>{visual.genre.split(', ')[1] ?? 'Phiêu lưu'}</span></div><p className="eyebrow">CHI TIẾT PHIM</p><h1 className="page-title">{movie.title}</h1><p className="original-title">CineBook Cinema • 2026</p><div className="detail-meta-grid"><div><small>Thời lượng</small><strong>◷ {movie.duration} phút</strong></div><div><small>Khởi chiếu</small><strong>◫ 01/03/2024</strong></div><div><small>Quốc gia</small><strong>◎ Hoa Kỳ</strong></div><div><small>Ngôn ngữ</small><strong>▤ Phụ đề</strong></div></div><p className="detail-description">{movie.description || 'Một hành trình điện ảnh đang chờ bạn khám phá.'}</p><div className="detail-cast"><div><span>Đạo diễn:</span><strong>Denis Villeneuve</strong></div><div><span>Diễn viên:</span><strong>Timothée Chalamet, Zendaya, Rebecca Ferguson</strong></div></div><div className="hero-actions"><a className="primary" href="#showtimes">Đặt vé ngay <span>→</span></a><button className="secondary" type="button" disabled={!movie.trailerKey} onClick={() => setTrailerOpen(true)}>▷ {movie.trailerKey ? 'Xem trailer' : 'Chưa có trailer'}</button><button className="secondary" type="button">♡ Yêu thích</button></div></div></div></section><section className="showtimes-section" id="showtimes"><div className="section-heading"><div><p className="eyebrow">LỊCH CHIẾU</p><h2>Chọn suất chiếu & đặt vé</h2></div></div><div className="date-strip">{dates.map((value) => <button className={`date-chip ${date === value ? 'active' : ''}`} key={value} type="button" onClick={() => setDate(date === value ? '' : value)}><small>{formatDay(value).split(',')[0]}</small><strong>{new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</strong><span>{formatDay(value).split(',').slice(-1)[0]}</span></button>)}</div><div className="showtime-toolbar"><span>RẠP:</span><select value={cinemaId} onChange={(event) => setCinemaId(event.target.value)}><option value="">Tất cả cụm rạp</option>{(cinemasQuery.data ?? []).map((cinema) => <option key={cinema.id} value={cinema.id}>{cinema.name}</option>)}</select><div className="format-filters"><button className="filter-chip active" type="button">Tất cả định dạng</button><button className="filter-chip" type="button">2D phụ đề</button><button className="filter-chip" type="button">IMAX Laser</button></div></div>{!Object.keys(groups).length && <EmptyState>Phim chưa có suất chiếu phù hợp.</EmptyState>}<div className="showtime-days">{Object.entries(groups).map(([day, showtimes]) => <div className="showtime-day" key={day}><div className="showtime-day-heading"><div><h3>{movie.title}</h3><p>⌖ {showtimes[0]?.room?.cinema?.name ?? 'Rạp phim'} · {showtimes[0]?.room?.name ?? 'Phòng chiếu'}</p></div><a href="#">Bản đồ chỉ đường ↗</a></div><div className="showtime-list">{showtimes.map((showtime) => <Link key={showtime.id} className="showtime-card" to={`/showtimes/${showtime.id}/seats`}><strong>{formatTime(showtime.startsAt)}</strong><span>Đến {formatTime(showtime.endsAt)}</span><small>Còn ghế</small></Link>)}</div></div>)}</div></section>{trailerOpen && movie.trailerKey && <TrailerModal movieTitle={movie.title} trailerKey={movie.trailerKey} onClose={() => setTrailerOpen(false)} />}</>;
+  return <>
+    <div className="breadcrumb"><Link to="/">Trang chủ</Link><span>›</span><Link to="/#now-showing">Phim</Link><span>›</span><strong>{movie.title}</strong></div>
+    <section className="movie-detail-hero" style={backdropStyle(movie.title, movie.backdropUrl) as CSSProperties}>
+      <div className="detail-hero-shade" />
+      <div className="movie-detail-grid">
+        <div>
+          <div className="detail-poster-wrap"><Poster title={movie.title} posterUrl={movie.posterUrl} className="detail-poster" /><div className="movie-badges"><span className="age-badge">{visual.age}</span><span className="format-badge">{visual.format}</span></div></div>
+          <div className="poster-meta"><span>{movie.trailerKey ? 'Trailer chính thức' : 'Thông tin phim CineBook'}</span><button type="button">↗ Chia sẻ phim</button></div>
+        </div>
+        <div className="detail-copy">
+          <div className="metadata-row"><span>{visual.age}</span><span>{visual.genre.split(', ')[0]}</span><span>{visual.genre.split(', ')[1] ?? 'Điện ảnh'}</span><span>{movie.status === 'PUBLISHED' ? 'Đang chiếu' : 'Cập nhật'}</span></div>
+          <p className="eyebrow">CHI TIẾT PHIM</p><h1 className="page-title">{movie.title}</h1><p className="original-title">CineBook Cinema · {movie.showtimes.length} suất chiếu đang có</p>
+          <div className="detail-meta-grid"><div><small>Thời lượng</small><strong>◷ {movie.duration} phút</strong></div><div><small>Trạng thái</small><strong>{movie.status === 'PUBLISHED' ? 'Đang chiếu' : 'Chưa công chiếu'}</strong></div><div><small>Định dạng</small><strong>{visual.format}</strong></div><div><small>Suất chiếu</small><strong>{movie.showtimes.length} suất</strong></div></div>
+          <p className="detail-description">{movie.description || 'Một hành trình điện ảnh đang chờ bạn khám phá.'}</p>
+          <div className="detail-cast"><div><span>Phân loại:</span><strong>{visual.age} · {visual.genre}</strong></div><div><span>Hệ thống:</span><strong>CineBook · Chọn rạp và suất chiếu bên dưới</strong></div></div>
+          <div className="hero-actions"><a className="primary" href="#showtimes">Đặt vé ngay <span>→</span></a><button className="secondary" type="button" disabled={!movie.trailerKey} onClick={() => setTrailerOpen(true)}>▷ {movie.trailerKey ? 'Xem trailer' : 'Chưa có trailer'}</button></div>
+        </div>
+      </div>
+    </section>
+    <section className="showtimes-section" id="showtimes">
+      <div className="section-heading"><div><p className="eyebrow">SUẤT CHIẾU THEO NGÀY</p><h2>Lịch chiếu & đặt vé</h2><p>Chọn ngày, cụm rạp và giờ chiếu phù hợp để tiếp tục chọn ghế.</p></div><span className="showtime-info">◷ Giờ hiển thị theo GMT+7</span></div>
+      <label className="showtime-filter-label">1. Chọn ngày chiếu</label><div className="date-strip">{dates.length ? dates.map((value, index) => <button className={`date-chip ${date === value || (!date && index === 0) ? 'active' : ''}`} key={value} type="button" onClick={() => setDate(date === value ? '' : value)}><small>{index === 0 ? 'Ngày gần nhất' : formatDay(value).split(',')[0]}</small><strong>{new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</strong><span>{formatDay(value).split(',').slice(-1)[0]}</span></button>) : <EmptyState>Chưa có ngày chiếu.</EmptyState>}</div>
+      <div className="showtime-toolbar"><label><span>Chọn cụm rạp</span><select value={cinemaId} onChange={(event) => setCinemaId(event.target.value)}><option value="">Tất cả cụm rạp</option>{(cinemasQuery.data ?? []).map((cinema) => <option key={cinema.id} value={cinema.id}>{cinema.name}</option>)}</select></label><div className="format-filters"><span>Định dạng</span><button className="filter-chip active" type="button">Tất cả</button><button className="filter-chip" type="button">{visual.format}</button></div></div>
+      {!Object.keys(groups).length && <EmptyState>Phim chưa có suất chiếu phù hợp. Vui lòng chọn ngày hoặc cụm rạp khác.</EmptyState>}
+      <div className="showtime-days">{Object.entries(groups).map(([cinemaName, showtimes]) => <div className="showtime-day" key={cinemaName}><div className="showtime-day-heading"><div><h3>{cinemaName}</h3><p>⌖ {showtimes[0]?.room?.name ?? 'Phòng chiếu'} · {showtimes.length} suất trong ngày đã chọn</p></div><span className="showtime-count">{showtimes.length} suất</span></div><div className="showtime-list">{showtimes.map((showtime) => <Link key={showtime.id} className="showtime-card" to={`/showtimes/${showtime.id}/seats`}><strong>{formatTime(showtime.startsAt)}</strong><span>Đến {formatTime(showtime.endsAt)}</span><small>{showtime.room?.name ?? 'Phòng chiếu'} · Chọn ghế →</small></Link>)}</div></div>)}</div>
+    </section>
+    {trailerOpen && movie.trailerKey && <TrailerModal movieTitle={movie.title} trailerKey={movie.trailerKey} onClose={() => setTrailerOpen(false)} />}
+  </>;
 }

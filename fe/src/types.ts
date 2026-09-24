@@ -56,6 +56,7 @@ export type AdminMoviesResponse = JsonResponse<'/api/v1/movies/admin', 'get'>;
 export type TmdbMoviesQuery = NonNullable<paths['/api/v1/movies/admin/tmdb']['get']['parameters']['query']>;
 export type TmdbMoviesResponse = JsonResponse<'/api/v1/movies/admin/tmdb', 'get'>;
 export type TmdbMovieImportResponse = JsonResponse<'/api/v1/movies/admin/tmdb/{tmdbId}/import', 'put'>;
+export type TmdbMovieResyncResponse = JsonResponse<'/api/v1/movies/admin/tmdb/{tmdbId}/resync', 'put'>;
 export type CreateMovieRequest = RequestBody<'/api/v1/movies', 'post'>;
 export type UpdateMovieRequest = RequestBody<'/api/v1/movies/{id}', 'patch'>;
 export type MovieMutationResponse = JsonResponse<'/api/v1/movies', 'post'>;

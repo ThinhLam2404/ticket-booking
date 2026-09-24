@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useLocationContext } from '../auth/LocationContext';
 import type { Province, User } from '../types';
 import { errorMessage, statusLabel } from '../utils/format';
+import { ThemeSwitch } from './ThemeToggle';
 
 export function LoadingState({ label = 'Đang tải…' }: { label?: string }) {
   return <div className="state-card loading-state" role="status"><span className="spinner" />{label}</div>;
@@ -27,7 +28,7 @@ function provinceShortName(name?: string) {
   return name?.replace(/^Thành phố /, 'TP. ').replace(/^Tỉnh /, '') ?? 'Đang chọn';
 }
 
-function useDialogFocus(open: boolean, dialogRef: RefObject<HTMLElement | null>, onClose: () => void, initialFocusRef?: RefObject<HTMLElement | null>) {
+export function useDialogFocus(open: boolean, dialogRef: RefObject<HTMLElement | null>, onClose: () => void, initialFocusRef?: RefObject<HTMLElement | null>) {
   const closeRef = useRef(onClose);
   useEffect(() => {
     closeRef.current = onClose;
@@ -131,13 +132,27 @@ export function LocationPicker({ className = '' }: { className?: string }) {
 
 export function TrailerModal({ movieTitle, trailerKey, onClose }: { movieTitle: string; trailerKey: string; onClose: () => void }) {
   const dialogRef = useRef<HTMLElement>(null);
+  const [frameState, setFrameState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [attempt, setAttempt] = useState(0);
   useDialogFocus(true, dialogRef, onClose);
+
+  useEffect(() => {
+    setFrameState('loading');
+    const timeout = window.setTimeout(() => setFrameState((state) => state === 'loading' ? 'error' : state), 10000);
+    return () => window.clearTimeout(timeout);
+  }, [attempt, trailerKey]);
+
+  const directUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(trailerKey)}`;
 
   return <div className="trailer-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section ref={dialogRef} className="trailer-modal" role="dialog" aria-modal="true" aria-labelledby="trailer-modal-title" tabIndex={-1}>
       <div className="trailer-modal-heading"><div><p className="eyebrow">TRAILER CHÍNH THỨC</p><h2 id="trailer-modal-title">{movieTitle}</h2></div><button className="modal-close" type="button" aria-label="Đóng trailer" onClick={onClose}>×</button></div>
-      <div className="trailer-frame"><iframe title={`Trailer ${movieTitle}`} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerKey)}?autoplay=1&rel=0`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div>
-      <div className="trailer-modal-footer"><span>Nhấn ESC hoặc chọn đóng để quay lại trang phim.</span><button className="secondary compact-button" type="button" onClick={onClose}>Đóng</button></div>
+      <div className={`trailer-frame trailer-frame-${frameState}`}>
+        {frameState === 'loading' && <div className="trailer-frame-state" role="status"><span className="spinner" />Đang tải trailer…</div>}
+        {frameState === 'error' && <div className="trailer-frame-state trailer-frame-error" role="alert"><strong>Không thể phát trailer trong cửa sổ này.</strong><span>Thử lại hoặc mở trực tiếp trên YouTube.</span><button className="secondary compact-button" type="button" onClick={() => setAttempt((value) => value + 1)}>Thử lại</button></div>}
+        <iframe key={attempt} title={`Trailer ${movieTitle}`} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerKey)}?autoplay=1&rel=0`} onLoad={() => setFrameState('ready')} onError={() => setFrameState('error')} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+      </div>
+      <div className="trailer-modal-footer"><span>Nhấn ESC hoặc chọn đóng để quay lại trang phim.</span><div className="trailer-modal-actions"><a className="secondary compact-button" href={directUrl} target="_blank" rel="noopener noreferrer">Mở trên YouTube</a><button className="secondary compact-button" type="button" onClick={onClose}>Đóng</button></div></div>
     </section>
   </div>;
 }
@@ -191,6 +206,7 @@ export function Layout() {
         </nav>
         <div className="topbar-actions">
           <LocationPicker />
+          <span className="customer-header-theme"><ThemeSwitch compact /></span>
           <Link className="search-button" aria-label="Tìm kiếm phim" to="/#now-showing">⌕</Link>
           {user ? <div className="account-menu"><span className="account-avatar">{user.fullName.slice(0, 2).toUpperCase()}</span><span className="account-name">{user.fullName}</span><button className="ghost" disabled={loggingOut} onClick={() => void handleLogout()}>{loggingOut ? 'Đang thoát…' : 'Đăng xuất'}</button></div> : <button className="primary login-button" onClick={() => openAuth()}>Đăng nhập</button>}
         </div>
@@ -206,7 +222,7 @@ export function Layout() {
       </div>
       <div className="footer-bottom"><span>© 2026 CineBook Vietnam. All rights reserved.</span><span>Trải nghiệm điện ảnh trong tầm tay.</span></div><p className="tmdb-footer-attribution">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
     </footer>
-    <nav className="mobile-nav" aria-label="Điều hướng di động"><Link className={navClass(location.pathname, '/')} to="/"><span>⌂</span><small>Trang chủ</small></Link><Link className={navClass(location.pathname, '/#now-showing')} to="/#now-showing"><span>▣</span><small>Phim</small></Link><Link className={navClass(location.pathname, '/cinemas')} to="/cinemas"><span>▤</span><small>Rạp chiếu</small></Link>{user ? <Link className={navClass(location.pathname, '/tickets')} to="/tickets"><span>▱</span><small>Vé của tôi</small></Link> : <button onClick={() => openAuth()}><span>◉</span><small>Tài khoản</small></button>}</nav>
+    <nav className="mobile-nav" aria-label="Điều hướng di động"><Link className={navClass(location.pathname, '/')} to="/"><span>⌂</span><small>Trang chủ</small></Link><Link className={navClass(location.pathname, '/#now-showing')} to="/#now-showing"><span>▣</span><small>Phim</small></Link><Link className={navClass(location.pathname, '/cinemas')} to="/cinemas"><span>▤</span><small>Rạp chiếu</small></Link>{user ? <Link className={navClass(location.pathname, '/tickets')} to="/tickets"><span>▱</span><small>Vé của tôi</small></Link> : <button onClick={() => openAuth()}><span>◉</span><small>Tài khoản</small></button>}<ThemeSwitch compact /></nav>
     {authMode && <AuthModal mode={authMode} onClose={closeAuth} />}
   </div>;
 }
@@ -258,13 +274,15 @@ export function AdminLayout() {
         <Link className={navClass(location.pathname, '/admin/showtimes')} to="/admin/showtimes" onClick={closeSidebar}><span>◷</span><span>Suất chiếu</span></Link>
         <Link className={navClass(location.pathname, '/admin/payments')} to="/admin/payments" onClick={closeSidebar}><span>💳</span><span>Thanh toán</span></Link>
       </nav>
-      <div className="admin-sidebar-footer">
+       <div className="admin-sidebar-footer">
+         <ThemeSwitch />
+
         <div className="admin-operator"><span className="account-avatar">{user?.fullName.slice(0, 2).toUpperCase()}</span><div><strong>{user?.fullName}</strong><small>Quản trị viên</small></div></div>
         <button className="admin-logout" type="button" disabled={loggingOut} onClick={() => void handleLogout()}><span>↪</span>{loggingOut ? 'Đang thoát…' : 'Đăng xuất'}</button>
         <Link className="admin-back-link" to="/" onClick={closeSidebar}><span>←</span> Trang khách</Link>
       </div>
     </aside>
-    <div className="admin-main"><header className="admin-mobile-header"><button className="admin-menu-button" type="button" aria-label="Mở menu quản trị" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}>☰</button><Link className="brand" to="/"><span className="brand-mark">▰</span><span>Cine<span>Book</span></span></Link><span>CINEBOOK CONTROL</span></header><main><Outlet /></main></div>
+    <div className="admin-main"><header className="admin-mobile-header"><ThemeSwitch compact /><button className="admin-menu-button" type="button" aria-label="Mở menu quản trị" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}>☰</button><Link className="brand" to="/"><span className="brand-mark">▰</span><span>Cine<span>Book</span></span></Link><span>CINEBOOK CONTROL</span></header><main><Outlet /></main></div>
   </div>;
 }
 
@@ -276,16 +294,9 @@ export function AuthModal({ mode, onClose }: { mode: 'login' | 'register'; onClo
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [loading, setLoading] = useState(false);
+  const dialogRef = useRef<HTMLFormElement>(null);
   const firstInput = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    firstInput.current?.focus();
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  useDialogFocus(true, dialogRef, onClose, firstInput);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -303,7 +314,7 @@ export function AuthModal({ mode, onClose }: { mode: 'login' | 'register'; onClo
   }
 
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <form className="auth-modal" autoComplete="off" onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <form ref={dialogRef} className="auth-modal" autoComplete="off" onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="auth-title" tabIndex={-1}>
       <button type="button" className="modal-close" aria-label="Đóng" onClick={onClose}>×</button>
       <div className="auth-mark">▰</div><p className="eyebrow">CINEBOOK MEMBER</p><h2 id="auth-title">{registerMode ? 'Tạo tài khoản' : 'Chào mừng trở lại'}</h2><p className="auth-copy">Đăng nhập để tiếp tục chọn ghế và quản lý vé điện tử.</p>
       {registerMode && <label>Họ và tên<input ref={firstInput} required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Nguyễn Văn A" autoComplete="name" /></label>}

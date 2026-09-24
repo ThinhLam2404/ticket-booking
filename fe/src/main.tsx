@@ -1,4 +1,6 @@
 import type { FormEvent } from 'react';
+import '@fontsource-variable/inter/index.css';
+import '@fontsource-variable/space-grotesk/index.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
