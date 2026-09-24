@@ -61,7 +61,7 @@ export class MoviesController {
 
   @Get('admin/tmdb')
   @ApiResponse({ status: 200, type: PaginatedTmdbMoviesResponseDto })
-  @ApiErrorResponses(400, 401, 403, 503, 504)
+  @ApiErrorResponses(400, 401, 403, 502, 503, 504)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -71,12 +71,22 @@ export class MoviesController {
 
   @Put('admin/tmdb/:tmdbId/import')
   @ApiResponse({ status: 200, type: TmdbMovieImportResponseDto })
-  @ApiErrorResponses(400, 401, 403, 404, 409, 503, 504)
+  @ApiErrorResponses(400, 401, 403, 404, 409, 502, 503, 504)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   importTmdb(@Param('tmdbId', ParseIntPipe) tmdbId: number) {
     return this.moviesService.importTmdbMovie(tmdbId);
+  }
+
+  @Put('admin/tmdb/:tmdbId/resync')
+  @ApiResponse({ status: 200, type: MovieResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 502, 503, 504)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  resyncTmdb(@Param('tmdbId', ParseIntPipe) tmdbId: number) {
+    return this.moviesService.resyncTmdbMovie(tmdbId);
   }
 
   @Get(':id')

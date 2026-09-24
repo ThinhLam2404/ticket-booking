@@ -119,4 +119,81 @@ describe('MoviesService TMDB import', () => {
     expect(tmdb.movie).not.toHaveBeenCalled();
     expect(prisma.movie.create).not.toHaveBeenCalled();
   });
+
+  it('resyncs only available TMDB media fields', async () => {
+    const existing = {
+      id: 'movie-1',
+      tmdbId: 10,
+      title: 'Tên phim đã biên tập',
+      description: 'Mô tả nội bộ',
+      posterUrl: 'https://old/poster.jpg',
+      backdropUrl: 'https://old/backdrop.jpg',
+      trailerKey: 'oldTrailer',
+      duration: 140,
+      status: MovieStatus.PUBLISHED,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const updated = {
+      ...existing,
+      posterUrl: 'w500/new-poster.jpg',
+      trailerKey: 'newTrailer',
+    };
+    const prisma = {
+      movie: {
+        findUnique: vi.fn().mockResolvedValue(existing),
+        update: vi.fn().mockResolvedValue(updated),
+      },
+    };
+    const tmdb = {
+      movie: vi.fn().mockResolvedValue({
+        id: 10,
+        poster_path: '/new-poster.jpg',
+        backdrop_path: null,
+        videos: { results: [{ key: 'newTrailer', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'vi' }] },
+      }),
+      image: vi.fn((path: string | null, size: string) => path ? `${size}${path}` : null),
+      trailerKey: TmdbClient.prototype.trailerKey,
+    };
+    const service = new MoviesService(prisma as never, tmdb as never);
+
+    await expect(service.resyncTmdbMovie(10)).resolves.toMatchObject({
+      title: 'Tên phim đã biên tập',
+      description: 'Mô tả nội bộ',
+      posterUrl: 'w500/new-poster.jpg',
+      backdropUrl: 'https://old/backdrop.jpg',
+      trailerKey: 'newTrailer',
+      duration: 140,
+      status: MovieStatus.PUBLISHED,
+    });
+    expect(prisma.movie.update).toHaveBeenCalledWith({
+      where: { id: 'movie-1' },
+      data: { posterUrl: 'w500/new-poster.jpg', trailerKey: 'newTrailer' },
+    });
+  });
+
+  it('does not clear existing media when TMDB has no media', async () => {
+    const existing = {
+      id: 'movie-1',
+      tmdbId: 10,
+      posterUrl: 'https://old/poster.jpg',
+      backdropUrl: 'https://old/backdrop.jpg',
+      trailerKey: 'oldTrailer',
+    };
+    const prisma = {
+      movie: {
+        findUnique: vi.fn().mockResolvedValue(existing),
+        update: vi.fn().mockResolvedValue(existing),
+      },
+    };
+    const tmdb = {
+      movie: vi.fn().mockResolvedValue({ id: 10, poster_path: null, backdrop_path: null, videos: { results: [] } }),
+      image: vi.fn().mockReturnValue(null),
+      trailerKey: vi.fn().mockReturnValue(null),
+    };
+    const service = new MoviesService(prisma as never, tmdb as never);
+
+    await expect(service.resyncTmdbMovie(10)).resolves.toMatchObject(existing);
+    expect(prisma.movie.update).not.toHaveBeenCalled();
+  });
 });

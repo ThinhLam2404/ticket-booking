@@ -97,6 +97,29 @@ export class MoviesService {
     }
   }
 
+  async resyncTmdbMovie(tmdbId: number) {
+    const existing = await this.prisma.movie.findUnique({ where: { tmdbId } });
+    if (!existing) throw new NotFoundException('Movie not found');
+
+    const movie = await this.tmdb.movie(tmdbId);
+    const posterUrl = this.tmdb.image(movie.poster_path, 'w500');
+    const backdropUrl = this.tmdb.image(movie.backdrop_path, 'w1280');
+    const trailerKey = this.tmdb.trailerKey(movie.videos?.results);
+    const data = {
+      ...(posterUrl && { posterUrl }),
+      ...(backdropUrl && { backdropUrl }),
+      ...(trailerKey && { trailerKey }),
+    };
+    if (!Object.keys(data).length) return toPublicResponse(existing);
+
+    const updated = await this.prisma.movie.update({
+      where: { id: existing.id },
+      data,
+    });
+
+    return toPublicResponse(updated);
+  }
+
   private async findMovies(
     query: ListMoviesDto | ListAdminMoviesDto,
     options: { publishedOnly: boolean },

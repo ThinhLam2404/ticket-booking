@@ -62,13 +62,33 @@ export class TmdbClient {
   async movie(id: number) {
     const params = new URLSearchParams({
       append_to_response: 'videos',
-      include_video_language: 'vi-VN,en-US',
+      include_video_language: 'vi-VN',
       language: 'vi-VN',
     });
-    return this.requestWithLanguageFallback<TmdbMovieDetails>(
-      `/movie/${id}`,
+    const path = `/movie/${id}`;
+    const movie = await this.requestWithLanguageFallback<TmdbMovieDetails>(
+      path,
       params,
     );
+
+    if (this.trailerKey(movie.videos?.results)) return movie;
+
+    const fallbackParams = new URLSearchParams({
+      append_to_response: 'videos',
+      include_video_language: 'en-US',
+      language: 'en-US',
+    });
+    try {
+      const fallback = await this.request<TmdbMovieDetails>(
+        path,
+        fallbackParams,
+      );
+      return fallback.videos?.results?.length
+        ? { ...movie, videos: fallback.videos }
+        : movie;
+    } catch {
+      return movie;
+    }
   }
 
   trailerKey(videos: TmdbVideo[] | undefined) {
@@ -76,27 +96,29 @@ export class TmdbClient {
     const candidates = (videos ?? []).filter(
       (video) => video.site === 'YouTube' && video.key,
     );
-    //NOTE - xếp hạng ngôn ngữ: càng nhỏ thì ưu tiên càng cao
     const languageRank = (video: TmdbVideo) =>
       video.iso_639_1 === 'vi' || video.iso_3166_1 === 'VN'
         ? 0
         : video.iso_639_1 === 'en' || video.iso_3166_1 === 'US'
           ? 1
           : 2;
-    //NOTE - sắp xếp theo ưu tiên và lấy cái ưu tiên cao nhất
-    const pick = (items: TmdbVideo[]) =>
-      items.sort((a, b) => languageRank(a) - languageRank(b))[0]?.key ?? null;
-    const officialTrailer = pick(
-      candidates.filter(
-        (video) => video.type === 'Trailer' && video.official === true,
-      ),
-    );
-    if (officialTrailer) return officialTrailer;
-    const trailer = pick(
-      candidates.filter((video) => video.type === 'Trailer'),
-    );
-    if (trailer) return trailer;
-    return pick(candidates.filter((video) => video.type === 'Teaser'));
+    const pick = (items: TmdbVideo[]) => items[0]?.key ?? null;
+    const pickByLanguage = (language: number) => {
+      const localized = candidates.filter(
+        (video) => languageRank(video) === language,
+      );
+      const officialTrailer = pick(
+        localized.filter(
+          (video) => video.type === 'Trailer' && video.official === true,
+        ),
+      );
+      if (officialTrailer) return officialTrailer;
+      const trailer = pick(localized.filter((video) => video.type === 'Trailer'));
+      if (trailer) return trailer;
+      return pick(localized.filter((video) => video.type === 'Teaser'));
+    };
+
+    return pickByLanguage(0) ?? pickByLanguage(1) ?? pickByLanguage(2);
   }
 
   image(path: string | null | undefined, size: 'w500' | 'w1280') {

@@ -9,7 +9,7 @@ export class ListTmdbMoviesDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ type: Number, example: 1, default: 1, minimum: 1 })
+  @ApiPropertyOptional({ type: Number, example: 1, default: 1, minimum: 1, maximum: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
