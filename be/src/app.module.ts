@@ -17,6 +17,7 @@ import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { RedisModule } from './modules/redis/redis.module.js';
 import { LocationsModule } from './modules/locations/locations.module.js';
+import { MailModule } from './modules/mail/mail.module.js';
 import { validateEnvironment } from './config/env.validation.js';
 
 @Module({
@@ -40,6 +41,7 @@ import { validateEnvironment } from './config/env.validation.js';
     BookingsModule,
     SepayModule,
     TicketsModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

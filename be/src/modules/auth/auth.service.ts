@@ -1,9 +1,12 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { User, UserRole } from '@prisma/client';
+import { Prisma, type User, type UserRole } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
+import { MailService } from '../mail/mail.service.js';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { hashPassword, verifyPassword } from '../../common/auth/password.js';
@@ -30,9 +33,12 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: JwtTokenService,
+    private readonly mailService: MailService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<AuthResponse> {
+  async register(
+    dto: RegisterDto,
+  ): Promise<{ verificationRequired: true; email: string }> {
     const email = dto.email.trim().toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -42,14 +48,25 @@ export class AuthService {
       throw new ConflictException('Email is already registered');
     }
 
-    let user: User;
+    const token = randomBytes(32).toString('hex');
     try {
-      user = await this.prisma.user.create({
-        data: {
-          fullName: dto.fullName.trim(),
-          email,
-          passwordHash: await hashPassword(dto.password),
-        },
+      await this.prisma.$transaction(async (transaction) => {
+        const user = await transaction.user.create({
+          data: {
+            fullName: dto.fullName.trim(),
+            email,
+            passwordHash: await hashPassword(dto.password),
+            emailVerifiedAt: null,
+          },
+        });
+        await transaction.emailVerificationToken.create({
+          data: {
+            tokenHash: this.mailService.hashToken(token),
+            userId: user.id,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+        });
+        await this.mailService.queueVerificationEmail(user, token, transaction);
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
@@ -57,8 +74,88 @@ export class AuthService {
       }
       throw error;
     }
+    return { verificationRequired: true, email };
+  }
 
-    return this.issueTokens(user);
+  async resendVerificationEmail(emailInput: string): Promise<{ sent: true }> {
+    const email = emailInput.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    //NOTE - nếu user ko tồn tại hoặc đã verified vẫn trả về true để tránh lộ email có tồn tại ko
+    if (!user || user.emailVerifiedAt) return { sent: true };
+
+    const token = randomBytes(32).toString('hex');
+    await this.prisma.$transaction(async (transaction) => {
+      //NOTE - khoá row bằng for update để tránh 2 request resend chạy đồng thời
+      await transaction.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`,
+      );
+      const lockedUser = await transaction.user.findUnique({
+        where: { id: user.id },
+      });
+      if (!lockedUser || lockedUser.emailVerifiedAt) return;
+      //NOTE - vô hiệu hoá token cũ
+      await transaction.emailVerificationToken.updateMany({
+        where: { userId: user.id, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
+      await transaction.emailVerificationToken.create({
+        data: {
+          tokenHash: this.mailService.hashToken(token),
+          userId: user.id,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+      //NOTE - tạo mailbox để thực hiện đọc và send email
+      await this.mailService.queueVerificationEmail(
+        lockedUser,
+        token,
+        transaction,
+      );
+    });
+    return { sent: true };
+  }
+
+  async verifyEmail(token: string): Promise<{ verified: true }> {
+    const tokenHash = this.mailService.hashToken(token);
+    const record = await this.prisma.emailVerificationToken.findUnique({
+      where: { tokenHash },
+    });
+    if (!record || record.consumedAt || record.expiresAt <= new Date()) {
+      throw new UnauthorizedException(
+        'Email verification token is invalid or expired',
+      );
+    }
+    await this.prisma.$transaction(async (transaction) => {
+      //NOTE - mục đích dùng update many để nếu ko có record nào update thì trả về 0, dễ xử lý lỗi hơn update
+      const consumed = await transaction.emailVerificationToken.updateMany({
+        where: {
+          id: record.id,
+          consumedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { consumedAt: new Date() },
+      });
+      if (consumed.count !== 1) {
+        throw new UnauthorizedException(
+          'Email verification token is invalid or expired',
+        );
+      }
+      //NOTE - đánh dấu tất cả token của user đó đã dùng
+      await transaction.emailVerificationToken.updateMany({
+        where: {
+          userId: record.userId,
+          id: { not: record.id },
+          consumedAt: null,
+        },
+        data: { consumedAt: new Date() },
+      });
+      //NOTE - update user là đã xác thực
+      await transaction.user.update({
+        where: { id: record.userId },
+        data: { emailVerifiedAt: new Date() },
+      });
+    });
+    return { verified: true };
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
@@ -68,6 +165,11 @@ export class AuthService {
 
     if (!user || !(await verifyPassword(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+    if (!user.emailVerifiedAt) {
+      throw new ForbiddenException(
+        'Email verification is required before login',
+      );
     }
 
     return this.issueTokens(user);
@@ -91,6 +193,11 @@ export class AuthService {
     }
 
     const user = storedToken.user;
+    if (!user.emailVerifiedAt) {
+      throw new ForbiddenException(
+        'Email verification is required before login',
+      );
+    }
     return this.prisma.$transaction(async (transaction) => {
       const revoked = await transaction.refreshToken.updateMany({
         where: { id: storedToken.id, revokedAt: null },

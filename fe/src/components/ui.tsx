@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import type { FormEvent, ReactNode, RefObject } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { api } from '../api';
 import { useLocationContext } from '../auth/LocationContext';
 import type { Province, User } from '../types';
 import { errorMessage, statusLabel } from '../utils/format';
@@ -306,6 +307,7 @@ export function AuthModal({ mode, onClose }: { mode: 'login' | 'register'; onClo
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
+  const [verificationEmail, setVerificationEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const dialogRef = useRef<HTMLFormElement>(null);
   const firstInput = useRef<HTMLInputElement>(null);
@@ -316,9 +318,13 @@ export function AuthModal({ mode, onClose }: { mode: 'login' | 'register'; onClo
     setFormError('');
     setLoading(true);
     try {
-      if (registerMode) await register({ fullName, email, password });
-      else await login({ email, password });
-      onClose();
+      if (registerMode) {
+        const response = await register({ fullName, email, password });
+        setVerificationEmail(response.email);
+      } else {
+        await login({ email, password });
+        onClose();
+      }
     } catch (cause) {
       setFormError(errorMessage(cause, 'Không thể xác thực.'));
     } finally {
@@ -329,13 +335,20 @@ export function AuthModal({ mode, onClose }: { mode: 'login' | 'register'; onClo
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <form ref={dialogRef} className="auth-modal" autoComplete="off" onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="auth-title" tabIndex={-1}>
       <button type="button" className="modal-close" aria-label="Đóng" onClick={onClose}>×</button>
-      <div className="auth-mark">▰</div><p className="eyebrow">CINEBOOK MEMBER</p><h2 id="auth-title">{registerMode ? 'Tạo tài khoản' : 'Chào mừng trở lại'}</h2><p className="auth-copy">Đăng nhập để tiếp tục chọn ghế và quản lý vé điện tử.</p>
-      {registerMode && <label>Họ và tên<input ref={firstInput} required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Nguyễn Văn A" autoComplete="name" /></label>}
-      <label>Email<input ref={registerMode ? undefined : firstInput} required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" autoComplete={registerMode ? 'email' : 'off'} /></label>
-      <label>Mật khẩu<input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mật khẩu" autoComplete="new-password" /></label>
-      {formError && <p className="form-error">{formError}</p>}
-      <button className="primary" disabled={loading}>{loading ? 'Đang xử lý…' : registerMode ? 'Đăng ký' : 'Đăng nhập'}</button>
-      <button type="button" className="link-button" onClick={() => { setRegisterMode((value) => !value); setFormError(''); }}>{registerMode ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký'}</button>
+      <div className="auth-mark">▰</div><p className="eyebrow">CINEBOOK MEMBER</p><h2 id="auth-title">{verificationEmail ? 'Kiểm tra email' : registerMode ? 'Tạo tài khoản' : 'Chào mừng trở lại'}</h2>
+      {verificationEmail ? <>
+        <p className="auth-copy">Liên kết xác thực đã được gửi tới <strong>{verificationEmail}</strong>. Mở email để kích hoạt tài khoản trước khi đăng nhập.</p>
+        <button type="button" className="primary" onClick={onClose}>Đã hiểu</button>
+        <button type="button" className="link-button" disabled={loading} onClick={async () => { setLoading(true); setFormError(''); try { await api.resendVerificationEmail(verificationEmail); setFormError('Đã gửi lại email xác thực.'); } catch (cause) { setFormError(errorMessage(cause, 'Không thể gửi lại email.')); } finally { setLoading(false); } }}>{loading ? 'Đang gửi…' : 'Gửi lại email xác thực'}</button>
+      </> : <>
+        <p className="auth-copy">Đăng nhập để tiếp tục chọn ghế và quản lý vé điện tử.</p>
+        {registerMode && <label>Họ và tên<input ref={firstInput} required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Nguyễn Văn A" autoComplete="name" /></label>}
+        <label>Email<input ref={registerMode ? undefined : firstInput} required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" autoComplete={registerMode ? 'email' : 'off'} /></label>
+        <label>Mật khẩu<input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mật khẩu" autoComplete="new-password" /></label>
+        {formError && <p className="form-error">{formError}</p>}
+        <button className="primary" disabled={loading}>{loading ? 'Đang xử lý…' : registerMode ? 'Đăng ký' : 'Đăng nhập'}</button>
+        <button type="button" className="link-button" onClick={() => { setRegisterMode((value) => !value); setFormError(''); }}>{registerMode ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký'}</button>
+      </>}
     </form>
   </div>;
 }

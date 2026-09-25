@@ -78,15 +78,29 @@ enum TicketStatus {
   CANCELLED
 }
 
+enum MailOutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum MailOutboxType {
+  EMAIL_VERIFICATION
+  TICKETS_ISSUED
+}
+
 model User {
   id            String         @id @default(cuid())
   email         String         @unique
   passwordHash  String
   fullName      String
-  role          UserRole       @default(CUSTOMER)
-  bookings      Booking[]
-  refreshTokens RefreshToken[]
-  createdAt     DateTime       @default(now())
+  role                   UserRole       @default(CUSTOMER)
+  emailVerifiedAt        DateTime?
+  bookings               Booking[]
+  refreshTokens          RefreshToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  createdAt              DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
 
@@ -200,6 +214,37 @@ model RefreshToken {
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, consumedAt])
+  @@index([expiresAt])
+}
+
+model MailOutbox {
+  id           String           @id @default(cuid())
+  type         MailOutboxType
+  status       MailOutboxStatus @default(PENDING)
+  recipient    String
+  dedupeKey    String           @unique
+  payload      Json
+  attemptCount Int              @default(0)
+  nextAttemptAt DateTime        @default(now())
+  sentAt       DateTime?
+  lastError    String?
+  lockedAt     DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([status, nextAttemptAt])
 }
 
 model Booking {

@@ -83,7 +83,7 @@ File: `be/docker-compose.yml`; root scripts gọi file này từ repository root
 | PostgreSQL | `5432` | DB `ticket_booking`, user `ticket_booking`, password local `ticket_booking` |
 | Redis      | `6379` | Seat lock                                                                   |
 
-Application hiện chạy trực tiếp bằng Node/NestJS và Vite; PostgreSQL/Redis chạy bằng Docker Compose. Chưa có Dockerfile cho API hoặc frontend.
+Application hiện chạy trực tiếp bằng Node/NestJS và Vite; chỉ PostgreSQL/Redis chạy bằng Docker Compose. Email dùng SMTP provider cấu hình qua biến môi trường. Chưa có Dockerfile cho API hoặc frontend.
 
 ### 2.3. URL API
 
@@ -253,6 +253,13 @@ JWT_ACCESS_SECRET=local-access-secret-change-me-32-chars-minimum
 JWT_REFRESH_SECRET=local-refresh-secret-change-me-32-chars-minimum
 JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-smtp-username
+SMTP_PASSWORD=your-smtp-password
+SMTP_FROM=CineBook <no-reply@example.com>
+PUBLIC_APP_URL=http://localhost:5173
 TMDB_ACCESS_TOKEN=<tmdb-api-read-access-token>
 SEED_ADMIN_EMAIL=admin@example.com
 SEED_ADMIN_PASSWORD=change-this-seed-password
@@ -268,6 +275,13 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `JWT_REFRESH_SECRET`     | Có       | Secret ký refresh token; phải khác access secret               |
 | `JWT_ACCESS_EXPIRES_IN`  | Không    | TTL access token, default `15m`                                |
 | `JWT_REFRESH_EXPIRES_IN` | Không    | TTL refresh token, default `7d`                                |
+| `SMTP_HOST`              | Không    | Host SMTP provider                                              |
+| `SMTP_PORT`              | Không    | Port SMTP provider, thường `587` hoặc `465`                    |
+| `SMTP_SECURE`            | Không    | Bật TLS trực tiếp khi là `true`                                |
+| `SMTP_USER`              | Không    | SMTP username nếu provider yêu cầu                             |
+| `SMTP_PASSWORD`          | Không    | SMTP password nếu provider yêu cầu                             |
+| `SMTP_FROM`              | Không    | Địa chỉ gửi email                                               |
+| `PUBLIC_APP_URL`         | Không    | Base URL frontend dùng trong link xác thực                     |
 | `TMDB_ACCESS_TOKEN`      | Không    | TMDB API Read Access Token; cần nếu Admin tìm hoặc nhập phim  |
 | `SEED_ADMIN_EMAIL`       | Seed     | Email admin bootstrap, default `admin@example.com`             |
 | `SEED_ADMIN_PASSWORD`    | Seed     | Password admin bootstrap, bắt buộc khi seed                    |
@@ -388,6 +402,7 @@ Nguồn: `be/prisma/schema.prisma`, model `User`.
 | `passwordHash`  | `String`         | REQ         | —                  | Hash bằng scrypt                     |
 | `fullName`      | `String`         | REQ         | —                  | Tên hiển thị                         |
 | `role`          | `UserRole`       | REQ         | `CUSTOMER`         | Quyền user                           |
+| `emailVerifiedAt` | `DateTime?`    | OPT         | `NULL`              | Thời điểm xác thực email              |
 | `bookings`      | `Booking[]`      | Relation    | —                  | Các booking của user                 |
 | `refreshTokens` | `RefreshToken[]` | Relation    | —                  | Các session refresh token            |
 | `createdAt`     | `DateTime`       | REQ         | `now()`            | Thời điểm tạo                        |
@@ -894,6 +909,12 @@ Bổ sung phân loại phòng/suất và chuẩn hóa giá theo từng suất:
 - Kiểm tra mỗi showtime có snapshot giá cho đầy đủ mọi ghế vật lý của room trước khi hệ thống tiếp tục vận hành.
 - Migration fail rõ ràng nếu snapshot thiếu ghế, tránh dữ liệu booking không thể định giá.
 
+#### `20260925100000_email_verification_and_mail_outbox`
+
+- Thêm `User.emailVerifiedAt`; user hiện có được backfill là đã xác thực.
+- Thêm token xác thực email dùng một lần với hash, expiry và `consumedAt`.
+- Thêm `MailOutbox` để gửi email bất đồng bộ, dedupe theo nghiệp vụ và retry khi SMTP lỗi.
+
 ### 6.2. Seed
 
 File: `be/prisma/seed.ts`.
@@ -909,9 +930,10 @@ Seed chạy idempotent bằng `upsert`:
   - `Interstellar`, duration `169`, status `PUBLISHED`.
 - Cinema, room và layout ghế:
   - Đọc từ `be/prisma/data/cinemas.seed.json`.
-  - File hiện chứa 50 cinema và mỗi cinema có một room mặc định.
-   - Cinema chỉ lưu `id`, `name`, `address`, `provinceCode`; `startingPrice` là giá tính động từ showtime, không lưu trong seed.
-   - Room có `format` tùy chọn trong dữ liệu seed, mặc định `STANDARD`.
+  - File nguồn hiện chứa 50 cinema và mỗi cinema có một room mặc định; seed runtime bổ sung ba format còn thiếu.
+  - Cinema chỉ lưu `id`, `name`, `address`, `provinceCode`; `startingPrice` là giá tính động từ showtime, không lưu trong seed.
+    - Seed tự bổ sung đủ một room cho mỗi format `STANDARD`, `IMAX`, `FOUR_DX`, `SCREEN_X`; room đã có showtime không bị đổi format hoặc reset ghế.
+    - Room có `format` tùy chọn trong dữ liệu seed, mặc định `STANDARD`.
    - Layout tạo 3 hàng đầu `STANDARD`, các hàng giữa `VIP`, hàng cuối `COUPLE`.
   - Hàng Couple luôn có số ghế chẵn; các ghế ghép cặp theo `1-2`, `3-4`, `5-6`.
 - Showtime demo dùng cinema và room đầu tiên trong file seed tĩnh.
@@ -1138,8 +1160,22 @@ sequenceDiagram
   - `fullName`: string, 2-100 ký tự.
   - `email`: email, tối đa 255 ký tự.
   - `password`: string, 8-128 ký tự.
-- Side effect: tạo `User(CUSTOMER)` và `RefreshToken`.
+- Side effect: tạo `User(CUSTOMER)`, token xác thực email và mail outbox; chưa cấp access/refresh token.
+- Response: `{ "verificationRequired": true, "email": "customer@example.com" }`.
 - Errors: `400`, `409` nếu email đã tồn tại.
+
+#### `POST /api/v1/auth/email/verify`
+
+- Auth: public.
+- Body: `{ "token": "<verification-token>" }`.
+- Token có hiệu lực 24 giờ và chỉ dùng một lần.
+- Success: `200`, trả `{ "verified": true }`.
+
+#### `POST /api/v1/auth/email/resend`
+
+- Auth: public.
+- Body: `{ "email": "customer@example.com" }`.
+- Success luôn trả `{ "sent": true }` để không làm lộ email tồn tại; tài khoản chưa xác thực sẽ nhận mail mới.
 
 #### `POST /api/v1/auth/login`
 
@@ -1155,7 +1191,8 @@ sequenceDiagram
 ```
 
 - Side effect: tạo refresh token record.
-- Errors: `400`, `401` nếu credential sai.
+- User chưa xác thực email nhận `403 AUTH_EMAIL_NOT_VERIFIED`; credential sai nhận `401`.
+- Refresh cũng bị chặn với user chưa xác thực.
 
 #### `POST /api/v1/auth/refresh`
 
@@ -1852,6 +1889,7 @@ Khi webhook SePay khớp payment code, số tiền và intent còn hạn:
 2. Payment được tạo hoặc cập nhật với `provider: "SEPAY"`, `status: "SUCCEEDED"` và reference `SEPAY-<sepayId>`.
 3. Booking chuyển sang `CONFIRMED`, ghế chuyển sang `SOLD`, ticket được upsert và Redis lock được giải phóng.
 4. Gửi lại cùng `sepayId` trả thành công idempotently nhờ unique constraint.
+5. Tạo một mail outbox `TICKETS_ISSUED` theo booking; worker SMTP gửi một email chứa toàn bộ vé và QR inline. SMTP lỗi không rollback booking/payment, outbox sẽ retry.
 
 Giao dịch không khớp mã, sai tiền hoặc đến sau khi intent hết hạn được lưu `REVIEW_REQUIRED`; hệ thống không tự cấp vé.
 ### 8.13. Tickets API
@@ -2426,7 +2464,7 @@ Khi reset database, chạy migration rồi chạy `npm run prisma:seed`. Seed kh
 
 ### 15.1. Limitations hiện tại
 
-- Mock payment chưa phải payment provider thật.
+- Email phụ thuộc SMTP provider được cấu hình qua `SMTP_*`; cần kiểm tra credentials và network access trước khi chạy worker.
 - Chưa có webhook signature verification.
 - Chưa có refund flow dù enum `REFUNDED` đã tồn tại.
 - Chưa có ticket check-in/consume.

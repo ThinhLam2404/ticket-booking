@@ -84,6 +84,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/email/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Auth_verifyEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/email/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Auth_resendVerificationEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -712,6 +744,43 @@ export interface components {
              */
             password: string;
         };
+        EmailVerificationRequiredResponseDto: {
+            /** @example true */
+            verificationRequired: boolean;
+            /** @example customer@example.com */
+            email: string;
+        };
+        VerifyEmailDto: {
+            /** @example hex-verification-token */
+            token: string;
+        };
+        EmailVerificationResponseDto: {
+            /** @example true */
+            verified: boolean;
+        };
+        ResendVerificationEmailDto: {
+            /**
+             * Format: email
+             * @example customer@example.com
+             */
+            email: string;
+        };
+        EmailVerificationResendResponseDto: {
+            /** @example true */
+            sent: boolean;
+        };
+        LoginDto: {
+            /**
+             * Format: email
+             * @example customer@example.com
+             */
+            email: string;
+            /**
+             * Format: password
+             * @example Password123!
+             */
+            password: string;
+        };
         UserResponseDto: {
             /** @example clx-user-id */
             id: string;
@@ -736,18 +805,6 @@ export interface components {
             accessToken: string;
             /** @example <refresh-token> */
             refreshToken: string;
-        };
-        LoginDto: {
-            /**
-             * Format: email
-             * @example customer@example.com
-             */
-            email: string;
-            /**
-             * Format: password
-             * @example Password123!
-             */
-            password: string;
         };
         RefreshTokenDto: {
             /**
@@ -1829,7 +1886,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthResponseDto"];
+                    "application/json": components["schemas"]["EmailVerificationRequiredResponseDto"];
                 };
             };
             400: {
@@ -1841,6 +1898,76 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Auth_verifyEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyEmailDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailVerificationResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Auth_resendVerificationEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResendVerificationEmailDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailVerificationResendResponseDto"];
+                };
+            };
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1887,6 +2014,14 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorResponseDto"];
                 };
             };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
         };
     };
     Auth_refresh: {
@@ -1919,6 +2054,14 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

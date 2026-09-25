@@ -911,6 +911,15 @@ export function AdminMoviesPage() {
       setConfirm(null);
     },
   });
+  const publishMutation = useMutation({
+    mutationFn: (movie: Movie) => api.updateMovie(movie.id, { status: "PUBLISHED" }),
+    onSuccess: () => {
+      setMutationError("");
+      void queryClient.invalidateQueries({ queryKey: ["admin-movies"] });
+      void queryClient.invalidateQueries({ queryKey: ["movies"] });
+    },
+    onError: (cause) => setMutationError(mutationMessage(cause)),
+  });
   const movies = query.data?.data ?? [];
 
   async function save(body: CreateMovieRequest) {
@@ -975,6 +984,7 @@ export function AdminMoviesPage() {
           ))}
         </select>
       </Toolbar>
+      {mutationError && !modal && <p className="form-error">{mutationError}</p>}
       {query.isError && (
         <ErrorState
           cause={query.error}
@@ -1014,6 +1024,14 @@ export function AdminMoviesPage() {
                   <td>{formatDate(movie.updatedAt)}</td>
                   <td>
                     <div className="admin-actions">
+                      {movie.status !== "PUBLISHED" && movie.status !== "ARCHIVED" && <button
+                        className="primary compact-button"
+                        type="button"
+                        disabled={publishMutation.isPending}
+                        onClick={() => publishMutation.mutate(movie)}
+                      >
+                        Đưa vào đang chiếu
+                      </button>}
                       <button
                         className="secondary compact-button"
                         type="button"

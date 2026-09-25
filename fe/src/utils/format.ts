@@ -61,6 +61,8 @@ export function statusLabel(status: string) {
 }
 
 const apiMessages: Record<string, string> = {
+  AUTH_EMAIL_NOT_VERIFIED: 'Vui lòng xác thực email trước khi đăng nhập.',
+  AUTH_EMAIL_TOKEN_INVALID: 'Liên kết xác thực email không hợp lệ hoặc đã hết hạn.',
   AUTH_INVALID_CREDENTIALS: 'Sai mật khẩu hoặc thông tin đăng nhập.',
   AUTH_ACCESS_TOKEN_INVALID: 'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.',
   AUTH_REFRESH_TOKEN_INVALID: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
@@ -86,6 +88,7 @@ const apiMessages: Record<string, string> = {
   RESOURCE_NOT_FOUND: 'Không tìm thấy dữ liệu yêu cầu.',
   ROOM_ALREADY_EXISTS: 'Phòng chiếu đã tồn tại trong cụm rạp.',
   ROOM_HAS_SHOWTIMES: 'Không thể xóa phòng đang có suất chiếu.',
+  ROOM_FORMAT_HAS_SHOWTIMES: 'Không thể thay đổi định dạng phòng đã có suất chiếu.',
   ROOM_LAYOUT_INVALID: 'Sơ đồ ghế của phòng chưa hợp lệ.',
   ROOM_NO_SEATS: 'Phòng chiếu chưa có ghế.',
   ROOM_NOT_FOUND: 'Không tìm thấy phòng chiếu.',
@@ -130,9 +133,8 @@ const legacyApiMessages: Record<string, string> = {
 
 export function errorMessage(cause: unknown, fallback: string) {
   if (cause instanceof ApiClientError) {
-    if (cause.path.endsWith('/auth/login')) return apiMessages.AUTH_INVALID_CREDENTIALS;
-    if (cause.statusCode === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-    return apiMessages[cause.code] ?? legacyApiMessages[cause.message] ?? fallback;
+    if (cause.path.endsWith('/auth/login') && cause.code === 'AUTH_INVALID_CREDENTIALS') return apiMessages.AUTH_INVALID_CREDENTIALS;
+    return apiMessages[cause.code] ?? (cause.statusCode === 401 ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' : undefined) ?? legacyApiMessages[cause.message] ?? fallback;
   }
   return fallback;
 }

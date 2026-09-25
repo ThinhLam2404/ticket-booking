@@ -50,6 +50,41 @@ function priceForSeat(type: SeatType) {
       : '132000.00';
 }
 
+const seededRoomFormats = [RoomFormat.STANDARD, RoomFormat.IMAX, RoomFormat.FOUR_DX, RoomFormat.SCREEN_X] as const;
+
+function generatedRoomName(format: RoomFormat) {
+  return format === RoomFormat.STANDARD
+    ? 'Phòng Standard'
+    : format === RoomFormat.FOUR_DX
+      ? 'Phòng 4DX'
+      : format === RoomFormat.SCREEN_X
+        ? 'Phòng ScreenX'
+        : 'Phòng IMAX';
+}
+
+function roomDataForCinema(cinema: StaticCinema): StaticCinemaRoom[] {
+  const rooms = [...cinema.rooms];
+  const formats = new Set(
+    rooms.map((room) => room.format ?? RoomFormat.STANDARD),
+  );
+  const names = new Set(rooms.map((room) => room.name));
+
+  for (const format of seededRoomFormats) {
+    if (formats.has(format)) continue;
+    const baseName = generatedRoomName(format);
+    let name = baseName;
+    let suffix = 2;
+    while (names.has(name)) name = `${baseName} ${suffix++}`;
+    rooms.push({
+      id: `room-${cinema.id}-${format.toLowerCase()}`,
+      name,
+      format,
+    });
+    names.add(name);
+  }
+  return rooms;
+}
+
 async function seedCinema(cinemaData: StaticCinemaData, cinema: StaticCinema) {
   await prisma.cinema.upsert({
     where: { id: cinema.id },
@@ -66,22 +101,30 @@ async function seedCinema(cinemaData: StaticCinemaData, cinema: StaticCinema) {
     },
   });
 
-  for (const roomData of cinema.rooms) {
-    const room = await prisma.room.upsert({
-      where: { id: roomData.id },
-      update: {
-        name: roomData.name,
-        cinemaId: cinema.id,
-        ...(roomData.format !== undefined && { format: roomData.format }),
-      },
-      create: {
-        id: roomData.id,
-        name: roomData.name,
-        cinemaId: cinema.id,
-        format: roomData.format ?? RoomFormat.STANDARD,
-      },
-    });
-    const hasShowtimes = await prisma.showtime.count({ where: { roomId: room.id } });
+  for (const roomData of roomDataForCinema(cinema)) {
+    const existingRoom = await prisma.room.findUnique({ where: { id: roomData.id } });
+    const hasShowtimes = existingRoom
+      ? (await prisma.showtime.count({ where: { roomId: existingRoom.id } })) > 0
+      : false;
+    const room = existingRoom
+      ? await prisma.room.update({
+          where: { id: existingRoom.id },
+          data: {
+            name: roomData.name,
+            cinemaId: cinema.id,
+            ...(!hasShowtimes && roomData.format !== undefined
+              ? { format: roomData.format }
+              : {}),
+          },
+        })
+      : await prisma.room.create({
+          data: {
+            id: roomData.id,
+            name: roomData.name,
+            cinemaId: cinema.id,
+            format: roomData.format ?? RoomFormat.STANDARD,
+          },
+        });
     if (hasShowtimes) continue;
 
     await prisma.seat.deleteMany({ where: { roomId: room.id } });
@@ -95,7 +138,7 @@ async function seedCinema(cinemaData: StaticCinemaData, cinema: StaticCinema) {
 async function cleanupLegacySeedData(cinemaData: StaticCinemaData) {
   const desiredCinemaIds = new Set(cinemaData.cinemas.map((cinema) => cinema.id));
   const desiredRoomIds = new Set(
-    cinemaData.cinemas.flatMap((cinema) => cinema.rooms.map((room) => room.id)),
+    cinemaData.cinemas.flatMap((cinema) => roomDataForCinema(cinema).map((room) => room.id)),
   );
   const staleCinemas = await prisma.cinema.findMany({
     where: {
@@ -188,12 +231,13 @@ async function main() {
   const passwordHash = await hashPassword(adminPassword);
   await prisma.user.upsert({
     where: { email: adminEmail.toLowerCase() },
-    update: { fullName: 'System Admin', role: UserRole.ADMIN },
+    update: { fullName: 'System Admin', role: UserRole.ADMIN, emailVerifiedAt: new Date() },
     create: {
       email: adminEmail.toLowerCase(),
       fullName: 'System Admin',
       passwordHash,
       role: UserRole.ADMIN,
+      emailVerifiedAt: new Date(),
     },
   });
 

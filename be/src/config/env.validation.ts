@@ -55,6 +55,33 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   JWT_REFRESH_EXPIRES_IN = '7d';
+
+  @IsOptional()
+  @IsString()
+  SMTP_HOST = 'smtp.example.com';
+
+  @IsOptional()
+  SMTP_PORT = '587';
+
+  @IsOptional()
+  @IsString()
+  SMTP_SECURE = 'false';
+
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_PASSWORD?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_FROM = 'CineBook <no-reply@example.com>';
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  PUBLIC_APP_URL = 'http://localhost:5173';
 }
 
 export function validateEnvironment(config: Record<string, unknown>) {

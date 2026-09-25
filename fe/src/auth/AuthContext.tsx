@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, clearAuth, getStoredUser, setAuth } from '../api';
-import type { LoginRequest, RegisterRequest, User } from '../types';
+import type { EmailVerificationRequiredResponse, LoginRequest, RegisterRequest, User } from '../types';
 
 type AuthMode = 'login' | 'register';
 
@@ -13,7 +13,7 @@ type AuthContextValue = {
   closeAuth: () => void;
   login: (body: LoginRequest) => Promise<void>;
   loginAsAdmin: (body: LoginRequest) => Promise<void>;
-  register: (body: RegisterRequest) => Promise<void>;
+  register: (body: RegisterRequest) => Promise<EmailVerificationRequiredResponse>;
   logout: () => Promise<void>;
 };
 
@@ -56,12 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     notifyAuthChange();
   }, [queryClient]);
 
-  const register = useCallback(async (body: RegisterRequest) => {
-    const response = await api.register(body);
-    setAuth(response);
-    setUser(response.user);
-    notifyAuthChange();
-  }, []);
+  const register = useCallback(async (body: RegisterRequest) => api.register(body), []);
 
   const logout = useCallback(async () => {
     await api.logout();

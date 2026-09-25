@@ -7,6 +7,7 @@ import { ThemeProvider } from './theme/ThemeContext';
 import { BookingPage, SeatsPage } from './pages/BookingPages';
 import { BookingsPage, TicketPage, TicketsPage } from './pages/AccountPages';
 import { CinemaPage, HomePage, MoviePage } from './pages/CatalogPages';
+import { VerifyEmailPage } from './pages/AuthPages';
 import { AdminCinemasPage, AdminDashboardPage, AdminLoginPage,   AdminMoviesPage,
   AdminPaymentsPage,
   AdminRoomsPage, AdminSeatsPage, AdminShowtimesPage } from './pages/AdminPages';
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'cinemas', element: <CinemaPage /> },
       { path: 'movies/:movieId', element: <MoviePage /> },
+      { path: 'verify-email', element: <VerifyEmailPage /> },
       { path: 'showtimes/:showtimeId/seats', element: <SeatsPage /> },
       {
         element: <RequireAuth />,

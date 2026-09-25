@@ -209,6 +209,18 @@
 - ĐÃ SỬA: Movie response từng trả Prisma `Decimal` của `rating` thành chuỗi, khiến Admin chỉ đổi status cũng gửi rating dạng string và API trả 400 (`rating must not be greater/less...`). MoviesService nay chuẩn hóa rating về number ở response boundary; MovieForm cũng normalize rating trước khi submit; đã thêm regression test.
 - CÒN LẠI: Browser verification live flow hold-expiry sau khi bật backend; tiếp tục rà format/price thật, filter catalogue và các copy cứng còn lại.
 
+## 2026-09-25 — Email verification, ticket mail và seed format
+
+- Thêm migration `20260925100000_email_verification_and_mail_outbox`: `User.emailVerifiedAt`, one-time verification token và outbox email có trạng thái/retry/dedupe.
+- Đăng ký không cấp token trước xác thực; thêm `POST /auth/email/verify`, `POST /auth/email/resend`; login/refresh chặn user chưa xác thực. User cũ và admin seed được backfill là đã xác thực.
+- Thêm `MailModule` dùng Nodemailer và worker scheduler retry mail; SMTP lỗi không rollback booking/payment. Mailpit local đã được loại bỏ, email dùng SMTP provider cấu hình từ env.
+- SePay confirmation enqueue một email chứa toàn bộ ticket và QR inline bằng `qrcode`, dedupe theo booking.
+- Frontend thêm route `/verify-email`, màn hình xác thực, trạng thái đăng ký chờ email và gửi lại email; regenerate OpenAPI/types.
+- Seed tự bổ sung room `STANDARD`, `IMAX`, `FOUR_DX`, `SCREEN_X` cho mỗi cinema, không đổi format/reset layout room đã có showtime.
+- Admin thêm quick publish phim; chuẩn hóa lỗi đổi format phòng sang `ROOM_FORMAT_HAS_SHOWTIMES`.
+- Review fixes: outbox tự reclaim lock `PROCESSING` bị stale, register/resend gộp user-token-outbox trong transaction, resend khóa user để token cũ bị vô hiệu hóa, email dùng timezone `Asia/Ho_Chi_Minh`, frontend verify chống duplicate effect của React Strict Mode và quick publish hiển thị lỗi mutation.
+- Verification: migration deploy, seed, lint, typecheck, build, unit `58/58`, FE `6/6`, E2E `6/6`, integration `13/13`, API check và diff check pass.
+
 ## 2026-09-24 — Room/showtime format, catalogue category và giá thật
 
 - Thêm `RoomFormat`: `STANDARD`, `IMAX`, `FOUR_DX`, `SCREEN_X`; thêm `ShowtimeFormat` cho 2D/3D phụ đề/lồng tiếng.

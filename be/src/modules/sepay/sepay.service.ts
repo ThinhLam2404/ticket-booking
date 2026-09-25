@@ -152,7 +152,7 @@ export class SepayService {
     let intent = paymentCode
       ? await this.prisma.sepayPaymentIntent.findUnique({
           where: { paymentCode },
-          include: { booking: { include: { items: true } } },
+          include: { booking: { include: { items: true, user: true } } },
         })
       : null;
 
@@ -237,7 +237,12 @@ export class SepayService {
       showtimeId: string;
       items: { id: string; showtimeSeatId: string }[];
     },
-    intent: { id: string; bookingId: string; expectedAmount: Prisma.Decimal },
+    intent: {
+      id: string;
+      bookingId: string;
+      expectedAmount: Prisma.Decimal;
+      booking: { user: { email: string } };
+    },
     sepayId: number,
   ) {
     try {
@@ -325,6 +330,17 @@ export class SepayService {
         await tx.sepayTransaction.update({
           where: { sepayId },
           data: { status: SepayTransactionStatus.CONFIRMED },
+        });
+
+        await tx.mailOutbox.upsert({
+          where: { dedupeKey: `TICKETS_ISSUED:${booking.id}` },
+          create: {
+            type: 'TICKETS_ISSUED',
+            recipient: intent.booking.user.email,
+            dedupeKey: `TICKETS_ISSUED:${booking.id}`,
+            payload: { bookingId: booking.id },
+          },
+          update: {},
         });
 
         return current;

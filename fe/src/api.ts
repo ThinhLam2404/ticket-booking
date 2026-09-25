@@ -1,6 +1,9 @@
 import type {
   ApiError,
   AuthResponse,
+  EmailVerificationRequiredResponse,
+  EmailVerificationResponse,
+  EmailVerificationResendResponse,
   Booking,
   Cinema,
   HoldRequest,
@@ -130,7 +133,8 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
     return response.json() as Promise<T>;
   }
 
-  if (response.status === 401 && retry && path !== '/auth/login' && sessionStorage.getItem(REFRESH_TOKEN_KEY)) {
+  const publicAuthPath = ['/auth/login', '/auth/register', '/auth/email/verify', '/auth/email/resend'].includes(path);
+  if (response.status === 401 && retry && !publicAuthPath && sessionStorage.getItem(REFRESH_TOKEN_KEY)) {
     const refreshed = await refreshToken();
     if (refreshed) return request<T>(path, init, false);
   }
@@ -184,12 +188,22 @@ async function performRefreshToken() {
 
 export const api = {
   async register(body: RegisterRequest) {
-    const response = await request<AuthResponse>('/auth/register', {
+    return request<EmailVerificationRequiredResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(body),
     });
-    setAuth(response);
-    return response;
+  },
+  verifyEmail(token: string) {
+    return request<EmailVerificationResponse>('/auth/email/verify', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+  resendVerificationEmail(email: string) {
+    return request<EmailVerificationResendResponse>('/auth/email/resend', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
   },
   async login(body: LoginRequest) {
     const response = await request<AuthResponse>('/auth/login', {
