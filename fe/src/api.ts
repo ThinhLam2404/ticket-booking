@@ -212,10 +212,11 @@ export const api = {
   provinces(signal?: AbortSignal) {
     return request<ProvincesResponse>('/locations/provinces', { signal });
   },
-  movies(search = '', provinceCode?: number, signal?: AbortSignal) {
+  movies(search = '', provinceCode?: number, category?: 'NOW_SHOWING' | 'COMING_SOON' | 'SPECIAL', signal?: AbortSignal) {
     const params = new URLSearchParams({ page: '1', pageSize: '50' });
     if (search) params.set('search', search);
     if (provinceCode) params.set('provinceCode', String(provinceCode));
+    if (category) params.set('category', category);
     return request<MoviesResponse>(`/movies?${params.toString()}`, { signal });
   },
   adminMovies(filters: AdminMoviesQuery = {}, signal?: AbortSignal) {
@@ -249,7 +250,7 @@ export const api = {
     const params = provinceCode ? `?provinceCode=${provinceCode}` : '';
     return request<MovieDetails>(`/movies/${id}${params}`, { signal });
   },
-  showtimes(filters: { movieId?: string; cinemaId?: string; provinceCode?: number; from?: string; to?: string } = {}, signal?: AbortSignal) {
+  showtimes(filters: { movieId?: string; cinemaId?: string; provinceCode?: number; format?: string; roomFormat?: string; specialOnly?: boolean; from?: string; to?: string } = {}, signal?: AbortSignal) {
     const params = new URLSearchParams({ page: '1', pageSize: '100' });
     for (const [key, value] of Object.entries(filters)) {
       if (value) params.set(key, String(value));

@@ -3,14 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MovieStatus, Prisma } from '@prisma/client';
+import { MovieStatus, Prisma, RoomFormat, ShowtimeFormat } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { TmdbClient } from './tmdb.client.js';
 import type { ListTmdbMoviesDto } from './dto/tmdb-movie.dto.js';
 import { CreateMovieDto } from './dto/create-movie.dto.js';
-import { ListAdminMoviesDto, ListMoviesDto } from './dto/list-movies.dto.js';
+import { ListAdminMoviesDto, ListMoviesDto, MovieCatalogCategory } from './dto/list-movies.dto.js';
 import { UpdateMovieDto } from './dto/update-movie.dto.js';
 
 function normalizeMovieRatings<T>(value: T): T {
@@ -150,19 +150,37 @@ export class MoviesService {
   ) {
     const page = query.page;
     const pageSize = query.pageSize;
+    const now = new Date();
+    const futureShowtime: Prisma.ShowtimeWhereInput = {
+      startsAt: { gte: now },
+      ...(query.provinceCode && { room: { cinema: { provinceCode: query.provinceCode } } }),
+    };
+    const specialShowtime: Prisma.ShowtimeWhereInput = {
+      ...futureShowtime,
+      OR: [
+        { room: { format: { not: RoomFormat.STANDARD } } },
+        { format: { in: [ShowtimeFormat.THREE_D_SUBTITLED, ShowtimeFormat.THREE_D_DUBBED] } },
+      ],
+    };
+    const priceShowtimeWhere = query.category === MovieCatalogCategory.SPECIAL
+      ? specialShowtime
+      : futureShowtime;
     const where: Prisma.MovieWhereInput = options.publishedOnly
       ? { status: MovieStatus.PUBLISHED }
       : 'status' in query && query.status
         ? { status: query.status }
         : {};
 
-    if (options.publishedOnly && query.provinceCode) {
-      where.showtimes = {
-        some: {
-          startsAt: { gte: new Date() },
-          room: { cinema: { provinceCode: query.provinceCode } },
-        },
-      };
+    if (options.publishedOnly) {
+      if (query.category === MovieCatalogCategory.COMING_SOON) {
+        where.releaseDate = { gt: now };
+      } else if (query.category === MovieCatalogCategory.SPECIAL) {
+        where.showtimes = {
+          some: specialShowtime,
+        };
+      } else {
+        where.showtimes = { some: futureShowtime };
+      }
     }
 
     if (query.search?.trim()) {
@@ -175,6 +193,12 @@ export class MoviesService {
     const [data, total] = await this.prisma.$transaction([
       this.prisma.movie.findMany({
         where,
+        include: {
+          showtimes: {
+            where: priceShowtimeWhere,
+            select: { basePrice: true },
+          },
+        },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -183,7 +207,14 @@ export class MoviesService {
     ]);
 
     return {
-      data: toMovieResponse(data),
+      data: toMovieResponse(data.map((movie) => {
+        const showtimes = movie.showtimes ?? [];
+        const startingPrice = showtimes.length
+          ? Math.min(...showtimes.map((showtime) => showtime.basePrice.toNumber()))
+          : null;
+        const { showtimes: _showtimes, ...movieData } = movie;
+        return { ...movieData, startingPrice };
+      })),
       meta: {
         page,
         pageSize,

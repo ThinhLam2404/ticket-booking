@@ -325,6 +325,24 @@ Nguồn chính: `be/prisma/schema.prisma`.
 | `VIP`      | Ghế VIP    |
 | `COUPLE`   | Ghế đôi    |
 
+#### `RoomFormat`
+
+| Giá trị | Ý nghĩa |
+| ------- | ------- |
+| `STANDARD` | Phòng tiêu chuẩn |
+| `IMAX` | Phòng IMAX |
+| `FOUR_DX` | Phòng 4DX |
+| `SCREEN_X` | Phòng ScreenX |
+
+#### `ShowtimeFormat`
+
+| Giá trị | Ý nghĩa |
+| ------- | ------- |
+| `TWO_D_SUBTITLED` | 2D phụ đề |
+| `TWO_D_DUBBED` | 2D lồng tiếng |
+| `THREE_D_SUBTITLED` | 3D phụ đề |
+| `THREE_D_DUBBED` | 3D lồng tiếng |
+
 #### `ShowtimeSeatStatus`
 
 | Giá trị     | Ý nghĩa               |
@@ -406,6 +424,9 @@ Nguồn: `be/prisma/schema.prisma`, model `User`.
 | `provinceCode` | `Int`      | REQ         | default `79`, check 34 mã | Mã tỉnh/thành của rạp       |
 | `rooms`        | `Room[]`   | Relation    | —                  | Các phòng chiếu             |
 | `createdAt`    | `DateTime` | REQ         | `now()`            | Thời điểm tạo               |
+| `updatedAt`    | `DateTime` | REQ         | `@updatedAt`       | Thời điểm cập nhật          |
+
+Public cinema list response tính thêm `startingPrice` là giá `basePrice` thấp nhất của các suất chiếu tương lai trong cụm rạp; đây không phải column của `Cinema`.
 | `updatedAt`    | `DateTime` | REQ         | `@updatedAt`       | Thời điểm cập nhật           |
 
 Cinema hiện không có unique constraint trên `name` hoặc `address`.
@@ -416,8 +437,9 @@ Cinema hiện không có unique constraint trên `name` hoặc `address`.
 | ----------- | ------------ | ----------- | ----------------------------- | ---------------------- |
 | `id`        | `String`     | REQ         | PK, `cuid()`                  | ID phòng               |
 | `name`      | `String`     | REQ         | Kết hợp unique với `cinemaId` | Tên phòng trong rạp    |
-| `cinemaId`  | `String`     | REQ         | FK → `Cinema.id`              | Rạp sở hữu phòng       |
-| `cinema`    | `Cinema`     | Relation    | `onDelete: Cascade`           | Rạp cha                |
+| `cinemaId`  | `String`         | REQ         | FK → `Cinema.id`              | Rạp sở hữu phòng    |
+| `format`    | `RoomFormat`     | REQ         | default `STANDARD`            | Công nghệ phòng     |
+| `cinema`    | `Cinema`         | Relation    | `onDelete: Cascade`           | Rạp cha              |
 | `seats`     | `Seat[]`     | Relation    | —                             | Ghế trong phòng        |
 | `showtimes` | `Showtime[]` | Relation    | —                             | Lịch chiếu trong phòng |
 | `createdAt` | `DateTime`   | REQ         | `now()`                       | Thời điểm tạo          |
@@ -450,7 +472,11 @@ Seat không có `createdAt`/`updatedAt`.
 | `endsAt`        | `DateTime`       | REQ         | —                    | Thời điểm kết thúc |
 | `movieId`       | `String`         | REQ         | FK → `Movie.id`      | Phim được chiếu    |
 | `movie`         | `Movie`          | Relation    | `onDelete: Restrict` | Phim cha           |
-| `roomId`        | `String`         | REQ         | FK → `Room.id`       | Phòng chiếu        |
+| `roomId`        | `String`         | REQ         | FK → `Room.id`       | Phòng chiếu      |
+| `format`        | `ShowtimeFormat`  | REQ         | default `TWO_D_SUBTITLED` | Định dạng trình chiếu |
+| `basePrice`     | `Decimal`        | REQ         | `>= 0`               | Giá ghế Standard trước multiplier |
+| `vipMultiplier` | `Decimal`        | REQ         | default `1.1`, `>= 0` | Hệ số giá VIP |
+| `coupleMultiplier` | `Decimal`     | REQ         | default `1.2`, `>= 0` | Hệ số giá Couple sau VIP |
 | `room`          | `Room`           | Relation    | `onDelete: Restrict` | Phòng cha          |
 | `showtimeSeats` | `ShowtimeSeat[]` | Relation    | —                    | Ghế snapshot       |
 | `bookings`      | `Booking[]`      | Relation    | —                    | Booking của suất   |
@@ -853,6 +879,21 @@ Bổ sung location context và trailer cho catalog:
 - Thêm check constraint giới hạn `provinceCode` trong 34 mã tỉnh/thành sau sáp nhập 07/2025.
 - Reference data 34 tỉnh/thành được phục vụ nội bộ qua `GET /api/v1/locations/provinces`.
 
+#### `20260924130000_room_showtime_formats_and_pricing`
+
+Bổ sung phân loại phòng/suất và chuẩn hóa giá theo từng suất:
+
+- Thêm enum `RoomFormat` và `ShowtimeFormat`.
+- Backfill phòng cũ thành `STANDARD`, suất cũ thành `TWO_D_SUBTITLED`.
+- Backfill `Showtime.basePrice` bằng giá ghế snapshot thấp nhất; multiplier mặc định là `1.10` và `1.20`.
+- Migration dừng rõ ràng nếu showtime không có snapshot giá ghế để tránh tạo giá không xác định.
+- Sau migration, các trường pricing và format của showtime là bắt buộc trong database.
+
+#### `20260924140000_validate_showtime_snapshots`
+
+- Kiểm tra mỗi showtime có snapshot giá cho đầy đủ mọi ghế vật lý của room trước khi hệ thống tiếp tục vận hành.
+- Migration fail rõ ràng nếu snapshot thiếu ghế, tránh dữ liệu booking không thể định giá.
+
 ### 6.2. Seed
 
 File: `be/prisma/seed.ts`.
@@ -869,8 +910,9 @@ Seed chạy idempotent bằng `upsert`:
 - Cinema, room và layout ghế:
   - Đọc từ `be/prisma/data/cinemas.seed.json`.
   - File hiện chứa 50 cinema và mỗi cinema có một room mặc định.
-  - Cinema chỉ lưu `id`, `name`, `address`, `provinceCode`.
-  - Layout tạo 3 hàng đầu `STANDARD`, các hàng giữa `VIP`, hàng cuối `COUPLE`.
+   - Cinema chỉ lưu `id`, `name`, `address`, `provinceCode`; `startingPrice` là giá tính động từ showtime, không lưu trong seed.
+   - Room có `format` tùy chọn trong dữ liệu seed, mặc định `STANDARD`.
+   - Layout tạo 3 hàng đầu `STANDARD`, các hàng giữa `VIP`, hàng cuối `COUPLE`.
   - Hàng Couple luôn có số ghế chẵn; các ghế ghép cặp theo `1-2`, `3-4`, `5-6`.
 - Showtime demo dùng cinema và room đầu tiên trong file seed tĩnh.
 - Khi chạy lại seed, layout chỉ được làm mới ở room chưa có showtime. Cinema/room seed cũ thuộc các namespace `cinema-`, `seed-cinema-`, `room-` hoặc `seed-room-` chỉ bị dọn khi không còn showtime liên quan; dữ liệu đang được sử dụng không bị xóa.
@@ -1179,6 +1221,10 @@ sequenceDiagram
 
 - Auth: public.
 - Chỉ trả movie `PUBLISHED`.
+- `NOW_SHOWING`: có ít nhất một suất tương lai, tùy `provinceCode` nếu có.
+- `COMING_SOON`: `releaseDate` lớn hơn thời điểm hiện tại; không bắt buộc đã có suất.
+- `SPECIAL`: có suất tương lai trong phòng không phải `STANDARD` hoặc có định dạng `3D`.
+- Response movie có `startingPrice`, là `basePrice` thấp nhất của các suất tương lai trong phạm vi tỉnh/thành.
 - Query:
 
 | Param      | Required | Ví dụ          | Mô tả                       |
@@ -1186,6 +1232,7 @@ sequenceDiagram
 | `search`   | Không    | `interstellar` | Tìm title, case-insensitive |
 | `page`     | Không    | `1`            | Default `1`                 |
 | `provinceCode` | Không | `79` | Lọc phim có suất chiếu tương lai tại tỉnh/thành |
+| `category` | Không | `NOW_SHOWING` | `NOW_SHOWING`, `COMING_SOON` hoặc `SPECIAL` |
 | `pageSize` | Không    | `20`           | Default `20`, max `100`     |
 
 - Success: `200`.
@@ -1373,7 +1420,8 @@ sequenceDiagram
 
 - Auth: public.
 - Success: `200`.
-- Trả cinema, `provinceCode`, thông tin tỉnh/thành và `_count.rooms`.
+- Trả cinema, `provinceCode`, thông tin tỉnh/thành, `_count.rooms` và `startingPrice`.
+- `startingPrice` là `basePrice` thấp nhất của các suất chiếu tương lai trong cụm rạp; có thể `null` nếu chưa có suất tương lai.
 - Query `provinceCode` là optional; nếu có chỉ trả các rạp thuộc mã tỉnh/thành hợp lệ.
 
 #### `GET /api/v1/cinemas/:id`
@@ -1539,13 +1587,16 @@ sequenceDiagram
 | ---------- | -------- | -------------------------- | ----------------------- |
 | `movieId`  | Không    | `clx-movie-id`             | Lọc theo movie          |
 | `cinemaId` | Không    | `clx-cinema-id`            | Lọc theo cinema         |
+| `format` | Không | `THREE_D_SUBTITLED` | Lọc định dạng suất |
+| `roomFormat` | Không | `IMAX` | Lọc công nghệ phòng |
+| `specialOnly` | Không | `true` | Phòng khác Standard hoặc suất 3D |
 | `provinceCode` | Không | `79` | Lọc theo tỉnh/thành của cinema |
 | `from`     | Không    | `2026-10-01T00:00:00.000Z` | Mốc bắt đầu             |
 | `to`       | Không    | `2026-10-02T00:00:00.000Z` | Mốc kết thúc            |
 | `page`     | Không    | `1`                        | Default `1`             |
 | `pageSize` | Không    | `20`                       | Default `20`, max `100` |
 
-- Success: `200`, response `{data, meta}`.
+- Success: `200`, response `{data, meta}`; mỗi showtime có `format`, `basePrice` và room có `format`.
 - Nếu `to <= from`: `400`.
 
 #### `GET /api/v1/showtimes/:id`
@@ -1624,6 +1675,7 @@ sequenceDiagram
   "movieId": "clx-movie-id",
   "roomId": "clx-room-id",
   "startsAt": "2026-10-01T19:00:00+07:00",
+  "format": "TWO_D_SUBTITLED",
   "basePrice": 100000,
   "vipMultiplier": 1.1,
   "coupleMultiplier": 1.2

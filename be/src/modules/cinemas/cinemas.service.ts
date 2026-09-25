@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { MovieStatus, Prisma } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
@@ -20,13 +20,29 @@ export class CinemasService {
       where: query.provinceCode ? { provinceCode: query.provinceCode } : undefined,
       include: {
         _count: { select: { rooms: true } },
+        rooms: {
+          select: {
+            showtimes: {
+              where: {
+                startsAt: { gte: new Date() },
+                movie: { status: MovieStatus.PUBLISHED },
+              },
+              select: { basePrice: true },
+            },
+          },
+        },
       },
       orderBy: { name: 'asc' },
     });
-    return toPublicResponse(cinemas.map((cinema) => ({
-      ...cinema,
-      province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
-    })));
+    return toPublicResponse(cinemas.map((cinema) => {
+      const prices = (cinema.rooms ?? []).flatMap((room) => (room.showtimes ?? []).map((showtime) => showtime.basePrice.toNumber()));
+      const { rooms: _rooms, ...cinemaData } = cinema;
+      return {
+        ...cinemaData,
+        province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
+        startingPrice: prices.length ? Math.min(...prices) : null,
+      };
+    }));
   }
 
   async findOne(id: string) {

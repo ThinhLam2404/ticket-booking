@@ -4,7 +4,9 @@ import {
   BookingStatus,
   MovieStatus,
   PaymentStatus,
+  RoomFormat,
   SeatType,
+  ShowtimeFormat,
   ShowtimeSeatStatus,
   TicketStatus,
   UserRole,
@@ -114,6 +116,9 @@ export class MovieResponseDto {
   @ApiProperty({ enum: MovieStatus, example: MovieStatus.PUBLISHED })
   status!: MovieStatus;
 
+  @ApiPropertyOptional({ type: Number, example: 100000, nullable: true })
+  startingPrice?: number | null;
+
   @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
   createdAt!: string;
 
@@ -136,6 +141,12 @@ export class MovieShowtimeResponseDto {
 
   @ApiProperty({ example: 'clx-room-id' })
   roomId!: string;
+
+  @ApiProperty({ enum: ShowtimeFormat, example: ShowtimeFormat.TWO_D_SUBTITLED })
+  format!: ShowtimeFormat;
+
+  @ApiProperty({ type: String, example: '100000.00' })
+  basePrice!: string;
 
   @ApiProperty({ type: () => RoomResponseDto })
   room!: object;
@@ -161,6 +172,9 @@ export class CinemaRoomResponseDto {
 
   @ApiProperty({ example: 'clx-cinema-id' })
   cinemaId!: string;
+
+  @ApiProperty({ enum: RoomFormat, example: RoomFormat.STANDARD })
+  format!: RoomFormat;
 
   @ApiProperty({ example: 32 })
   seatCount!: number;
@@ -193,6 +207,9 @@ export class CinemaResponseDto {
 
   @ApiPropertyOptional({ example: 3 })
   roomCount?: number;
+
+  @ApiPropertyOptional({ type: Number, example: 100000, nullable: true })
+  startingPrice?: number | null;
 
   @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
   createdAt!: string;
@@ -232,6 +249,9 @@ export class RoomResponseDto {
 
   @ApiProperty({ example: 'clx-cinema-id' })
   cinemaId!: string;
+
+  @ApiProperty({ enum: RoomFormat, example: RoomFormat.STANDARD })
+  format!: RoomFormat;
 
   @ApiPropertyOptional({ type: CinemaResponseDto })
   cinema?: CinemaResponseDto;
@@ -299,14 +319,17 @@ export class ShowtimeResponseDto {
   @ApiProperty({ example: 'clx-room-id' })
   roomId!: string;
 
-  @ApiPropertyOptional({ type: String, example: '100000.00', nullable: true })
-  basePrice?: string | null;
+  @ApiProperty({ enum: ShowtimeFormat, example: ShowtimeFormat.TWO_D_SUBTITLED })
+  format!: ShowtimeFormat;
 
-  @ApiPropertyOptional({ type: String, example: '1.10', nullable: true })
-  vipMultiplier?: string | null;
+  @ApiProperty({ type: String, example: '100000.00' })
+  basePrice!: string;
 
-  @ApiPropertyOptional({ type: String, example: '1.20', nullable: true })
-  coupleMultiplier?: string | null;
+  @ApiProperty({ type: String, example: '1.10' })
+  vipMultiplier!: string;
+
+  @ApiProperty({ type: String, example: '1.20' })
+  coupleMultiplier!: string;
 
   @ApiProperty({ type: RoomResponseDto })
   room!: RoomResponseDto;

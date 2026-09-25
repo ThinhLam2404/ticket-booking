@@ -208,3 +208,15 @@
 - ĐÃ CHỐT SCOPE: Không thêm field metadata vào `Cinema` cho amenities/giờ hoạt động riêng; không làm Admin sidebar/API/camera check-in. QR vé chỉ dành cho người dùng xuất trình tại rạp. Promotion giả sẽ được gỡ và module AI tạo promotion để backlog sau.
 - ĐÃ SỬA: Movie response từng trả Prisma `Decimal` của `rating` thành chuỗi, khiến Admin chỉ đổi status cũng gửi rating dạng string và API trả 400 (`rating must not be greater/less...`). MoviesService nay chuẩn hóa rating về number ở response boundary; MovieForm cũng normalize rating trước khi submit; đã thêm regression test.
 - CÒN LẠI: Browser verification live flow hold-expiry sau khi bật backend; tiếp tục rà format/price thật, filter catalogue và các copy cứng còn lại.
+
+## 2026-09-24 — Room/showtime format, catalogue category và giá thật
+
+- Thêm `RoomFormat`: `STANDARD`, `IMAX`, `FOUR_DX`, `SCREEN_X`; thêm `ShowtimeFormat` cho 2D/3D phụ đề/lồng tiếng.
+- Thêm format vào Room/Showtime DTO, Prisma schema, response DTO và Admin form; không cho đổi format phòng khi phòng đã có showtime.
+- Chuẩn hóa migration `20260924130000_room_showtime_formats_and_pricing`: backfill format cũ, backfill `basePrice` từ giá ghế snapshot thấp nhất, đặt multiplier mặc định `1.10/1.20`, sau đó chuyển pricing/format thành non-null.
+- Public movie catalogue hỗ trợ `NOW_SHOWING`, `COMING_SOON`, `SPECIAL`; `SPECIAL` là phòng khác Standard hoặc suất 3D và lọc theo tỉnh/thành khi có.
+- Public movie/cinema response tính `startingPrice` từ `basePrice` thấp nhất của suất tương lai; không thêm column nghiệp vụ vào `Cinema`.
+- Customer Home hiển thị tab catalogue thật, giá bắt đầu, format phòng/suất và giá trong Movie Detail; Admin có chọn format khi lập lịch đơn/hàng loạt và lọc suất đặc biệt.
+- Đồng bộ OpenAPI và generated frontend types.
+- Review fixes: Admin update gửi cả `format`; seed chỉ cập nhật format khi file seed khai báo và bổ sung một phòng IMAX để có dữ liệu `SPECIAL`; thêm migration kiểm tra snapshot đủ mọi ghế vật lý; cinema `startingPrice` chỉ tính suất của movie `PUBLISHED`; DTO pricing response đồng bộ non-null; Quick Booking luôn dùng phim `NOW_SHOWING`, còn catalogue đặc biệt chỉ preview suất đặc biệt.
+- Verification batch: lint, typecheck, build, backend unit `58/58`, FE `6/6`, E2E `6/6`, API check, Prisma validate/deploy/seed và `git diff --check` pass; integration bị chặn bởi port Windows `55432`.

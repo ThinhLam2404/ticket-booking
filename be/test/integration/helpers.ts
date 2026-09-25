@@ -142,10 +142,17 @@ export async function createFixture(app: INestApplication): Promise<IntegrationF
       roomId: room.id,
       startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       endsAt: new Date(Date.now() + 26 * 60 * 60 * 1000),
-      showtimeSeats: {
-        create: seats.map((seat) => ({ seatId: seat.id, price: '100000.00' })),
-      },
+      format: 'TWO_D_SUBTITLED',
+      basePrice: '100000.00',
+      vipMultiplier: '1.10',
+      coupleMultiplier: '1.20',
     },
+  });
+  await adminPrisma.showtimeSeat.createMany({
+    data: seats.map((seat) => ({ showtimeId: showtime.id, seatId: seat.id, price: '100000.00' })),
+  });
+  const showtimeWithSeats = await adminPrisma.showtime.findUniqueOrThrow({
+    where: { id: showtime.id },
     include: { showtimeSeats: true },
   });
   const tokenService = app.get(JwtTokenService);
@@ -165,6 +172,6 @@ export async function createFixture(app: INestApplication): Promise<IntegrationF
       token: tokenService.createAccessToken(customerB),
     },
     showtimeId: showtime.id,
-    showtimeSeatIds: showtime.showtimeSeats.map((seat) => seat.id),
+    showtimeSeatIds: showtimeWithSeats.showtimeSeats.map((seat) => seat.id),
   };
 }

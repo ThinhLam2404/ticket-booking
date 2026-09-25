@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ShowtimeFormat } from '@prisma/client';
 import {
   IsDateString,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -24,6 +26,11 @@ export class BulkShowtimeDto {
   @ApiProperty({ example: '2026-10-01T19:00:00+07:00', format: 'date-time' })
   @IsDateString()
   firstStartsAt!: string;
+
+  @ApiPropertyOptional({ enum: ShowtimeFormat, default: ShowtimeFormat.TWO_D_SUBTITLED })
+  @IsOptional()
+  @IsEnum(ShowtimeFormat)
+  format?: ShowtimeFormat = ShowtimeFormat.TWO_D_SUBTITLED;
 
   @ApiProperty({ example: 5, minimum: 1, maximum: 100 })
   @IsInt()

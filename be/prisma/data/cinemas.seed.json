@@ -11,7 +11,7 @@
       "name": "CGV Thảo Điền Pearl",
       "address": "12 Quốc Hương, Thảo Điền, Thành phố Hồ Chí Minh",
       "provinceCode": 79,
-      "rooms": [{ "id": "room-cgv-thao-dien-pearl-01", "name": "Phòng 01" }]
+      "rooms": [{ "id": "room-cgv-thao-dien-pearl-01", "name": "Phòng 01", "format": "IMAX" }]
     },
     {
       "id": "cinema-cgv-pham-van-dong",

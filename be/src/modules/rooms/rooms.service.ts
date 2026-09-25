@@ -39,7 +39,11 @@ export class RoomsService {
   async create(dto: CreateRoomDto) {
     try {
       const room = await this.prisma.room.create({
-        data: { name: dto.name.trim(), cinemaId: dto.cinemaId },
+        data: {
+          name: dto.name.trim(),
+          cinemaId: dto.cinemaId,
+          format: dto.format,
+        },
       });
       return toPublicResponse(room);
     } catch (error) {
@@ -57,11 +61,21 @@ export class RoomsService {
   }
 
   async update(id: string, dto: UpdateRoomDto) {
-    await this.getById(id);
+    const current = await this.prisma.room.findUnique({
+      where: { id },
+      include: { _count: { select: { showtimes: true } } },
+    });
+    if (!current) throw new NotFoundException('Room not found');
+    if (dto.format !== undefined && dto.format !== current.format && current._count.showtimes > 0) {
+      throw new ConflictException('Room format cannot be changed while it has showtimes');
+    }
     try {
       const room = await this.prisma.room.update({
         where: { id },
-        data: dto.name === undefined ? {} : { name: dto.name.trim() },
+        data: {
+          ...(dto.name !== undefined && { name: dto.name.trim() }),
+          ...(dto.format !== undefined && { format: dto.format }),
+        },
       });
       return toPublicResponse(room);
     } catch (error) {

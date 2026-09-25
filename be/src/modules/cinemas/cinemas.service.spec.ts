@@ -25,4 +25,41 @@ describe('CinemasService province filtering', () => {
       where: { provinceCode: 79 },
     }));
   });
+
+  it('calculates starting price from future published showtimes only', async () => {
+    const cinemaFindMany = vi.fn().mockResolvedValue([
+      {
+        id: 'cinema-1',
+        name: 'Central Cinema',
+        address: '1 Example Street',
+        provinceCode: 79,
+        _count: { rooms: 1 },
+        rooms: [
+          {
+            showtimes: [
+              { basePrice: { toNumber: () => 120000 } },
+              { basePrice: { toNumber: () => 100000 } },
+            ],
+          },
+        ],
+      },
+    ]);
+    const service = new CinemasService({ cinema: { findMany: cinemaFindMany } } as never);
+
+    await expect(service.findAll()).resolves.toMatchObject([{ startingPrice: 100000 }]);
+    expect(cinemaFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({
+        rooms: {
+          select: {
+            showtimes: {
+              where: expect.objectContaining({
+                movie: { status: 'PUBLISHED' },
+              }),
+              select: { basePrice: true },
+            },
+          },
+        },
+      }),
+    }));
+  });
 });

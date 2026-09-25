@@ -4,6 +4,12 @@ import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-valid
 import { PROVINCE_CODES } from '../../locations/provinces.js';
 import { MovieStatus } from '@prisma/client';
 
+export enum MovieCatalogCategory {
+  NOW_SHOWING = 'NOW_SHOWING',
+  COMING_SOON = 'COMING_SOON',
+  SPECIAL = 'SPECIAL',
+}
+
 export class ListMoviesDto {
   @ApiPropertyOptional({
     example: 'interstellar',
@@ -19,6 +25,11 @@ export class ListMoviesDto {
   @IsInt()
   @IsIn(PROVINCE_CODES)
   provinceCode?: number;
+
+  @ApiPropertyOptional({ enum: MovieCatalogCategory })
+  @IsOptional()
+  @IsEnum(MovieCatalogCategory)
+  category?: MovieCatalogCategory;
 
   @ApiPropertyOptional({ type: Number, example: 1, default: 1, minimum: 1 })
   @IsOptional()

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MovieStatus, Prisma, SeatType } from '@prisma/client';
+import { MovieStatus, Prisma, RoomFormat, SeatType, ShowtimeFormat } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
@@ -86,12 +86,18 @@ export class ShowtimesService {
         ...(!options.publishedOnly && query.status && { status: query.status }),
         ...(query.movieId && { id: query.movieId }),
       },
-      ...((query.cinemaId || query.provinceCode) && {
+      ...(query.format && { format: query.format }),
+      ...(query.specialOnly && {
+        OR: [
+          { room: { format: { not: RoomFormat.STANDARD } } },
+          { format: { in: [ShowtimeFormat.THREE_D_SUBTITLED, ShowtimeFormat.THREE_D_DUBBED] } },
+        ],
+      }),
+      ...((query.cinemaId || query.provinceCode || query.roomFormat) && {
         room: {
           ...(query.cinemaId && { cinemaId: query.cinemaId }),
-          ...(query.provinceCode && {
-            cinema: { provinceCode: query.provinceCode },
-          }),
+          ...(query.provinceCode && { cinema: { provinceCode: query.provinceCode } }),
+          ...(query.roomFormat && { format: query.roomFormat }),
         },
       }),
     };
@@ -340,6 +346,7 @@ export class ShowtimesService {
               data: {
                 movieId: dto.movieId,
                 roomId: dto.roomId,
+                format: dto.format,
                 startsAt: slot.startsAt,
                 endsAt: slot.endsAt,
                 basePrice: this.toDecimalString(pricing.basePrice),
@@ -422,6 +429,7 @@ export class ShowtimesService {
           data: {
             movieId: dto.movieId,
             roomId: dto.roomId,
+            format: dto.format,
             startsAt,
             endsAt,
             basePrice: this.toDecimalString(pricing.basePrice),
@@ -576,6 +584,7 @@ export class ShowtimesService {
             data: {
               movieId,
               roomId,
+              format: dto.format ?? current.format,
               startsAt,
               endsAt,
               ...(pricing && {

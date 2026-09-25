@@ -797,6 +797,8 @@ export interface components {
              * @enum {string}
              */
             status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+            /** @example 100000 */
+            startingPrice?: number | null;
             /**
              * Format: date-time
              * @example 2026-09-07T10:00:00.000Z
@@ -873,6 +875,8 @@ export interface components {
             province?: components["schemas"]["ProvinceResponseDto"] | null;
             /** @example 3 */
             roomCount?: number;
+            /** @example 100000 */
+            startingPrice?: number | null;
             /**
              * Format: date-time
              * @example 2026-09-07T10:00:00.000Z
@@ -906,6 +910,11 @@ export interface components {
             name: string;
             /** @example clx-cinema-id */
             cinemaId: string;
+            /**
+             * @example STANDARD
+             * @enum {string}
+             */
+            format: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
             cinema?: components["schemas"]["CinemaResponseDto"];
             seats?: components["schemas"]["SeatResponseDto"][];
             /** @example 32 */
@@ -938,6 +947,13 @@ export interface components {
             movieId: string;
             /** @example clx-room-id */
             roomId: string;
+            /**
+             * @example TWO_D_SUBTITLED
+             * @enum {string}
+             */
+            format: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
+            /** @example 100000.00 */
+            basePrice: string;
             room: components["schemas"]["RoomResponseDto"];
             /**
              * Format: date-time
@@ -991,6 +1007,8 @@ export interface components {
              * @enum {string}
              */
             status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+            /** @example 100000 */
+            startingPrice?: number | null;
             /**
              * Format: date-time
              * @example 2026-09-07T10:00:00.000Z
@@ -1104,6 +1122,11 @@ export interface components {
             name: string;
             /** @example clx-cinema-id */
             cinemaId: string;
+            /**
+             * @example STANDARD
+             * @enum {string}
+             */
+            format: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
             /** @example 32 */
             seatCount: number;
             /**
@@ -1129,6 +1152,8 @@ export interface components {
             province?: components["schemas"]["ProvinceResponseDto"] | null;
             /** @example 3 */
             roomCount?: number;
+            /** @example 100000 */
+            startingPrice?: number | null;
             /**
              * Format: date-time
              * @example 2026-09-07T10:00:00.000Z
@@ -1168,10 +1193,17 @@ export interface components {
             name: string;
             /** @example clx123cinema */
             cinemaId: string;
+            /**
+             * @default STANDARD
+             * @enum {string}
+             */
+            format: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
         };
         UpdateRoomDto: {
             /** @example Room 1 */
             name?: string;
+            /** @enum {string} */
+            format?: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
         };
         BulkSeatLayoutItemDto: {
             /** @example A */
@@ -1232,12 +1264,17 @@ export interface components {
             movie: components["schemas"]["MovieResponseDto"];
             /** @example clx-room-id */
             roomId: string;
+            /**
+             * @example TWO_D_SUBTITLED
+             * @enum {string}
+             */
+            format: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
             /** @example 100000.00 */
-            basePrice?: string | null;
+            basePrice: string;
             /** @example 1.10 */
-            vipMultiplier?: string | null;
+            vipMultiplier: string;
             /** @example 1.20 */
-            coupleMultiplier?: string | null;
+            coupleMultiplier: string;
             room: components["schemas"]["RoomResponseDto"];
             showtimeSeats?: components["schemas"]["ShowtimeSeatResponseDto"][];
             /**
@@ -1322,6 +1359,11 @@ export interface components {
              * @example 2026-10-01T19:00:00+07:00
              */
             firstStartsAt: string;
+            /**
+             * @default TWO_D_SUBTITLED
+             * @enum {string}
+             */
+            format: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
             /** @example 5 */
             count: number;
             /**
@@ -1401,6 +1443,11 @@ export interface components {
              */
             startsAt: string;
             /**
+             * @default TWO_D_SUBTITLED
+             * @enum {string}
+             */
+            format: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
+            /**
              * @description Base price for standard seats
              * @example 100000
              */
@@ -1426,6 +1473,11 @@ export interface components {
              * @example 2026-10-01T19:00:00+07:00
              */
             startsAt?: string;
+            /**
+             * @default TWO_D_SUBTITLED
+             * @enum {string}
+             */
+            format: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
             /**
              * @description Base price for standard seats
              * @example 100000
@@ -1955,6 +2007,7 @@ export interface operations {
                 search?: string;
                 /** @description Filter by cinema province or city code */
                 provinceCode?: number;
+                category?: "NOW_SHOWING" | "COMING_SOON" | "SPECIAL";
                 page?: number;
                 pageSize?: number;
             };
@@ -2044,6 +2097,7 @@ export interface operations {
                 search?: string;
                 /** @description Filter by cinema province or city code */
                 provinceCode?: number;
+                category?: "NOW_SHOWING" | "COMING_SOON" | "SPECIAL";
                 page?: number;
                 pageSize?: number;
                 status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -2327,6 +2381,7 @@ export interface operations {
                 search?: string;
                 /** @description Filter by cinema province or city code */
                 provinceCode?: number;
+                category?: "NOW_SHOWING" | "COMING_SOON" | "SPECIAL";
                 page?: number;
                 pageSize?: number;
             };
@@ -3194,6 +3249,9 @@ export interface operations {
             query?: {
                 movieId?: string;
                 cinemaId?: string;
+                format?: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
+                roomFormat?: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
+                specialOnly?: boolean;
                 /** @description Filter by cinema province or city code */
                 provinceCode?: number;
                 from?: string;
@@ -3293,6 +3351,9 @@ export interface operations {
             query?: {
                 movieId?: string;
                 cinemaId?: string;
+                format?: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
+                roomFormat?: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
+                specialOnly?: boolean;
                 /** @description Filter by cinema province or city code */
                 provinceCode?: number;
                 from?: string;

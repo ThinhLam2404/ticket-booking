@@ -321,6 +321,13 @@
   color: var(--text-secondary);
 }
 
+.app-shell .movie-starting-price {
+  display: block;
+  margin-top: 6px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .app-shell .movie-showtimes a,
 .app-shell .showtime-placeholder {
   background: var(--surface-2);

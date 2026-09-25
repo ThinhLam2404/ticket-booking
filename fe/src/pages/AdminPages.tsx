@@ -55,6 +55,10 @@ type ConfirmState = {
 
 const movieStatuses: MovieStatus[] = ["DRAFT", "PUBLISHED", "ARCHIVED"];
 const seatTypes: SeatType[] = ["STANDARD", "VIP", "COUPLE"];
+const roomFormats = ["STANDARD", "IMAX", "FOUR_DX", "SCREEN_X"] as const;
+const showtimeFormats = ["TWO_D_SUBTITLED", "TWO_D_DUBBED", "THREE_D_SUBTITLED", "THREE_D_DUBBED"] as const;
+const roomFormatText: Record<(typeof roomFormats)[number], string> = { STANDARD: "Tiêu chuẩn", IMAX: "IMAX", FOUR_DX: "4DX", SCREEN_X: "ScreenX" };
+const showtimeFormatText: Record<(typeof showtimeFormats)[number], string> = { TWO_D_SUBTITLED: "2D · Phụ đề", TWO_D_DUBBED: "2D · Lồng tiếng", THREE_D_SUBTITLED: "3D · Phụ đề", THREE_D_DUBBED: "3D · Lồng tiếng" };
 const editableSeatTypes: SeatType[] = ["STANDARD", "VIP"];
 const emptySeats: Seat[] = [];
 
@@ -1301,10 +1305,11 @@ function RoomForm({
   onSubmit,
 }: RoomFormProps) {
   const [name, setName] = useState(room?.name ?? "");
+  const [format, setFormat] = useState(room?.format ?? "STANDARD");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    await onSubmit({ name, cinemaId });
+    await onSubmit({ name, cinemaId, format });
   }
 
   return (
@@ -1321,6 +1326,11 @@ function RoomForm({
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
+        </Field>
+        <Field label="Định dạng phòng">
+          <select value={format} onChange={(event) => setFormat(event.target.value as typeof format)}>
+            {roomFormats.map((value) => <option key={value} value={value}>{roomFormatText[value]}</option>)}
+          </select>
         </Field>
         {error && <p className="form-error">{error}</p>}
         <FormActions
@@ -1360,7 +1370,7 @@ export function AdminRoomsPage() {
   });
   const saveMutation = useMutation({
     mutationFn: ({ id, body }: { id?: string; body: CreateRoomRequest }) =>
-      id ? api.updateRoom(id, { name: body.name }) : api.createRoom(body),
+      id ? api.updateRoom(id, { name: body.name, format: body.format }) : api.createRoom(body),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["admin-rooms", cinemaId],
@@ -1463,9 +1473,9 @@ export function AdminRoomsPage() {
               <div>
                 <p className="eyebrow">PHÒNG CHIẾU</p>
                 <h2>{room.name}</h2>
+                <span className="admin-room-format">{roomFormatText[room.format]} · {room.seatCount ?? room.seats?.length ?? 0} ghế</span>
                 <span>
-                  {room.seatCount ?? room.seats?.length ?? 0} ghế · Cập nhật{" "}
-                  {formatDate(room.updatedAt)}
+                  Cập nhật {formatDate(room.updatedAt)}
                 </span>
               </div>
               <div className="admin-actions">
@@ -1981,6 +1991,7 @@ function ShowtimeForm({
   const [cinemaId, setCinemaId] = useState(showtime?.room.cinemaId ?? "");
   const [roomId, setRoomId] = useState(showtime?.roomId ?? "");
   const [startsAt, setStartsAt] = useState(localDateTime(showtime?.startsAt));
+  const [format, setFormat] = useState(showtime?.format ?? "TWO_D_SUBTITLED");
   const selectedMovie = movies.find((movie) => movie.id === movieId);
   const calculatedEndsAt = startsAt && selectedMovie
     ? new Date(new Date(vietnameseDateTime(startsAt)).getTime() + selectedMovie.duration * 60 * 1000).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "medium", timeStyle: "short" })
@@ -2011,6 +2022,7 @@ function ShowtimeForm({
         movieId,
         roomId,
         startsAt: vietnameseDateTime(startsAt),
+        format,
         basePrice,
         vipMultiplier,
         coupleMultiplier,
@@ -2021,6 +2033,7 @@ function ShowtimeForm({
       movieId,
       roomId,
       startsAt: vietnameseDateTime(startsAt),
+      format,
       ...(pricingTouched.basePrice && { basePrice }),
       ...(pricingTouched.vipMultiplier && { vipMultiplier }),
       ...(pricingTouched.coupleMultiplier && { coupleMultiplier }),
@@ -2080,9 +2093,14 @@ function ShowtimeForm({
               </option>
               {(roomsQuery.data ?? []).map((room) => (
                 <option key={room.id} value={room.id}>
-                  {room.name}
+                  {room.name} · {roomFormatText[room.format]}
                 </option>
               ))}
+            </select>
+          </Field>
+          <Field label="Định dạng suất chiếu">
+            <select value={format} onChange={(event) => setFormat(event.target.value as typeof format)}>
+              {showtimeFormats.map((value) => <option key={value} value={value}>{showtimeFormatText[value]}</option>)}
             </select>
           </Field>
           <Field label="Bắt đầu">
@@ -2130,6 +2148,7 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
   const [movieId, setMovieId] = useState("");
   const [cinemaId, setCinemaId] = useState("");
   const [roomId, setRoomId] = useState("");
+  const [format, setFormat] = useState<(typeof showtimeFormats)[number]>("TWO_D_SUBTITLED");
   const [firstStartsAt, setFirstStartsAt] = useState("");
   const [count, setCount] = useState(5);
   const [turnaroundMinutes, setTurnaroundMinutes] = useState(20);
@@ -2153,6 +2172,7 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
     movieId,
     roomId,
     firstStartsAt: firstStartsAt ? vietnameseDateTime(firstStartsAt) : "",
+    format,
     count,
     turnaroundMinutes,
     basePrice,
@@ -2224,6 +2244,11 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
               {(roomsQuery.data ?? []).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
             </select>
           </Field>
+          <Field label="Định dạng suất chiếu">
+            <select value={format} onChange={(event) => { setFormat(event.target.value as typeof format); setPreview(null); }}>
+              {showtimeFormats.map((value) => <option key={value} value={value}>{showtimeFormatText[value]}</option>)}
+            </select>
+          </Field>
           <Field label="Suất đầu tiên (giờ Việt Nam)">
             <input required type="datetime-local" value={firstStartsAt} onChange={(event) => { setFirstStartsAt(event.target.value); setPreview(null); }} />
           </Field>
@@ -2259,6 +2284,7 @@ export function AdminShowtimesPage() {
   const [movieId, setMovieId] = useState("");
   const [cinemaId, setCinemaId] = useState("");
   const [status, setStatus] = useState<MovieStatus | "">("");
+  const [specialOnly, setSpecialOnly] = useState(false);
   const [includePast, setIncludePast] = useState(true);
   const [modal, setModal] = useState<{
     mode: FormMode;
@@ -2277,14 +2303,15 @@ export function AdminShowtimesPage() {
     queryFn: ({ signal }) => api.cinemas(undefined, signal),
   });
   const query = useQuery({
-    queryKey: ["admin-showtimes", movieId, cinemaId, status, includePast],
+    queryKey: ["admin-showtimes", movieId, cinemaId, status, specialOnly, includePast],
     queryFn: ({ signal }) =>
       api.adminShowtimes(
         {
           movieId: movieId || undefined,
           cinemaId: cinemaId || undefined,
-          status: status || undefined,
-          includePast,
+           status: status || undefined,
+           specialOnly: specialOnly || undefined,
+           includePast,
           pageSize: 100,
         },
         signal,
@@ -2421,10 +2448,14 @@ export function AdminShowtimesPage() {
             </option>
           ))}
         </select>
-        <label className="admin-checkbox">
-          <input
-            type="checkbox"
-            checked={includePast}
+         <label className="admin-checkbox">
+           <input type="checkbox" checked={specialOnly} onChange={(event) => setSpecialOnly(event.target.checked)} />
+           Suất đặc biệt
+         </label>
+         <label className="admin-checkbox">
+           <input
+             type="checkbox"
+             checked={includePast}
             onChange={(event) => setIncludePast(event.target.checked)}
           />{" "}
           Bao gồm suất đã bắt đầu
@@ -2476,12 +2507,12 @@ export function AdminShowtimesPage() {
                   </td>
                   <td>
                     <strong>{showtime.room.name}</strong>
-                    <small>
-                      {showtime.room.cinema?.name ??
-                        `Mã rạp: ${showtime.room.cinemaId}`}
-                    </small>
-                  </td>
-                  <td>{money(showtime.basePrice ?? 0)}</td>
+                     <small>
+                       {showtime.room.cinema?.name ??
+                         `Mã rạp: ${showtime.room.cinemaId}`} · {roomFormatText[showtime.room.format ?? "STANDARD"]} · {showtimeFormatText[showtime.format ?? "TWO_D_SUBTITLED"]}
+                     </small>
+                   </td>
+                   <td>{money(showtime.basePrice ?? 0)}</td>
                   <td>
                     <div className="admin-actions">
                       <button

@@ -24,6 +24,20 @@ enum SeatType {
   COUPLE
 }
 
+enum RoomFormat {
+  STANDARD
+  IMAX
+  FOUR_DX
+  SCREEN_X
+}
+
+enum ShowtimeFormat {
+  TWO_D_SUBTITLED
+  TWO_D_DUBBED
+  THREE_D_SUBTITLED
+  THREE_D_DUBBED
+}
+
 enum ShowtimeSeatStatus {
   AVAILABLE
   HELD
@@ -110,6 +124,7 @@ model Cinema {
 model Room {
   id        String     @id @default(cuid())
   name      String
+  format    RoomFormat @default(STANDARD)
   cinemaId  String
   cinema    Cinema     @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
   seats     Seat[]
@@ -118,6 +133,7 @@ model Room {
   updatedAt DateTime   @updatedAt
 
   @@unique([cinemaId, name])
+  @@index([format])
 }
 
 model Seat {
@@ -140,9 +156,10 @@ model Showtime {
   movie            Movie     @relation(fields: [movieId], references: [id], onDelete: Restrict)
   roomId           String
   room             Room      @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  basePrice        Decimal?  @db.Decimal(10, 2)
-  vipMultiplier    Decimal?  @db.Decimal(5, 2)
-  coupleMultiplier Decimal?  @db.Decimal(5, 2)
+  format           ShowtimeFormat @default(TWO_D_SUBTITLED)
+  basePrice        Decimal   @db.Decimal(10, 2)
+  vipMultiplier    Decimal   @db.Decimal(5, 2)
+  coupleMultiplier Decimal   @db.Decimal(5, 2)
   showtimeSeats    ShowtimeSeat[]
   bookings         Booking[]
   createdAt        DateTime  @default(now())
@@ -150,6 +167,7 @@ model Showtime {
 
   @@index([movieId, startsAt])
   @@index([roomId, startsAt, endsAt])
+  @@index([format, startsAt])
 }
 
 model ShowtimeSeat {

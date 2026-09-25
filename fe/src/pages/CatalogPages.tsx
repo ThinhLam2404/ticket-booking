@@ -6,8 +6,16 @@ import { api } from '../api';
 import { useLocationContext } from '../auth/LocationContext';
 import { EmptyState, ErrorState, LoadingState, LocationPicker, PageHeader, TrailerModal } from '../components/ui';
 import type { Cinema, Movie, MovieDetails, Showtime } from '../types';
-import { formatDay, formatReleaseDate, formatTime } from '../utils/format';
+import { formatDay, formatReleaseDate, formatTime, money as formatMoney } from '../utils/format';
 import { backdropStyle, posterStyle, initials } from '../utils/media';
+
+function roomFormatLabel(format?: string | null) {
+  return format === 'IMAX' ? 'IMAX' : format === 'FOUR_DX' ? '4DX' : format === 'SCREEN_X' ? 'ScreenX' : 'Tiêu chuẩn';
+}
+
+function showtimeFormatLabel(format?: string | null) {
+  return format === 'THREE_D_SUBTITLED' ? '3D · Phụ đề' : format === 'THREE_D_DUBBED' ? '3D · Lồng tiếng' : format === 'TWO_D_DUBBED' ? '2D · Lồng tiếng' : format === 'TWO_D_SUBTITLED' ? '2D · Phụ đề' : 'Chưa phân loại';
+}
 
 function Poster({ title, posterUrl, className = '' }: { title: string; posterUrl?: string | null; className?: string }) {
   return <div className={`poster-image ${className}`} style={posterStyle(title, posterUrl)} role="img" aria-label={`Poster ${title}`}><span>{posterUrl ? '' : initials(title)}</span></div>;
@@ -31,6 +39,7 @@ function MovieCard({ movie, showtimes = [] }: { movie: Movie; showtimes?: Showti
     <div className="movie-info">
       <Link to={`/movies/${movie.id}`}><h3>{movie.title}</h3></Link>
       <p>{movie.duration} phút{movie.genres.length ? ` · ${movie.genres.slice(0, 2).join(' · ')}` : ''}</p>
+      {movie.startingPrice != null && <small className="movie-starting-price">Từ {formatMoney(movie.startingPrice)}</small>}
       <div className="movie-showtimes">{previewTimes.map((showtime) => 'id' in showtime ? <Link key={showtime.id} to={`/showtimes/${showtime.id}/seats`}>{showtime.label}</Link> : <span className="showtime-placeholder" key={showtime.label}>{showtime.label}</span>)}</div>
       <Link className="movie-buy" to={`/movies/${movie.id}`}>Mua vé <span>→</span></Link>
     </div>
@@ -47,7 +56,7 @@ function CinemaCard({ cinema, index }: { cinema: Cinema; index: number }) {
     <div className="cinema-card-body">
       <div className="cinema-card-heading"><div><p className="eyebrow">CINEBOOK NETWORK</p><h2>{cinema.name}</h2></div></div>
       <p className="cinema-address"><span aria-hidden="true">⌖</span><span>{cinema.address}</span></p>
-      <div className="cinema-meta"><span>⌂ {cinema.roomCount ?? 0} phòng chiếu</span><span>Lịch chiếu theo ngày</span></div>
+      <div className="cinema-meta"><span>⌂ {cinema.roomCount ?? 0} phòng chiếu</span><span>{cinema.startingPrice != null ? `Giá từ ${formatMoney(cinema.startingPrice)}` : 'Lịch chiếu theo ngày'}</span></div>
       <div className="cinema-actions"><a className="secondary" href={directionsUrl} target="_blank" rel="noreferrer">Chỉ đường</a><Link className="primary" to={`/?cinemaId=${encodeURIComponent(cinema.id)}#quick-booking`}>Xem lịch chiếu</Link></div>
     </div>
   </article>;
@@ -62,17 +71,24 @@ export function HomePage() {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedShowtime, setSelectedShowtime] = useState('');
   const [trailerOpen, setTrailerOpen] = useState(false);
+  const [catalogCategory, setCatalogCategory] = useState<'NOW_SHOWING' | 'COMING_SOON' | 'SPECIAL'>('NOW_SHOWING');
   const { selectedProvinceCode, settledProvinceCode, selectedProvince } = useLocationContext();
-  const moviesQuery = useQuery({ queryKey: ['movies', search, settledProvinceCode], queryFn: ({ signal }) => api.movies(search, settledProvinceCode, signal) });
+  const moviesQuery = useQuery({ queryKey: ['movies', search, settledProvinceCode, catalogCategory], queryFn: ({ signal }) => api.movies(search, settledProvinceCode, catalogCategory, signal) });
+  const bookingMoviesQuery = useQuery({ queryKey: ['movies', search, settledProvinceCode, 'NOW_SHOWING'], queryFn: ({ signal }) => api.movies(search, settledProvinceCode, 'NOW_SHOWING', signal) });
   const cinemasQuery = useQuery({ queryKey: ['cinemas', settledProvinceCode], queryFn: ({ signal }) => api.cinemas(settledProvinceCode, signal) });
   const showtimesQuery = useQuery({ queryKey: ['showtimes', settledProvinceCode], queryFn: ({ signal }) => api.showtimes({ provinceCode: settledProvinceCode }, signal) });
   const movies = moviesQuery.data?.data ?? [];
+  const bookingMovies = bookingMoviesQuery.data?.data ?? [];
   const cinemas = cinemasQuery.data ?? [];
   const showtimeData = showtimesQuery.data?.data;
   const showtimes = useMemo(() => showtimeData ?? [], [showtimeData]);
   const dates = useMemo(() => [...new Set(showtimes.map((showtime) => new Date(showtime.startsAt).toISOString().slice(0, 10)))], [showtimes]);
   const quickShowtimes = useMemo(() => showtimes.filter((showtime) => (!selectedMovie || showtime.movieId === selectedMovie) && (!selectedCinema || showtime.room.cinemaId === selectedCinema) && (!selectedDate || showtime.startsAt.startsWith(selectedDate))), [selectedCinema, selectedDate, selectedMovie, showtimes]);
-  const featuredMovie = movies[0];
+  const catalogShowtimes = useMemo(() => catalogCategory === 'SPECIAL'
+    ? showtimes.filter((showtime) => showtime.room.format !== 'STANDARD' || showtime.format === 'THREE_D_SUBTITLED' || showtime.format === 'THREE_D_DUBBED')
+    : catalogCategory === 'COMING_SOON' ? [] : showtimes, [catalogCategory, showtimes]);
+  const featuredMovie = bookingMovies[0];
+  const catalogLabel = catalogCategory === 'COMING_SOON' ? 'PHIM SẮP CHIẾU' : catalogCategory === 'SPECIAL' ? 'SUẤT CHIẾU ĐẶC BIỆT' : 'PHIM ĐANG CHIẾU';
 
   useEffect(() => {
     setSelectedCinema('');
@@ -85,8 +101,8 @@ export function HomePage() {
     <section className="spotlight-hero" style={featuredMovie ? backdropStyle(featuredMovie.title, featuredMovie.backdropUrl) as CSSProperties : undefined}>
       <div className="spotlight-shade" /><div className="spotlight-content"><div className="spotlight-copy"><div className="hero-badges"><span className="hero-duration">◷ {featuredMovie?.duration ?? '—'} phút</span></div><p className="eyebrow">PHIM ĐANG CHIẾU / CINEBOOK</p><h1>{featuredMovie?.title ?? 'Khám phá phim đang chiếu'}</h1><p>{featuredMovie?.description ?? `Chọn suất chiếu phù hợp tại ${selectedProvince?.name ?? 'khu vực của bạn'} và giữ ghế trong vài bước.`}</p><div className="hero-actions"><a className="primary" href="#quick-booking">Đặt vé ngay <span>→</span></a><button className="secondary" type="button" disabled={!featuredMovie?.trailerKey} onClick={() => setTrailerOpen(true)}>▷ {featuredMovie?.trailerKey ? 'Xem trailer' : 'Chưa có trailer'}</button></div></div></div>
     </section>
-    <section className="quick-booking" id="quick-booking"><div className="quick-booking-heading"><div><span className="quick-dot" /><h2>Thanh đặt vé nhanh</h2></div><small>Chọn nhanh 4 bước để giữ vị trí đẹp</small></div><div className="quick-booking-grid">{[[1, 'Chọn rạp', <select key="cinema" value={selectedCinema} onChange={(event) => { setSelectedCinema(event.target.value); setSelectedShowtime(''); }}><option value="">Tất cả cụm rạp</option>{cinemas.map((cinema) => <option key={cinema.id} value={cinema.id}>{cinema.name}</option>)}</select>], [2, 'Chọn phim', <select key="movie" value={selectedMovie} onChange={(event) => { setSelectedMovie(event.target.value); setSelectedShowtime(''); }}><option value="">Chọn phim</option>{movies.map((movie) => <option key={movie.id} value={movie.id}>{movie.title}</option>)}</select>], [3, 'Chọn ngày', <select key="date" value={selectedDate} onChange={(event) => { setSelectedDate(event.target.value); setSelectedShowtime(''); }}><option value="">Ngày gần nhất</option>{dates.map((date) => <option key={date} value={date}>{formatDay(date)}</option>)}</select>], [4, 'Chọn suất chiếu', <select key="showtime" value={selectedShowtime} onChange={(event) => setSelectedShowtime(event.target.value)}><option value="">Chọn suất</option>{quickShowtimes.map((showtime) => <option key={showtime.id} value={showtime.id}>{formatTime(showtime.startsAt)} · {showtime.room.cinema?.name}</option>)}</select>]].map(([number, label, control]) => <label className="quick-step" key={String(number)}><span><b>{number}</b>{label}</span>{control}</label>)}<button className="primary quick-booking-submit" type="button" disabled={!selectedShowtime} onClick={() => navigate(`/showtimes/${selectedShowtime}/seats`)}>Mua vé ngay <span>→</span></button></div></section>
-    <section className="catalog-section" id="now-showing"><div className="section-heading catalog-heading"><div><p className="eyebrow">PHIM ĐANG CHIẾU</p><h2>Chọn câu chuyện tiếp theo</h2><p>Khám phá các bom tấn đỉnh cao tại hệ thống cụm rạp CineBook.</p></div></div><div className="filter-tabs"><button className="filter-chip active" type="button">Đang chiếu</button><button className="filter-chip" type="button">Suất chiếu đặc biệt</button><button className="filter-chip" type="button">Sắp chiếu</button></div>{moviesQuery.isPending && <LoadingState label="Đang tải danh sách phim…" />}{moviesQuery.isError && <ErrorState cause={moviesQuery.error} fallback="Không thể tải danh sách phim." onRetry={() => void moviesQuery.refetch()} />}{moviesQuery.isSuccess && !movies.length && <EmptyState>{search ? 'Không tìm thấy phim phù hợp.' : `Chưa có phim đang chiếu tại ${selectedProvince?.name ?? 'khu vực này'}.`}</EmptyState>}{movies.length > 0 && <div className="movie-grid">{movies.map((movie) => <MovieCard key={movie.id} movie={movie} showtimes={showtimes} />)}</div>}</section>
+    <section className="quick-booking" id="quick-booking"><div className="quick-booking-heading"><div><span className="quick-dot" /><h2>Thanh đặt vé nhanh</h2></div><small>Chọn nhanh 4 bước để giữ vị trí đẹp</small></div><div className="quick-booking-grid">{[[1, 'Chọn rạp', <select key="cinema" value={selectedCinema} onChange={(event) => { setSelectedCinema(event.target.value); setSelectedShowtime(''); }}><option value="">Tất cả cụm rạp</option>{cinemas.map((cinema) => <option key={cinema.id} value={cinema.id}>{cinema.name}</option>)}</select>], [2, 'Chọn phim', <select key="movie" value={selectedMovie} onChange={(event) => { setSelectedMovie(event.target.value); setSelectedShowtime(''); }}><option value="">Chọn phim</option>{bookingMovies.map((movie) => <option key={movie.id} value={movie.id}>{movie.title}</option>)}</select>], [3, 'Chọn ngày', <select key="date" value={selectedDate} onChange={(event) => { setSelectedDate(event.target.value); setSelectedShowtime(''); }}><option value="">Ngày gần nhất</option>{dates.map((date) => <option key={date} value={date}>{formatDay(date)}</option>)}</select>], [4, 'Chọn suất chiếu', <select key="showtime" value={selectedShowtime} onChange={(event) => setSelectedShowtime(event.target.value)}><option value="">Chọn suất</option>{quickShowtimes.map((showtime) => <option key={showtime.id} value={showtime.id}>{formatTime(showtime.startsAt)} · {roomFormatLabel(showtime.room.format)} · {showtimeFormatLabel(showtime.format)} · {showtime.basePrice != null ? formatMoney(Number(showtime.basePrice)) : 'Giá đang cập nhật'} · {showtime.room.cinema?.name}</option>)}</select>]].map(([number, label, control]) => <label className="quick-step" key={String(number)}><span><b>{number}</b>{label}</span>{control}</label>)}<button className="primary quick-booking-submit" type="button" disabled={!selectedShowtime} onClick={() => navigate(`/showtimes/${selectedShowtime}/seats`)}>Mua vé ngay <span>→</span></button></div></section>
+    <section className="catalog-section" id="now-showing"><div className="section-heading catalog-heading"><div><p className="eyebrow">{catalogLabel}</p><h2>Chọn câu chuyện tiếp theo</h2><p>Khám phá các bom tấn đỉnh cao tại hệ thống cụm rạp CineBook.</p></div></div><div className="filter-tabs"><button className={`filter-chip ${catalogCategory === 'NOW_SHOWING' ? 'active' : ''}`} type="button" onClick={() => setCatalogCategory('NOW_SHOWING')}>Đang chiếu</button><button className={`filter-chip ${catalogCategory === 'SPECIAL' ? 'active' : ''}`} type="button" onClick={() => setCatalogCategory('SPECIAL')}>Suất chiếu đặc biệt</button><button className={`filter-chip ${catalogCategory === 'COMING_SOON' ? 'active' : ''}`} type="button" onClick={() => setCatalogCategory('COMING_SOON')}>Sắp chiếu</button></div>{moviesQuery.isPending && <LoadingState label="Đang tải danh sách phim…" />}{moviesQuery.isError && <ErrorState cause={moviesQuery.error} fallback="Không thể tải danh sách phim." onRetry={() => void moviesQuery.refetch()} />}{moviesQuery.isSuccess && !movies.length && <EmptyState>{search ? 'Không tìm thấy phim phù hợp.' : `Chưa có phim đang chiếu tại ${selectedProvince?.name ?? 'khu vực này'}.`}</EmptyState>}{movies.length > 0 && <div className="movie-grid">{movies.map((movie) => <MovieCard key={movie.id} movie={movie} showtimes={catalogShowtimes} />)}</div>}</section>
     {trailerOpen && featuredMovie?.trailerKey && <TrailerModal movieTitle={featuredMovie.title} trailerKey={featuredMovie.trailerKey} onClose={() => setTrailerOpen(false)} />}
   </>;
 }
@@ -172,7 +188,7 @@ export function MoviePage() {
       <label className="showtime-filter-label">1. Chọn ngày chiếu</label><div className="date-strip">{dates.length ? dates.map((value, index) => <button className={`date-chip ${date === value || (!date && index === 0) ? 'active' : ''}`} key={value} type="button" onClick={() => setDate(date === value ? '' : value)}><small>{index === 0 ? 'Ngày gần nhất' : formatDay(value).split(',')[0]}</small><strong>{new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</strong><span>{formatDay(value).split(',').slice(-1)[0]}</span></button>) : <EmptyState>Chưa có ngày chiếu.</EmptyState>}</div>
       <div className="showtime-toolbar"><label><span>Chọn cụm rạp</span><select value={cinemaId} onChange={(event) => setCinemaId(event.target.value)}><option value="">Tất cả cụm rạp</option>{(cinemasQuery.data ?? []).map((cinema) => <option key={cinema.id} value={cinema.id}>{cinema.name}</option>)}</select></label></div>
       {!Object.keys(groups).length && <EmptyState>Phim chưa có suất chiếu phù hợp. Vui lòng chọn ngày hoặc cụm rạp khác.</EmptyState>}
-      <div className="showtime-days">{Object.entries(groups).map(([cinemaName, showtimes]) => <div className="showtime-day" key={cinemaName}><div className="showtime-day-heading"><div><h3>{cinemaName}</h3><p>⌖ {showtimes[0]?.room?.name ?? 'Phòng chiếu'} · {showtimes.length} suất trong ngày đã chọn</p></div><span className="showtime-count">{showtimes.length} suất</span></div><div className="showtime-list">{showtimes.map((showtime) => <Link key={showtime.id} className="showtime-card" to={`/showtimes/${showtime.id}/seats`}><strong>{formatTime(showtime.startsAt)}</strong><span>Đến {formatTime(showtime.endsAt)}</span><small>{showtime.room?.name ?? 'Phòng chiếu'} · Chọn ghế →</small></Link>)}</div></div>)}</div>
+      <div className="showtime-days">{Object.entries(groups).map(([cinemaName, showtimes]) => <div className="showtime-day" key={cinemaName}><div className="showtime-day-heading"><div><h3>{cinemaName}</h3><p>⌖ {showtimes[0]?.room?.name ?? 'Phòng chiếu'} · {showtimes.length} suất trong ngày đã chọn</p></div><span className="showtime-count">{showtimes.length} suất</span></div><div className="showtime-list">{showtimes.map((showtime) => <Link key={showtime.id} className="showtime-card" to={`/showtimes/${showtime.id}/seats`}><strong>{formatTime(showtime.startsAt)}</strong><span>Đến {formatTime(showtime.endsAt)}</span><small>{roomFormatLabel(showtime.room?.format)} · {showtimeFormatLabel(showtime.format)} · {showtime.basePrice != null ? `Từ ${formatMoney(Number(showtime.basePrice))}` : 'Giá đang cập nhật'} · Chọn ghế →</small></Link>)}</div></div>)}</div>
     </section>
     {trailerOpen && movie.trailerKey && <TrailerModal movieTitle={movie.title} trailerKey={movie.trailerKey} onClose={() => setTrailerOpen(false)} />}
   </>;

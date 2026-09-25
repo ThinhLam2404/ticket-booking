@@ -1,12 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { PrismaClient, SeatType, UserRole } from '@prisma/client';
+import { PrismaClient, RoomFormat, SeatType, ShowtimeFormat, UserRole } from '@prisma/client';
 import { hashPassword } from '../src/common/auth/password.js';
 import { buildSeatLayout, type SeatLayoutPreset } from '../src/modules/seats/seat-layout.js';
 
 type StaticCinemaRoom = {
   id: string;
   name: string;
+  format?: RoomFormat;
   layout?: SeatLayoutPreset;
 };
 
@@ -68,8 +69,17 @@ async function seedCinema(cinemaData: StaticCinemaData, cinema: StaticCinema) {
   for (const roomData of cinema.rooms) {
     const room = await prisma.room.upsert({
       where: { id: roomData.id },
-      update: { name: roomData.name, cinemaId: cinema.id },
-      create: { id: roomData.id, name: roomData.name, cinemaId: cinema.id },
+      update: {
+        name: roomData.name,
+        cinemaId: cinema.id,
+        ...(roomData.format !== undefined && { format: roomData.format }),
+      },
+      create: {
+        id: roomData.id,
+        name: roomData.name,
+        cinemaId: cinema.id,
+        format: roomData.format ?? RoomFormat.STANDARD,
+      },
     });
     const hasShowtimes = await prisma.showtime.count({ where: { roomId: room.id } });
     if (hasShowtimes) continue;
@@ -143,6 +153,7 @@ async function seedDemoShowtime(cinema: StaticCinema) {
           roomId: room.id,
           startsAt,
           endsAt,
+          format: ShowtimeFormat.TWO_D_SUBTITLED,
           basePrice: '100000.00',
           vipMultiplier: '1.10',
           coupleMultiplier: '1.20',
@@ -155,6 +166,7 @@ async function seedDemoShowtime(cinema: StaticCinema) {
           roomId: room.id,
           startsAt,
           endsAt,
+          format: ShowtimeFormat.TWO_D_SUBTITLED,
           basePrice: '100000.00',
           vipMultiplier: '1.10',
           coupleMultiplier: '1.20',

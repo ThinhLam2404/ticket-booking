@@ -11,7 +11,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { MovieStatus } from '@prisma/client';
+import { MovieStatus, RoomFormat, ShowtimeFormat } from '@prisma/client';
 import { PROVINCE_CODES } from '../../locations/provinces.js';
 
 export class ListShowtimesDto {
@@ -24,6 +24,22 @@ export class ListShowtimesDto {
   @IsOptional()
   @IsString()
   cinemaId?: string;
+
+  @ApiPropertyOptional({ enum: ShowtimeFormat })
+  @IsOptional()
+  @IsEnum(ShowtimeFormat)
+  format?: ShowtimeFormat;
+
+  @ApiPropertyOptional({ enum: RoomFormat })
+  @IsOptional()
+  @IsEnum(RoomFormat)
+  roomFormat?: RoomFormat;
+
+  @ApiPropertyOptional({ type: Boolean, default: false })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' ? true : value === 'false' ? false : value)
+  @IsBoolean()
+  specialOnly?: boolean;
 
   @ApiPropertyOptional({ type: Number, example: 79, description: 'Filter by cinema province or city code' })
   @IsOptional()
