@@ -87,6 +87,27 @@ Definition of done:
 - `npm run lint`, `npm run typecheck`, `npm run build`, `npm run test:fe` và browser smoke flow pass.
 - Có ghi chú dependency graph đơn giản để tránh circular import giữa shared, feature và page layers.
 
+## Sprint 1 completion record — 2026-09-29
+
+Đã hoàn thành frontend architecture extraction:
+
+- Customer features được tách dưới `fe/src/features/catalog`, `booking`, `account` và `auth`; các file trong `fe/src/pages/` còn thin compatibility barrels để giữ nguyên import và route map.
+- Admin features được tách dưới `fe/src/features/admin`: dashboard, movies/TMDB, cinemas/rooms/seats, showtimes/bulk scheduling, payments và shared admin primitives; `AdminPages.tsx` giữ named exports cũ.
+- `AuthModal` được đưa về `fe/src/features/auth/AuthModal.tsx`; dialog focus logic được đưa về `fe/src/components/useDialogFocus.ts`; shared UI chỉ giữ shell/primitives và compatibility exports.
+- `fe/src/features/*/components.tsx` và `fe/src/features/admin/shared.tsx` giữ các component/helper dùng trong cùng feature; API boundary vẫn là `fe/src/api.ts`, không thêm fetch trực tiếp vào component.
+- Route paths, API contracts, React Query keys, booking/hold/payment behavior, CSS class names và loading/error/empty/pending states được giữ nguyên.
+- Thêm helper regression tests cho catalog labels, booking seat labels, admin YouTube parsing/showtime status; frontend suite hiện pass `10/10`.
+- Verification: frontend lint pass, frontend typecheck pass, frontend tests `10/10`, full `npm run check` pass, integration `14/14`, API check pass và `git diff --check` pass.
+- Browser smoke sau extraction pass ở Home desktop/mobile `390px` và Cinema mobile `390px`; route barrels render đúng dữ liệu seed, không có console error khi backend development chạy.
+
+Dependency direction:
+
+- `pages/*` → `features/*` → shared `components/*`, `auth/*`, `utils/*`, `api.ts`.
+- Shared components không import page hoặc feature page; feature admin dùng `components/useDialogFocus.ts` trực tiếp để tránh phụ thuộc ngược vào UI barrel.
+- `App.tsx` tiếp tục import từ page barrels, nên route wiring không đổi.
+
+Trạng thái: Sprint 1 hoàn thành. Commit message đề xuất: `refactor(fe): extract feature-based page architecture`.
+
 ### Sprint 2 — Security và correctness hardening
 
 Mục tiêu: giảm các rủi ro có thể làm lộ tài khoản, bị abuse hoặc tạo trạng thái payment sai.
