@@ -2513,7 +2513,7 @@ Khi reset database, chạy migration rồi chạy `npm run prisma:seed`. Seed kh
 - Email phụ thuộc SMTP provider được cấu hình qua `SMTP_*`; cần kiểm tra credentials và network access trước khi chạy Worker Thread. Worker dùng at-least-once delivery, dedupe theo outbox và có thể gửi lại nếu process crash sau SMTP thành công nhưng trước khi ghi `SENT`.
 - Chưa có webhook signature verification.
 - Chưa có refund flow dù enum `REFUNDED` đã tồn tại.
-- Chưa có ticket check-in/consume.
+- Chưa có ticket check-in/consume; đây là chủ ý ngoài scope roadmap hiện tại, QR chỉ dùng để khách xuất trình tại rạp.
 - Chưa có admin user management.
 - TMDB search/import hiện do Admin chủ động; chưa có scheduler tự động đồng bộ phim từ TMDB.
 - Province context mặc định mã `79` (Thành phố Hồ Chí Minh), được lưu ở frontend localStorage key `ticket_booking_province_code`.
@@ -2530,13 +2530,15 @@ Khi reset database, chạy migration rồi chạy `npm run prisma:seed`. Seed kh
 
 ### 15.2. Roadmap đề xuất
 
-1. Bổ sung integration test cho showtime overlap, migration backfill và refresh rotation concurrent.
-2. Tách payment provider interface khỏi mock provider.
-3. Thêm webhook và payment attempt/event table.
-4. Thêm ticket scan/check-in.
-5. Thêm admin user management và audit log.
-6. Thêm pagination/filter/sort chuẩn hóa cho booking/ticket/catalog.
-7. Thêm rate limiting, Helmet, logging, metrics và tracing.
-9. Thêm cleanup job cho refresh token hết hạn.
-10. Tạo Dockerfile/API container và CI pipeline.
-11. Kiểm tra `npm audit` và cập nhật dependencies.
+Roadmap chi tiết được lưu trong [`WORKLOG.md`](./WORKLOG.md). Mục tiêu là học sâu các năng lực cần cho production nhưng giữ kiến trúc monolith vừa đủ cho personal project.
+
+1. **Baseline và release contract:** đồng bộ tài liệu, production checklist, smoke test customer flow thật và browser verification.
+2. **Frontend architecture và component extraction:** tách page monolith theo feature, shared components, hooks và state boundaries; giữ nguyên route/API/query key/behavior, plain CSS và design system.
+3. **Security/correctness hardening:** Redis rate limiting, CORS allowlist, Helmet/security headers, production Swagger gate, webhook hardening, refresh-token reuse detection, cleanup jobs và concurrency tests.
+4. **Container/CI/CD/observability:** Dockerfile, staging, CI quality gate, structured logs, request ID, metrics, alerts, backup/restore và rollback runbook.
+5. **Payment reconciliation/refund:** hoàn thiện state transition SePay/payment/booking/ticket, manual reconciliation, refund idempotency và audit trail; chưa cần payment abstraction provider thứ hai.
+6. **Pagination/query performance:** chuẩn hóa pagination/filter/sort cho booking, ticket, payment và các list tăng trưởng; kiểm tra index, query plan và load test.
+7. **Automated critical journeys:** browser/component/contract tests cho auth, seat hold, checkout, webhook, nhiều ticket, responsive và light/dark.
+8. **Account/RBAC/audit:** password reset, session management, admin user management, permission boundaries và audit log.
+
+Ticket check-in/consume không thuộc scope roadmap hiện tại; QR chỉ phục vụ khách xuất trình tại rạp. Promotion, TMDB scheduler, dashboard nâng cao, provider thứ hai và recommendation để backlog sau production baseline.

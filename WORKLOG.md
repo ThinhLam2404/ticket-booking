@@ -1,271 +1,262 @@
-# Worklog — 2026-09-17
+# WORKLOG — CineBook roadmap
 
-## Trạng thái
+## Mục tiêu dự án
 
-Đã hoàn thiện batch xử lý các finding về cinema seed tĩnh, layout ghế Couple, pricing showtime và UI admin/booking. Chưa commit.
+CineBook là personal project với hai mục tiêu song song:
 
-## Đã làm
+1. Học đủ sâu các phần quan trọng của một hệ thống thực tế: domain modeling, concurrency, payment, security, testing, observability, deployment và vận hành.
+2. Đưa hệ thống chạy production thật với chi phí và độ phức tạp phù hợp personal project.
 
-- Seed cinema tĩnh từ `be/prisma/data/cinemas.seed.json`, không gọi mạng lúc runtime hoặc seed.
-- Seed upsert cinema/room, sinh layout ghế bằng `buildSeatLayout()` và bảo vệ dữ liệu showtime/booking hiện có.
-- Cleanup seed cũ theo namespace static IDs; chỉ xóa cinema/room không còn showtime liên quan.
-- Showtime update chỉ repricing khi giá hoặc room thay đổi; chỉ đổi lịch/phim giữ nguyên `ShowtimeSeat.price`.
-- DTO pricing giữ multiplier optional trong OpenAPI và generated frontend types.
-- Layout hợp lệ yêu cầu hàng liên tục từ A, tối thiểu 5 hàng, ba hàng đầu Standard, hàng giữa VIP và hàng cuối Couple chẵn.
-- Seat CRUD chặn Couple đơn lẻ và chặn sửa layout hoàn chỉnh ngoài bulk layout.
-- Booking canonicalize Couple thành hai ghế vật lý và giới hạn tối đa 10 ghế vật lý.
-- Booking UI chọn cả cặp Couple, hiển thị legend/nhãn trạng thái và loại bỏ cặp không còn khả dụng sau refresh.
-- Admin UI quản lý Couple qua bulk layout, không còn mở form CRUD đơn lẻ cho Couple.
-- Cập nhật README và generated OpenAPI artifacts.
+Ưu tiên quyết định:
 
-## Verification đã pass
+- Correctness và security trước feature mới.
+- Mỗi sprint phải tạo ra một năng lực có thể kiểm chứng bằng test, smoke flow hoặc production-like deployment.
+- Không xây abstraction/microservice/Kubernetes chỉ để “đủ kiến trúc”. Chỉ thêm khi có nhu cầu thực tế.
+- Không triển khai ticket check-in/consume trong roadmap hiện tại; QR chỉ dùng để khách xuất trình tại rạp.
+- Không dùng dữ liệu giả trong customer/admin UI nếu API chưa cung cấp dữ liệu tương ứng.
 
-- `npm run lint`
-- `npm run typecheck`
-- `npm run build`
-- `npm test`: 32/32
-- `npm run test:e2e`: 6/6
-- `npm run test:integration`: 9/9
-- `npm run api:check`
-- `git diff --check`
-- Prisma schema validation và migration deploy trên PostgreSQL integration
-- Focused layout, seats, showtimes, bookings và error-filter regression tests: 20/20
+## Baseline hiện tại
 
-## Sprint 0 đã hoàn tất
+Đã có:
 
-- Error response giữ domain `code` ổn định, có `VALIDATION_FAILED`, và frontend dịch theo code với fallback tiếng Việt.
-- Idempotent hold retry được kiểm tra trước trạng thái movie/showtime hiện tại.
-- PATCH seat công bố đầy đủ lỗi `409` trong OpenAPI.
-- Province picker hỗ trợ tìm không dấu/codename, reset search khi đóng, dùng lỗi API thật và không kéo giãn option khi ít kết quả.
-- Mobile province picker có fallback `100vh` và hỗ trợ `100dvh`.
-- Migration index dùng `DROP INDEX IF EXISTS`; migration chain đã deploy sạch trên integration database.
+- NestJS modular monolith, React 19/Vite SPA, PostgreSQL, Redis và Prisma.
+- Customer flow: catalogue, chọn suất, seat locking, Couple seat, booking expiry, checkout SePay, webhook idempotency và ticket history.
+- Admin flow: movie/TMDB import, cinema/room/seat, showtime đơn/bulk/cinema-bulk, pricing policy và payment review.
+- Email verification và ticket email qua MailOutbox + Worker Thread, retry/backoff, stale-lock recovery, graceful shutdown và QR inline.
+- Theme system Cobalt Editorial light/dark, responsive customer/admin UI và generated OpenAPI types.
+- Integration coverage cho booking concurrency, hold idempotency, expiry, cancel, SePay webhook và nhiều ticket.
+- Verification gần nhất: lint, typecheck, build, backend unit, frontend tests, E2E, integration, API check và diff check pass.
 
-## Sprint 3 — Tích hợp SePay QR & Webhook — ĐÃ HOÀN TẤT
+Các giới hạn production chính:
 
-- Chuẩn hóa hold policy: > 15 phút hold 10 phút; > 5 đến 15 phút hold 2 phút; <= 5 phút chặn tạo booking mới để giữ buffer.
-- Migration database: bảng `SepayPaymentIntent` (paymentCode unique, expectedAmount, expiresAt) và `SepayTransaction` (sepayId unique, transferAmount, status MATCHED / REVIEW_REQUIRED / CONFIRMED / REFUNDED).
-- `SepayService`:
-  - `checkout()`: tạo hoặc reuse intent với VietQR compact QR URL và mã thanh toán `CB...`.
-  - `handleWebhook()`: xác thực API key, bỏ qua giao dịch ra hoặc trùng id, khớp mã và số tiền, xác nhận booking và phát hành vé; nếu lỗi/hết hạn chuyển `REVIEW_REQUIRED` để hoàn tiền thủ công.
-  - `findTransactions()` và `updateTransactionStatus()` cho Admin.
-- `SepayWebhookGuard`: xác thực `Authorization: Apikey <KEY>`.
-- Frontend `BookingPages.tsx`: hiển thị QR SePay, thông tin ngân hàng, nút copy nội dung CK, countdown hết hạn và polling kiểm tra trạng thái tự động chuyển sang trang vé khi thành công.
-- Admin UI `AdminPaymentsPage`: xem danh sách giao dịch SePay, lọc theo trạng thái và đánh dấu đã hoàn tiền thủ công.
-- Unit tests: 6 test cases cho `SepayService` (checkout tạo intent, reuse intent, webhook bỏ qua transferType khác, bỏ qua trùng id, xử lý thiếu mã và sai số tiền sang REVIEW_REQUIRED).
-- Cập nhật README, generated OpenAPI và types.
+- Chưa có rate limiting, Helmet/security headers, structured logging, metrics/tracing và CI/CD.
+- CORS đang mở rộng; Swagger chưa có production gate.
+- Chưa có refund/reconciliation flow hoàn chỉnh.
+- Booking/ticket/payment list chưa có pagination chuẩn hóa.
+- Chưa có Dockerfile/deployment recipe và backup/restore runbook.
+- Refresh-token concurrent rotation, migration backfill và một số overlap edge case chưa đủ coverage.
+- Chưa có admin user management và audit log.
 
-## Roadmap các sprint
+## Roadmap
 
-### Sprint 0 — Nền tảng correctness/error/test — ĐÃ HOÀN TẤT
+### Sprint 0 — Baseline, documentation và release contract
 
-- Chuẩn hóa domain error codes và `VALIDATION_FAILED`.
-- Frontend dịch lỗi theo `code`, fallback tiếng Việt, không hiển thị raw network error.
-- Sửa idempotent hold retry sau khi showtime/movie thay đổi trạng thái.
-- Bổ sung OpenAPI `409` cho PATCH seat.
-- Fix province picker: tìm không dấu/codename, reset search, lỗi API thật, layout ít kết quả và mobile viewport.
-- Deploy migration chain trên PostgreSQL integration và bổ sung regression tests.
+Mục tiêu: biến trạng thái hiện tại thành baseline đáng tin trước khi mở rộng.
 
-### Sprint 1 — Hold, expiry và payment correctness — ĐANG THỰC HIỆN
+Việc cần làm:
 
-- ĐÃ LÀM: Back/“Thay đổi ghế” xác nhận, cancel/release hold thành công rồi mới điều hướng.
-- ĐÃ LÀM: Cancel idempotent: `PENDING -> CANCELLED`; retry trên `CANCELLED/EXPIRED` trả kết quả hiện tại; `CONFIRMED` trả conflict.
-- ĐÃ LÀM: Chính sách server giữ ghế 10 phút khi suất còn hơn 15 phút, 2 phút khi còn từ 5 đến 15 phút, và chặn hold mới khi còn tối đa 5 phút.
-- ĐÃ LÀM: Couple được canonicalize khi hold; seat read và payment transaction tự normalize DB hold đã hết hạn.
-- ĐÃ LÀM: Countdown/progress checkout dùng thời gian còn lại; xóa timer giả `09:59` trên seat map.
-- ĐÃ LÀM: Integration coverage cho cancel idempotency và boundary suất chiếu quá gần.
-- ĐÃ LÀM: Browser verification desktop/mobile cho hold, checkout, countdown và điều hướng Back/cancel.
-- Không còn áp dụng payload hash payment cũ sau khi loại bỏ mock payment; duplicate/concurrent SePay webhook đã có coverage riêng.
+- Đồng bộ README, WORKLOG, limitations, test matrix và API behavior với source hiện tại.
+- Rà lại các mục roadmap lỗi thời: mock payment, ticket check-in và payment abstraction chưa cần thiết.
+- Tạo production checklist cho environment, secret, SMTP, SePay, migration, seed, backup và rollback.
+- Thực hiện smoke flow thật: register/verify/login → chọn nhiều ghế → SePay → nhận đủ ticket/email.
+- Chạy browser verification desktop/mobile và light/dark cho các flow critical.
+- Ghi lại release notes và quyết định kỹ thuật quan trọng.
 
-### Sprint 2 — Admin showtime và bulk scheduling — ĐANG THỰC HIỆN
+Kỹ năng đạt được: release discipline, requirements traceability, smoke testing và documentation as code.
 
-- ĐÃ LÀM: Chỉ cho admin chọn movie `PUBLISHED` khi tạo/sửa suất chiếu.
-- ĐÃ LÀM: `datetime-local` được serialize theo giờ Việt Nam `Asia/Ho_Chi_Minh` với offset `+07:00`.
-- ĐÃ LÀM: Backend tự tính `endsAt = startsAt + movie.duration`; UI hiển thị kết thúc read-only.
-- ĐÃ LÀM: Khi đổi start/movie thì tính lại end; chỉ đổi pricing giữ end hiện tại.
-- ĐÃ LÀM: Thêm bulk preview và bulk commit cho nhiều suất cùng movie/room.
-- ĐÃ LÀM: Sinh slot tuần tự theo `firstStartsAt`, `duration`, `turnaroundMinutes`; không dùng random.
-- ĐÃ LÀM: Commit bulk atomic với Serializable transaction; overlap rollback toàn batch.
-- ĐÃ LÀM: Exclusion/transaction overlap trả `409 SHOWTIME_OVERLAP`.
-- ĐÃ LÀM: Unit coverage timezone/duration/preview và integration coverage bulk/rollback.
-- ĐÃ LÀM: Integration coverage hai bulk request đồng thời; một request commit, request còn lại nhận `409 SHOWTIME_OVERLAP`.
-- ĐÃ LÀM: Browser verification admin bulk desktop/mobile cho free slots, conflict preview và modal không tràn ngang.
+Definition of done:
 
-### Sprint 3 — TMDB import nhiều phim và trailer (ĐÃ HOÀN TẤT)
+- README và WORKLOG không mâu thuẫn với source.
+- Có checklist chạy được trên một database/SMTP-like environment sạch.
+- Critical customer flow có kết quả kiểm chứng và known issue rõ ràng.
 
-- ĐÃ LÀM: Tạo Stitch reference desktop `989cd32409cb42ff9f480572762407ba` và mobile `396a64b32fae4fe48574a6779ca1b88e` theo CineNoir Violet; Inspo study dùng hướng component-playground/dark technical.
-- ĐÃ LÀM: Sau import patch mọi cache có prefix `tmdb-movies`; row đổi ngay thành `Đã nhập`, sau đó invalidate catalog.
-- ĐÃ LÀM: Pending state theo từng `tmdbId`, modal giữ mở sau import và chặn đóng khi queue còn chạy.
-- ĐÃ LÀM: Pagination tối đa 20 trang, checkbox chọn xuyên trang, giới hạn chính xác 20 phim mỗi batch.
-- ĐÃ LÀM: Bounded queue concurrency chính xác 3, partial success và retry riêng item lỗi.
-- ĐÃ LÀM: TMDB detail lấy tiếng Việt trước; nếu chưa có video phù hợp mới fallback video tiếng Anh; ưu tiên ngôn ngữ rồi official Trailer, Trailer, Teaser.
-- ĐÃ LÀM: `PUT /movies/admin/tmdb/:tmdbId/resync` chỉ cập nhật poster/backdrop/trailer có giá trị mới, giữ nguyên trường biên tập và status.
-- ĐÃ LÀM: Trailer modal có loading, timeout/error, retry remount và link mở trực tiếp trên YouTube.
-- ĐÃ LÀM: Thêm Vitest helper coverage cho concurrency, partial failure, giới hạn 20 và cache synchronization.
-- ĐÃ LÀM: Full verification — lint, typecheck, build, 56 backend unit, 3 frontend helper tests, 6 e2e, 13 integration, API check và diff check đều pass.
-- ĐÃ LÀM: Browser kiểm tra modal ở viewport 375px; layout search/bulk/row/pagination không tràn ngang. Flow API live cần đăng nhập lại Admin vì phiên browser hiện trả `401`.
+### Sprint 1 — Frontend architecture và component extraction
 
-### Sprint 4 — UX polish, browser verification và vận hành
+Mục tiêu: tách frontend hiện tại khỏi các file page/component lớn để dễ học, test, refactor và mở rộng mà không làm thay đổi behavior.
 
-- Hoàn thiện toàn bộ thông báo lỗi admin bằng tiếng Việt.
-- Bổ sung request ID ở vùng hỗ trợ, không hiển thị làm lỗi chính.
-- ĐÃ LÀM: Browser verification desktop và viewport `<= 720px` cho hold/back, checkout, countdown và admin bulk scheduling.
-- ĐÃ LÀM: Chạy đầy đủ lint, typecheck, build, unit, e2e, integration, API generation/check.
-- ĐÃ LÀM: Seed hai lần trên database development; counts giữ nguyên `3,16,50,50,3218,19,1396`, fixed movie/showtime IDs vẫn mỗi loại 1 bản ghi.
-- ĐÃ LÀM: Cập nhật README, OpenAPI, generated frontend types và WORKLOG.
+Việc cần làm:
 
-## Việc còn lại
+- Chụp baseline behavior trước refactor: route map, query key, mutation, loading/error/empty/pending state và screenshot các flow chính.
+- Tách `fe/src/pages/CatalogPages.tsx` thành các page/section/component theo feature catalog; giữ nguyên movie catalogue, cinema directory, movie detail, trailer và filter behavior.
+- Tách `fe/src/pages/BookingPages.tsx` thành seat map, seat legend, booking summary, checkout, countdown, QR payment và booking state components; giữ nguyên hold/cancel/expiry/polling/Couple seat.
+- Tách `fe/src/pages/AccountPages.tsx` thành booking list, ticket list, ticket card, ticket detail, QR và shared record/filter components.
+- Tách `fe/src/pages/AdminPages.tsx` theo domain admin: dashboard, movies/TMDB, cinemas/rooms/seats, showtimes/bulk scheduling và payments; giữ modal/form/table behavior.
+- Tách `fe/src/pages/AuthPages.tsx` và `fe/src/components/ui.tsx` để auth modal, layout shell, admin shell, dialog focus, state primitives và navigation primitives có ranh giới rõ.
+- Gom component dùng chung vào `fe/src/components/`; component theo nghiệp vụ vào `fe/src/features/` hoặc thư mục domain tương ứng; không tạo abstraction chỉ để bọc một dòng JSX.
+- Tách query/mutation logic lặp lại thành hooks theo feature khi hook có trách nhiệm rõ; giữ `fe/src/api.ts` là HTTP boundary và không đưa fetch trực tiếp vào component mới.
+- Chuẩn hóa props/type/local state, đặt tên file nhất quán và loại bỏ dead code sau mỗi extraction.
+- Giữ plain CSS/Cobalt tokens; không thêm Tailwind, UI library hoặc font mới.
+- Bổ sung component/helper tests cho extracted behavior và kiểm tra route/API/query key không đổi.
 
-## 2026-09-21 — Loại bỏ legacy PaymentsService/mock payment
+Kỹ năng đạt được: React composition, feature-based architecture, state ownership, custom hooks, testable UI boundaries và refactor an toàn.
 
-- Xóa `PaymentsModule`, `PaymentsController`, `PaymentsService` và mock DTO; production chỉ còn checkout/webhook SePay.
-- Giữ bảng `Payment` vì SePay vẫn tạo `provider: SEPAY`, nhưng xóa `Payment.idempotencyKey` và unique index bằng migration `20260921110000_remove_mock_payment_idempotency`.
-- Cancel/expire booking cập nhật `SepayPaymentIntent` sang `CANCELLED`/`EXPIRED`.
-- Webhook SePay xử lý race duplicate theo unique `sepayId`; integration coverage chuyển từ mock payment sang matched, duplicate/concurrent và review-required webhook.
-- Đã pass lint, typecheck, build, unit `52/52`, E2E `6/6`, integration `12/12`, `api:check`.
+Definition of done:
 
-## 2026-09-21 — Webhook SePay vẫn 400 do test delivery dùng `id: 0`
+- Không còn page/component monolith khó bảo trì; mỗi file có một trách nhiệm chính và page chỉ điều phối composition.
+- Route paths, API contracts, query keys, booking/payment behavior và accessibility states không thay đổi.
+- `npm run lint`, `npm run typecheck`, `npm run build`, `npm run test:fe` và browser smoke flow pass.
+- Có ghi chú dependency graph đơn giản để tránh circular import giữa shared, feature và page layers.
 
-- Log `SePay webhook payload rejected` cho thấy bản "Gửi thử" của SePay dùng `"id": 0` giả, rớt `@Min(1)` trong DTO.
-- Bỏ `@Min(1)`, giữ `@IsInt()` (giao dịch thật luôn id ≥ 1; bản test sai số tài khoản nên cũng không lưu DB).
-- Thêm unit test payload test (`id: 0`) → 201; verify HTTP thật với đúng payload SePay → 201.
-- Tổng unit hiện tại: 52/52 pass.
+### Sprint 2 — Security và correctness hardening
 
-## 2026-09-21 — Sửa webhook SePay 400 do field `code`
+Mục tiêu: giảm các rủi ro có thể làm lộ tài khoản, bị abuse hoặc tạo trạng thái payment sai.
 
-- Nguyên nhân: global `ValidationPipe` bật `forbidNonWhitelisted`, payload thật của SePay có field `code` chưa khai báo trong DTO nên mọi webhook (kể cả Gửi thử) đều 400.
-- Webhook giờ bypass pipe toàn cục (body dạng record) và tự validate lenient trong `SepayService`: strip field lạ, chỉ 400 khi thiếu/sai field bắt buộc; thêm `code` optional, `content` optional, `@IsNumber()` cho `transferAmount`.
-- Thêm 2 unit test (payload đủ field SePay + field lạ vẫn 201; thiếu field bắt buộc thì 400); đã verify qua HTTP thật: payload mẫu SePay → 201, gửi trùng → 201 idempotent, sai key → 401.
-- Đồng bộ README.
+Việc cần làm:
 
-- Hoàn tất payment payload hash/race hardening và test cạnh tranh chuyên sâu.
-- Browser verification desktop và viewport `<= 720px` cho hold/back, checkout, countdown và admin bulk scheduling.
-- Test concurrency hai bulk scheduling request đồng thời.
-- Chạy seed hai lần trên database development và kiểm tra counts/idempotency nếu cần môi trường dữ liệu thật.
+- Thêm rate limiting dựa trên Redis cho login, register, resend, verify, refresh và các admin mutation nhạy cảm.
+- Giữ cooldown resend 60 giây như domain rule; rate limit tổng quát là lớp bảo vệ bổ sung.
+- Cấu hình CORS allowlist theo environment, Helmet/security headers và giới hạn request body.
+- Chỉ bật Swagger production khi có cấu hình cho phép hoặc có bảo vệ phù hợp.
+- Production fail-fast khi thiếu `SEPAY_WEBHOOK_API_KEY`; bổ sung signature/IP verification nếu provider hỗ trợ.
+- Hardening refresh-token rotation: test concurrent refresh, token reuse detection và revoke token family khi phát hiện reuse.
+- Bổ sung integration tests cho migration backfill, showtime overlap edge cases và resend concurrent.
+- Thêm cleanup job cho refresh token, verification token và dữ liệu mail outbox hết retention.
 
-## 2026-09-21 — Đồng bộ integration spec với payment flow hiện tại
+Kỹ năng đạt được: threat modeling, abuse prevention, secure session design và concurrency correctness.
 
-- Chuẩn hóa coverage checkout theo route `/api/v1/payments/bookings/:id/checkout`.
-- Thay toàn bộ coverage mock bằng checkout/webhook SePay, nên không còn endpoint mock trong integration flow.
-- Thay assertion mã lỗi cũ `PURCHASE_REQUIRED` bằng `SHOWTIME_TOO_CLOSE` cho suất còn dưới 5 phút.
-- Lint, typecheck, build, unit `52/52`, E2E `6/6`, integration `12/12` và `api:check` pass sau đợt dọn mock.
+Definition of done:
 
-## 2026-09-21 — Sửa bulk conflict tiếng Việt, guard rời trang thanh toán, CSS nút payment, giờ vận hành 08:00–23:00 và gợi ý khung trống
+- Endpoint nhạy cảm có test abuse/429.
+- Concurrent refresh chỉ chấp nhận một rotation hợp lệ.
+- Production config không thể khởi động với secret/security setting thiếu.
+- Cleanup job chạy idempotent và không xóa dữ liệu nghiệp vụ còn cần.
 
-- Bulk preview trả `reasonCode` (`SHOWTIME_OVERLAP`/`SHOWTIME_OUTSIDE_HOURS`) và `conflicts[]` kèm giờ suất đang chiếm thay cho chuỗi tiếng Anh cứng; frontend render `Trùng với suất 14:00 – 16:10, 18:20 – 20:30` (ngăn cách dấu phẩy, khác ngày thì prefix ngày).
-- Thêm CSS `.bulk-preview*` (trước đó chưa có nên các suất dính sát nhau).
-- Trang thanh toán: guard khi booking còn `PENDING` — nút Back trình duyệt, click link rời trang và đóng tab (`pagehide` + `fetch keepalive`) đều hỏi xác nhận rồi tự gọi cancel nhả ghế; redirect vé khi `CONFIRMED` không bị chặn. Cancel API vốn idempotent nên gọi thừa an toàn.
-- Sửa toàn bộ nút dùng class không tồn tại (`btn-primary`/`btn-secondary`/`btn-full`/`btn-sm`) sang `.primary`/`.secondary` đúng design system; thêm utility `.btn-full`, `.btn-sm` và `.summary-actions`.
-- Quy tắc giờ vận hành: suất chiếu chỉ được bắt đầu 08:00–23:00 hằng ngày (giờ VN), suất 23:00 được chấp nhận; áp dụng cho create/update/previewBulk/createBulk với code mới `SHOWTIME_OUTSIDE_HOURS`.
-- Endpoint admin mới `GET /showtimes/rooms/:roomId/free-slots` gợi ý khung trống trong `[08:00 → 23:00]` sau khi trừ suất bận và turnaround hai đầu; UI bulk modal và form lẻ có nút xem khung trống, chip khung trống và hint cảnh báo ngoài giờ.
-- Cố định giờ VN trong unit/integration spec bulk (`10:00 VN`) để không flaky theo giờ chạy; thêm 7 unit test mới (giờ vận hành, conflicts, free slots).
-- Đồng bộ README, OpenAPI và generated frontend types.
+### Sprint 3 — Container, CI/CD và observability
 
-## 2026-09-22 — Ghi chú tiếp tục plan redesign FE light/dark
+Mục tiêu: có thể build, deploy, theo dõi và khôi phục hệ thống một cách lặp lại.
 
-- Mục tiêu tiếp theo: làm UI CineBook bắt mắt hơn và hỗ trợ chuyển giữa `light` / `dark` mode.
-- Hướng reference đã chọn: Admin theo Elastic Cloud + Highlight Explore + Hex; User theo Standard Hotels + M+ Museum. Admin ưu tiên dashboard/table/filter rõ ràng; User ưu tiên cinematic/editorial, hình ảnh lớn, catalogue và CTA đặt vé rõ.
-- Đã dùng Inspo để khảo sát các reference: `elastic-co--cloud`, `highlight-xyz--explore-trending`, `hex-tech`, `standardhotels-com`, `mplus-org-hk`, `palaisdetokyo-com--tarifs`.
-- Khi tiếp tục: hoàn thiện plan full FE redesign trước, sau đó cập nhật `DESIGN.md` để mô tả semantic tokens hai theme, layout Admin/User, typography, surface, contrast, responsive và theme switch.
-- Sau khi cập nhật design direction: tạo/cập nhật Stitch screens trong project `5412677534890310186` cho customer home/catalog, movie detail/booking, admin dashboard/list và light/dark + mobile variants; ghi screen IDs vào worklog.
-- Sau Stitch mới bắt đầu sửa FE theo phase: theme runtime/persistence + pre-paint bootstrap; semantic CSS tokens; shared primitives/dialogs; customer/admin shells; customer screens; admin screens; booking/checkout sau cùng.
-- Theme preference dự kiến lưu `system | light | dark` ở `localStorage` key `ticket_booking_theme`; áp dụng `data-theme` lên `html`, hỗ trợ `prefers-color-scheme`, `color-scheme`, `theme-color`, cross-tab sync và không flash sai theme.
-- Scope redesign ban đầu chỉ đổi visual/theme/accessibility; không đổi API, query key, booking timing, seat rules, payment polling hoặc route paths.
-- Cần kiểm tra browser các viewport `320`, `390`, `720`, `721`, `1024`, `1280`, `1440` ở cả hai theme; giữ loading/error/empty/disabled/focus, seat map, QR và ticket print.
-- ĐÃ LÀM: Chốt direction Cobalt điện, Space Grotesk + Inter, mặc định theo hệ thống.
-- ĐÃ LÀM: Cập nhật `DESIGN.md` và `AGENTS.md` sang CineBook Cobalt Editorial với semantic light/dark tokens, customer/admin layout rules và theme runtime contract.
-- ĐÃ LÀM: Bắt đầu FE theme foundation: pre-paint bootstrap, `ThemeProvider`, preference `system/light/dark`, localStorage/cross-tab/system sync, `data-theme`, `color-scheme`, `theme-color`, theme selector ở customer/admin/admin login, font variable dependencies.
-- ĐÃ LÀM: Tạo lớp `cobalt-editorial.css` cho customer/admin shell, hero, catalogue cards, panels, tables và mobile hierarchy; không đổi JSX/API/booking behavior.
-- ĐÃ LÀM: Auth modal dùng shared focus trap, Escape, scroll lock và focus restoration; theme selector có ở customer desktop/mobile, admin sidebar/mobile header và admin login.
-- ĐÃ LÀM: FE verification sau redesign foundation — lint, typecheck, 6 frontend tests, build và diff check đều pass.
-- ĐÃ LÀM: Stitch MCP đã hoạt động trở lại; tạo design system mới `assets/16369739445538399432` với tên CineBook Cobalt Editorial, Space Grotesk + Inter, light/dark semantic tokens và hướng customer/admin riêng.
-- ĐÃ LÀM: Tạo Stitch canonical desktop Admin Dashboard Cobalt Editorial `f48e9fba552a4c76a6fb5ad08d81c912`, gồm sidebar ổn định, metrics, chart, lịch chiếu và bảng giao dịch.
-- ĐÃ GHI NHẬN: Yêu cầu tạo Stitch customer Home/Catalogue đã timeout hai lần và chưa xuất hiện screen; không giả lập ID. Các screen customer cũ vẫn là `93da427d5e094571bc9fbfc8549663da` (desktop tone tím) và `2320f094c2d6490dab49c90ef7e70edd` (mobile).
-- ĐÃ LÀM: Bắt đầu migrate customer Home/Catalogue theo Stitch Cobalt Editorial; dùng desktop `70ec68912dc24a2abbfa1173ba8a160c` và mobile `2320f094c2d6490dab49c90ef7e70edd`, chuyển composition hero/quick booking/catalogue/promotion sang React + plain CSS với dữ liệu API thật, thay customer theme select bằng direct `ThemeSwitch`.
-- ĐÃ LÀM: Browser kiểm tra Home desktop `1440px` và mobile `390px`; xác nhận hero/quick booking, dark toggle, localStorage và không còn overflow header mobile.
-- ĐÃ LÀM: Migrate CinemaPage theo Stitch desktop `b865a8655e9f40a1ab3d55eff47abd26` và mobile `85b8f29177844aff9fbd3287790b936b`; chuyển sang hero/stats, directory search, responsive cinema cards, price summary và CTA bằng React + plain CSS, chỉ dùng dữ liệu cinema/roomCount thật.
-- ĐÃ LÀM: Browser kiểm tra Cinema desktop `1440px` và mobile `390px`; card mobile chuyển thành một cột, desktop dùng grid responsive, không còn overflow. Lỗi console khi kiểm tra là API backend chưa chạy (`ERR_CONNECTION_REFUSED`), không phải lỗi build/runtime frontend.
-- ĐÃ LÀM: Tạo Stitch canonical desktop Movie Detail Cobalt Editorial `d7d4e1bc57374b40933e7d471272ab12` bằng design system `assets/16369739445538399432`, đọc HTML reference và migrate `MoviePage` theo poster/info/showtime directory composition bằng React + plain CSS.
-- ĐÃ LÀM: Movie Detail chỉ hiển thị dữ liệu có thật từ API/fallback (poster, backdrop, title, description, duration, status, showtime count, cinema/room); không giữ đạo diễn, diễn viên, ngày phát hành, review hoặc số ghế demo không có trong contract. Giữ nguyên trailer modal, filters, date selection và link chọn ghế.
-- ĐÃ LÀM: Browser kiểm tra Movie Detail desktop `1440px` và mobile `390px`; hero/poster/showtime toolbar xếp đúng và không overflow. Lỗi console là API backend chưa chạy (`ERR_CONNECTION_REFUSED`). FE lint, typecheck và build pass sau batch.
-- ĐÃ LÀM: Dùng Checkout SePay Cobalt desktop `1770a4bffa004d9ab0a92ddb9138d181`; job tạo Seats desktop bị timeout và không xuất hiện, không retry tạo trùng, dùng mobile seat reference hiện có `46f906538e2a41aea242298d064ee68c` để đối chiếu cấu trúc.
-- ĐÃ LÀM: Migrate visual Seats/Checkout bằng `BookingSteps`, token Cobalt, seat map/legend/summary, countdown/pending/expired/success/error states và SePay QR card; giữ nguyên Couple pair, tối đa 10 ghế, hold/cancel guard, QR copy, payment polling và route/API behavior.
-- ĐÃ LÀM: FE lint, typecheck, build pass; browser kiểm tra route seat error state mobile `390px`, không overflow. Console là API backend chưa chạy (`ERR_CONNECTION_REFUSED`).
-- ĐÃ LÀM: Đối chiếu Stitch Admin Dashboard Cobalt desktop `f48e9fba552a4c76a6fb5ad08d81c912` và mobile `df37f134bf4640878c4d52a7aaa5ae37`; migrate `AdminDashboardPage` theo sidebar/dashboard operations composition.
-- ĐÃ LÀM: Dashboard dùng dữ liệu thật phim/rạp/suất chiếu; metric cards, recent operations rows, status `Đang diễn ra/Sắp diễn ra/Đã lên lịch`, quick actions và responsive admin CSS. Không thêm doanh thu, chart, tỷ lệ lấp đầy, uptime hoặc số ghế demo vì API hiện chưa cung cấp.
-- ĐÃ LÀM: FE lint, typecheck, build pass; browser kiểm tra admin redirect/login mobile `390px`, không overflow. Console chỉ là locations API chưa chạy.
-- ĐÃ GHI NHẬN: Job tạo Stitch Account/Ticket Cobalt desktop bị timeout và không xuất hiện screen, không retry tạo trùng.
-- ĐÃ LÀM: Polish `BookingsPage`, `TicketsPage`, `TicketPage` theo Cobalt account/ticket hierarchy bằng primitives hiện có: index/filter/search, booking/ticket cards, QR check-in stub, ticket detail split layout, print/check-in actions và mobile stacking; giữ nguyên query, cancel, QR và route behavior.
-- ĐÃ LÀM: Hoàn thiện visual layer Cobalt cho Admin management Movies/TMDB, Cinemas/Rooms/Seats, Showtimes/bulk scheduling và Payments bằng plain CSS: bảng density cao, filter/toolbars, card cụm rạp, room/seat map, TMDB queue, free-slot/bulk preview, SePay tabs và responsive mobile; giữ nguyên API, mutation, modal và mọi loading/error/empty/pending state.
-- ĐÃ LÀM: Admin management lint, typecheck, build, FE tests và diff check pass; browser login desktop `1440px`/mobile `390px` không overflow. Live route checks bị chặn do chưa có Admin session và backend `localhost:3000` chưa chạy (`ERR_CONNECTION_REFUSED`).
-- ĐÃ LÀM: Khi countdown hold về 0, `BookingPage` refetch booking và chỉ khi server trả `EXPIRED` mới invalidate booking/sơ đồ ghế, điều hướng `replace` về `/showtimes/:showtimeId/seats`, đồng thời hiển thị cảnh báo phiên giữ ghế hết hạn một lần trên sơ đồ ghế.
-- ĐÃ LÀM: Customer catalog cleanup: gỡ promotion giả, bỏ fallback movie/cinema hard-code và media fallback theo tên phim; bỏ claim tiện nghi/giá/giờ mở cửa không có trong API; nút Chỉ đường mở Google Maps theo địa chỉ thật, CTA catalogue vẫn dùng route thật.
-- ĐÃ LÀM: Movie metadata batch: thêm `releaseDate`, `rating`, `genres`, `ageRating` vào Prisma/API/OpenAPI; TMDB import lưu release date, rating và genres thật; Admin Movie form có thể chỉnh metadata; giữ resync chỉ cập nhật media.
-- ĐÃ LÀM: Movie metadata lint, typecheck, unit `56/56`, FE `6/6`, API check pass; Prisma migration đã tạo và schema validate, Prisma client generate cần dừng dev process đang khóa Windows query engine rồi đã chạy thành công.
-- ĐÃ LÀM: QR vé thật bằng thư viện `qrcode`, payload versioned `cinebook-ticket:v1:<ticket.code>`, nền trắng/mực đen phù hợp in và xuất trình tại rạp; không thêm scanner/check-in Admin.
-- ĐÃ LÀM: Customer Movie card/detail render rating, age rating, genres và release date khi API có dữ liệu; footer không còn `href="#"`; README đã cập nhật schema, TMDB mapping và QR scope.
-- ĐÃ LÀM: UI polish batch: trailer modal dùng portal và scrim `overlay` theo theme thay nền đen cứng; xung đột giữ ghế `SEATS_HELD/SEATS_UNAVAILABLE` hiển thị popup và refetch sơ đồ; bỏ toggle check-in giả, QR luôn hiển thị với copy “Mã soát vé”; sửa font family sang `Space Grotesk Variable`/`Inter Variable`; Admin Cụm rạp có lọc tỉnh/thành, card gọn hơn, khoảng cách sidebar rõ hơn và checkbox suất chiếu nhỏ hơn. Stitch mobile reference mới: `1ac171b2f49e4edab09139adaac4961d`.
+Việc cần làm:
 
-- ĐÃ CHỐT SCOPE: Không thêm field metadata vào `Cinema` cho amenities/giờ hoạt động riêng; không làm Admin sidebar/API/camera check-in. QR vé chỉ dành cho người dùng xuất trình tại rạp. Promotion giả sẽ được gỡ và module AI tạo promotion để backlog sau.
-- ĐÃ SỬA: Movie response từng trả Prisma `Decimal` của `rating` thành chuỗi, khiến Admin chỉ đổi status cũng gửi rating dạng string và API trả 400 (`rating must not be greater/less...`). MoviesService nay chuẩn hóa rating về number ở response boundary; MovieForm cũng normalize rating trước khi submit; đã thêm regression test.
-- CÒN LẠI: Browser verification live flow hold-expiry sau khi bật backend; tiếp tục rà format/price thật, filter catalogue và các copy cứng còn lại.
+- Tạo multi-stage Dockerfile cho backend và production frontend serving strategy.
+- Viết CI pipeline chạy lint, typecheck, build, unit, frontend, E2E, integration và API drift check.
+- Thiết lập staging environment gần production với PostgreSQL/Redis/SMTP test provider.
+- Thêm structured JSON logging với request ID cho cả success và error; tuyệt đối không log token, password, secret hoặc QR payload.
+- Thêm metrics tối thiểu: request latency/error rate, hold conflicts, booking expiry, payment review, outbox pending/failed/age và worker restart.
+- Mở rộng readiness với mail worker/outbox signal phù hợp, tránh báo healthy khi worker chết lâu.
+- Viết backup PostgreSQL, restore drill và rollback migration runbook.
+- Thêm alert cho payment `REVIEW_REQUIRED`, mail backlog, Redis/DB down và worker restart loop.
 
-## 2026-09-25 — Bulk scheduling đa phòng và seed lịch chiếu (đang thực hiện)
+Kỹ năng đạt được: containerization, CI/CD, SRE fundamentals, logs/metrics/health checks và disaster recovery.
 
-- Đã thêm DTO/API cinema-bulk preview/commit theo `cinemaId`, ngày và số suất; planner xác định, phân bổ vòng tròn giữa các room và trả assignment theo thứ tự thời gian.
-- Đã thêm API free-slots cấp rạp, trả lịch tối đa có thể xếp riêng theo từng room và tổng `schedulableCount` thực tế; không còn giới hạn 2 suất mỗi room.
-- Đã regenerate OpenAPI/frontend types và thêm client API cho `cinema-bulk`.
-- Đã hoàn thiện Admin UI cinema-bulk: chọn phim/rạp/ngày/tổng số suất, ẩn seed nội bộ, xem khung giờ từng room không chồng lấn, xem shortage tổng, preview assignment theo room và giá policy/override hiệu lực.
-- Đã thêm seed deterministic/idempotent: 4 phim published, lịch 2 suất mỗi room cho ngày kế tiếp, phân bổ phim/2D-3D theo hash ổn định; chạy seed hai lần không nhân bản.
-- Database development sau seed: 45 phim, 50 cinema, 202 room, 433 showtime; 10 phim có suất chiếu.
-- Review follow-up: planner dùng Fisher–Yates seeded shuffle thay vì comparator random; DTO validate ngày `YYYY-MM-DD`; shortage response dùng code `SHOWTIME_BULK_SHORTAGE` để frontend hiển thị đúng thông báo chi tiết; date mặc định Admin dùng giờ địa phương.
-- Verification batch: lint, typecheck, build, unit `58/58`, FE `6/6`, E2E `6/6`, API check, Prisma deploy/seed và diff check pass. Integration review run bị Windows chặn port Redis `56379`, không phải assertion failure.
+Definition of done:
 
-## 2026-09-25 — Email verification, ticket mail và seed format
+- Một commit có thể build/deploy staging từ CI.
+- Có dashboard/log query đủ để điều tra một booking bằng request ID/booking ID.
+- Backup restore được kiểm chứng trên database cô lập.
+- Có rollback procedure đã chạy thử.
 
-- Thêm migration `20260925100000_email_verification_and_mail_outbox`: `User.emailVerifiedAt`, one-time verification token và outbox email có trạng thái/retry/dedupe.
-- Đăng ký không cấp token trước xác thực; thêm `POST /auth/email/verify`, `POST /auth/email/resend`; login/refresh chặn user chưa xác thực. User cũ và admin seed được backfill là đã xác thực.
-- Thêm `MailModule` dùng Nodemailer và worker scheduler retry mail; SMTP lỗi không rollback booking/payment. Mailpit local đã được loại bỏ, email dùng SMTP provider cấu hình từ env.
-- SePay confirmation enqueue một email chứa toàn bộ ticket và QR inline bằng `qrcode`, dedupe theo booking.
-- Frontend thêm route `/verify-email`, màn hình xác thực, trạng thái đăng ký chờ email và gửi lại email; regenerate OpenAPI/types.
-- Seed tự bổ sung room `STANDARD`, `IMAX`, `FOUR_DX`, `SCREEN_X` cho mỗi cinema, không đổi format/reset layout room đã có showtime.
-- Admin thêm quick publish phim; chuẩn hóa lỗi đổi format phòng sang `ROOM_FORMAT_HAS_SHOWTIMES`.
-- Review fixes: outbox tự reclaim lock `PROCESSING` bị stale, register/resend gộp user-token-outbox trong transaction, resend khóa user để token cũ bị vô hiệu hóa, email dùng timezone `Asia/Ho_Chi_Minh`, frontend verify chống duplicate effect của React Strict Mode và quick publish hiển thị lỗi mutation.
-- Verification: migration deploy, seed, lint, typecheck, build, unit `58/58`, FE `6/6`, E2E `6/6`, integration `13/13`, API check và diff check pass.
+### Sprint 4 — Payment reconciliation và refund thủ công
 
-## 2026-09-29 — Hiển thị đủ vé sau thanh toán và resend email xác thực
+Mục tiêu: hoàn thiện vòng đời payment mà không cần xây abstraction provider chung khi mới có SePay.
 
-- Sau khi booking `CONFIRMED`, frontend invalidate query `tickets` và chuyển tới `/tickets` thay vì mở `booking.tickets[0]`, bảo đảm booking nhiều ghế hiển thị toàn bộ ticket đã phát hành.
-- Bổ sung integration assertion: booking hai ghế phải trả đúng hai ticket thuộc cùng booking qua `GET /api/v1/tickets`.
-- Auth modal nhận diện `AUTH_EMAIL_NOT_VERIFIED`, giữ email đăng nhập và hiển thị nút gửi lại email với trạng thái loading/success/error; thông báo thành công là `Email xác thực mới đã được gửi, vui lòng kiểm tra email`.
-- Resend verification được giới hạn một lần mỗi 60 giây ở cả backend (transaction/row lock) và frontend (đếm ngược, khóa nút); request sớm không tạo token hoặc outbox mới.
-- Cập nhật README mô tả redirect sau thanh toán và resend action.
+Việc cần làm:
 
-## 2026-09-24 — Room/showtime format, catalogue category và giá thật
+- Chuẩn hóa state transition giữa `SepayTransaction`, `Payment`, `Booking` và ticket.
+- Thêm reconciliation workflow cho giao dịch `REVIEW_REQUIRED`: tìm booking, xác nhận thủ công hoặc đánh dấu hoàn tiền.
+- Thêm refund record/attempt với actor, amount, reason, provider reference, admin note và timestamp.
+- Định nghĩa chính sách refund: cutoff trước suất, hoàn toàn phần/toàn phần, ticket đã dùng và ghế được bán lại.
+- Bảo đảm refund idempotent; không để payment đã refund nhưng ticket vẫn `ACTIVE` hoặc booking vẫn có thể dùng.
+- Bổ sung customer/admin UI cho trạng thái refund và lỗi payment rõ ràng.
+- Gửi email thông báo refund/reconciliation nếu phù hợp.
+- Chỉ tách payment provider interface khi chuẩn bị tích hợp provider thứ hai.
 
-- Thêm `RoomFormat`: `STANDARD`, `IMAX`, `FOUR_DX`, `SCREEN_X`; thêm `ShowtimeFormat` cho 2D/3D phụ đề/lồng tiếng.
-- Thêm format vào Room/Showtime DTO, Prisma schema, response DTO và Admin form; không cho đổi format phòng khi phòng đã có showtime.
-- Chuẩn hóa migration `20260924130000_room_showtime_formats_and_pricing`: backfill format cũ, backfill `basePrice` từ giá ghế snapshot thấp nhất, đặt multiplier mặc định `1.10/1.20`, sau đó chuyển pricing/format thành non-null.
-- Public movie catalogue hỗ trợ `NOW_SHOWING`, `COMING_SOON`, `SPECIAL`; `SPECIAL` là phòng khác Standard hoặc suất 3D và lọc theo tỉnh/thành khi có.
-- Public movie/cinema response tính `startingPrice` từ `basePrice` thấp nhất của suất tương lai; không thêm column nghiệp vụ vào `Cinema`.
-- Customer Home hiển thị tab catalogue thật, giá bắt đầu, format phòng/suất và giá trong Movie Detail; Admin có chọn format khi lập lịch đơn/hàng loạt và lọc suất đặc biệt.
-- Đồng bộ OpenAPI và generated frontend types.
-- Review fixes: Admin update gửi cả `format`; seed chỉ cập nhật format khi file seed khai báo và bổ sung một phòng IMAX để có dữ liệu `SPECIAL`; thêm migration kiểm tra snapshot đủ mọi ghế vật lý; cinema `startingPrice` chỉ tính suất của movie `PUBLISHED`; DTO pricing response đồng bộ non-null; Quick Booking luôn dùng phim `NOW_SHOWING`, còn catalogue đặc biệt chỉ preview suất đặc biệt.
-- Verification batch: lint, typecheck, build, backend unit `58/58`, FE `6/6`, E2E `6/6`, API check, Prisma validate/deploy/seed và `git diff --check` pass; integration bị chặn bởi port Windows `55432`.
+Kỹ năng đạt được: payment state machine, reconciliation, idempotency, financial auditability và manual operations.
 
-## 2026-09-29 — Mail Worker Thread và email templates
+Definition of done:
 
-- Bỏ `@Cron` khỏi `MailService`; thêm Worker Thread riêng với Prisma/Nodemailer connection riêng.
-- Worker hỗ trợ claim outbox có điều kiện, drain liên tục, polling fallback, `wake` sau transaction commit, retry/backoff, stale lock, stable Message-ID, restart backoff và graceful shutdown.
-- Tách template xác thực và ticket thành pure TypeScript functions, HTML inline/table, plain-text fallback, HTML escaping, thông tin booking/tổng tiền/mã vé và QR inline.
-- Thêm cấu hình `MAIL_WORKER_*`, readiness check và shutdown hooks; test/OpenAPI mặc định không spawn worker.
-- Thêm unit tests template, facade enqueue/dedupe/wake; integration reset dọn thêm outbox/token tables.
-- Chưa commit.
+- Mọi transition payment/refund có invariant và integration test.
+- Admin xử lý được giao dịch review mà không cấp vé trùng.
+- Refund có audit trail và không thể thực hiện hai lần ngoài ý muốn.
 
-## 2026-09-28 — Centralized showtime pricing policy
+### Sprint 5 — Pagination, query performance và scale vừa đủ
 
-- Thêm centralized pricing policy code theo `RoomFormat`, 2D/3D và ngày địa phương Việt Nam; cuối tuần là thứ Sáu–Chủ nhật.
-- Ma trận policy: Standard 2D `110000/130000`, Standard 3D `145000/185000`, IMAX 2D `155000/185000`, IMAX 3D `190000/240000`, ScreenX 2D `145000/175000`, ScreenX 3D `180000/230000`, 4DX 2D `155000/185000`, 4DX 3D `190000/240000` cho ngày thường/cuối tuần.
-- Các flow create, bulk single-room và cinema-bulk dùng policy khi pricing bị bỏ trống; cinema-bulk resolve giá riêng theo từng room. Override explicit vẫn được snapshot như trước.
-- Thêm `POST /showtimes/pricing/quote` cho Admin, frontend API/types và preview giá trong form lập lịch single-room/bulk.
-- Seed dùng cùng policy cho giá showtime và snapshot ghế.
-- Thêm regression coverage cho weekday/weekend, room/2D-3D matrix, quote override và create showtime không truyền giá.
+Mục tiêu: tránh các endpoint danh sách tải toàn bộ dữ liệu khi production bắt đầu có nhiều user/booking.
+
+Việc cần làm:
+
+- Chuẩn hóa response `{ data, meta }` với `page`, `pageSize`, `total`, `totalPages`.
+- Áp dụng cho customer bookings/tickets và admin payments trước; sau đó cinemas/rooms/showtimes nếu cần.
+- Chuẩn hóa filter/search/sort/date range ở backend thay vì lọc toàn bộ ở frontend.
+- Đồng bộ query state vào URL để reload/chia sẻ được.
+- Rà index và query plan bằng dữ liệu lớn; chỉ thêm cache khi benchmark chứng minh cần.
+- Giữ giới hạn page size và validate sort field để tránh query abuse.
+- Bổ sung load test cho catalogue, booking list, ticket list và payment list.
+
+Kỹ năng đạt được: database indexing, query planning, API pagination design và performance measurement.
+
+Definition of done:
+
+- Không còn list nghiệp vụ production nào tải không giới hạn.
+- Query có filter/sort được kiểm chứng bằng EXPLAIN hoặc benchmark.
+- Frontend giữ loading/empty/error/pagination state đúng trên mobile.
+
+### Sprint 6 — Automated critical journeys và quality gate
+
+Mục tiêu: biến các flow quan trọng thành regression tự động để có thể refactor an toàn.
+
+Việc cần làm:
+
+- Bổ sung component/helper tests cho auth unverified + resend cooldown, booking confirmed redirect và multi-ticket display.
+- Bổ sung browser tests cho register/verify/login, Couple seat, hold expiry/cancel, checkout/webhook và nhận nhiều ticket.
+- Chạy test ở viewport desktop/mobile và light/dark.
+- Kiểm tra keyboard/focus/dialog/form error accessibility.
+- Bổ sung contract tests cho API error codes, OpenAPI và generated frontend types.
+- Đưa smoke suite vào CI sau deploy staging.
+
+Kỹ năng đạt được: testing pyramid, browser automation, contract testing, accessibility và release confidence.
+
+Definition of done:
+
+- Critical customer flow chạy tự động trên staging.
+- Regression quan trọng không phụ thuộc dữ liệu development thủ công.
+- CI chặn merge khi test/API artifact/security check thất bại.
+
+### Sprint 7 — Account, RBAC và audit log
+
+Mục tiêu: hoàn thiện quản trị tài khoản và trách nhiệm thao tác khi hệ thống chạy thật.
+
+Việc cần làm:
+
+- Password reset bằng token một lần, expiry, cooldown và email.
+- Đổi mật khẩu, xem/thu hồi session và logout all sessions.
+- Admin user management tối thiểu: tạo, disable, role và reset access.
+- Tách quyền theo nhóm catalog, scheduling, payment/refund và system operations.
+- Audit log cho mọi admin mutation: actor, action, resource, before/after summary, request ID và timestamp.
+- Admin UI tra cứu user, session và audit theo thời gian/action/actor.
+
+Kỹ năng đạt được: identity lifecycle, RBAC, auditability và operational accountability.
+
+Definition of done:
+
+- Tài khoản bị disable không thể đăng nhập hoặc refresh.
+- Admin mutation quan trọng đều truy ngược được actor và request.
+- Password/reset/session flow có test expiry, reuse và concurrent behavior.
+
+### Backlog sau production baseline
+
+Chỉ làm sau khi các sprint trên ổn định:
+
+- TMDB scheduled sync và quản lý retry.
+- Dashboard doanh thu/occupancy/conversion bằng dữ liệu thật.
+- Promotion/coupon khi đã chốt rule accounting và refund interaction.
+- Notification preferences.
+- Payment provider thứ hai và abstraction chung.
+- Recommendation/personalization.
+- Ticket check-in/consume nếu product scope thay đổi trong tương lai.
+
+## Production gates
+
+Không coi dự án là production-ready nếu thiếu:
+
+- Secret/env validation, CORS allowlist, rate limiting và security headers.
+- CI chạy static checks, tests, integration và API drift.
+- Docker/deployment recipe, migration/rollback và backup/restore drill.
+- Structured logs, request ID, health/readiness và alert tối thiểu.
+- Payment reconciliation/refund policy rõ ràng.
+- Smoke test customer flow trên staging với SMTP/SePay sandbox hoặc test provider.
+
+## Verification commands
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+npm test
+npm run test:fe
+npm run test:e2e
+npm run test:integration
+npm run api:check
+git diff --check
+```
+
+Trạng thái: roadmap đã được chốt theo mục tiêu personal project học sâu và production thật; chưa commit.
