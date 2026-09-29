@@ -30,13 +30,14 @@ export class CreateShowtimeDto {
   @IsEnum(ShowtimeFormat)
   format?: ShowtimeFormat = ShowtimeFormat.TWO_D_SUBTITLED;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 100000,
-    description: 'Base price for standard seats',
+    description: 'Base price override for standard seats; omitted values use the centralized pricing policy',
   })
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
-  basePrice!: number;
+  basePrice?: number;
 
   @ApiPropertyOptional({ example: 1.1, description: 'VIP price multiplier, defaults to 1.1' })
   @IsOptional()

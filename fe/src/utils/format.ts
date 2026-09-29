@@ -109,6 +109,7 @@ const apiMessages: Record<string, string> = {
   SHOWTIME_INVALID_ORDER: 'Giờ kết thúc phải sau giờ bắt đầu.',
   SHOWTIME_NOT_FOUND: 'Không tìm thấy suất chiếu.',
   SHOWTIME_OVERLAP: 'Phòng đã có suất chiếu trùng thời gian.',
+  SHOWTIME_BULK_SHORTAGE: 'Số suất trống trong rạp không đủ số lượng đã yêu cầu.',
   SHOWTIME_OUTSIDE_HOURS: 'Suất chiếu chỉ được bắt đầu từ 08:00 đến 23:00 hằng ngày (giờ Việt Nam).',
   SHOWTIME_STARTED: 'Suất chiếu đã bắt đầu.',
   TICKET_NOT_FOUND: 'Không tìm thấy vé.',
@@ -134,6 +135,7 @@ const legacyApiMessages: Record<string, string> = {
 export function errorMessage(cause: unknown, fallback: string) {
   if (cause instanceof ApiClientError) {
     if (cause.path.endsWith('/auth/login') && cause.code === 'AUTH_INVALID_CREDENTIALS') return apiMessages.AUTH_INVALID_CREDENTIALS;
+    if (cause.code === 'SHOWTIME_BULK_SHORTAGE') return cause.message;
     return apiMessages[cause.code] ?? (cause.statusCode === 401 ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' : undefined) ?? legacyApiMessages[cause.message] ?? fallback;
   }
   return fallback;

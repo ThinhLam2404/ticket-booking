@@ -2880,6 +2880,181 @@
         ]
       }
     },
+    "/api/v1/showtimes/cinemas/{cinemaId}/free-slots": {
+      "get": {
+        "operationId": "Showtimes_findCinemaFreeSlots",
+        "parameters": [
+          {
+            "name": "cinemaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "description": "Calendar date in Asia/Ho_Chi_Minh (YYYY-MM-DD)",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "durationMinutes",
+            "required": true,
+            "in": "query",
+            "description": "Movie duration in minutes",
+            "schema": {
+              "example": 120,
+              "type": "number"
+            }
+          },
+          {
+            "name": "turnaroundMinutes",
+            "required": false,
+            "in": "query",
+            "description": "Turnaround minutes kept clear around existing showtimes",
+            "schema": {
+              "example": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CinemaFreeSlotsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "showtimes"
+        ]
+      }
+    },
+    "/api/v1/showtimes/pricing/quote": {
+      "post": {
+        "operationId": "Showtimes_quotePricing",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShowtimePricingQuoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShowtimePricingQuoteResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "showtimes"
+        ]
+      }
+    },
     "/api/v1/showtimes/{id}": {
       "get": {
         "operationId": "Showtimes_findOne",
@@ -3121,6 +3296,181 @@
             }
           }
         },
+        "tags": [
+          "showtimes"
+        ]
+      }
+    },
+    "/api/v1/showtimes/cinema-bulk/preview": {
+      "post": {
+        "operationId": "Showtimes_previewCinemaBulk",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CinemaBulkShowtimeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CinemaBulkPreviewResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "showtimes"
+        ]
+      }
+    },
+    "/api/v1/showtimes/cinema-bulk": {
+      "post": {
+        "operationId": "Showtimes_createCinemaBulk",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CinemaBulkShowtimeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ShowtimeResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
           "showtimes"
         ]
@@ -5427,6 +5777,265 @@
           "busy"
         ]
       },
+      "CinemaFreeSlotDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "example": "clx123room"
+          },
+          "roomName": {
+            "type": "string",
+            "example": "Phòng IMAX"
+          },
+          "roomFormat": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "IMAX",
+              "FOUR_DX",
+              "SCREEN_X"
+            ],
+            "example": "IMAX"
+          },
+          "startsAt": {
+            "type": "string",
+            "example": "2026-10-01T12:00:00.000Z",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "example": "2026-10-01T14:49:00.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "roomId",
+          "roomName",
+          "roomFormat",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "CinemaRoomFreeSlotsDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "example": "clx123room"
+          },
+          "roomName": {
+            "type": "string",
+            "example": "Phòng IMAX"
+          },
+          "roomFormat": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "IMAX",
+              "FOUR_DX",
+              "SCREEN_X"
+            ],
+            "example": "IMAX"
+          },
+          "freeSlots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CinemaFreeSlotDto"
+            }
+          }
+        },
+        "required": [
+          "roomId",
+          "roomName",
+          "roomFormat",
+          "freeSlots"
+        ]
+      },
+      "CinemaFreeSlotsResponseDto": {
+        "type": "object",
+        "properties": {
+          "cinemaId": {
+            "type": "string",
+            "example": "clx123cinema"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "schedulableCount": {
+            "type": "number",
+            "example": 6
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CinemaRoomFreeSlotsDto"
+            }
+          }
+        },
+        "required": [
+          "cinemaId",
+          "date",
+          "schedulableCount",
+          "rooms"
+        ]
+      },
+      "ShowtimePricingQuoteDto": {
+        "type": "object",
+        "properties": {
+          "roomFormat": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "IMAX",
+              "FOUR_DX",
+              "SCREEN_X"
+            ],
+            "example": "IMAX"
+          },
+          "showtimeFormat": {
+            "type": "string",
+            "enum": [
+              "TWO_D_SUBTITLED",
+              "TWO_D_DUBBED",
+              "THREE_D_SUBTITLED",
+              "THREE_D_DUBBED"
+            ],
+            "example": "THREE_D_SUBTITLED"
+          },
+          "startsAt": {
+            "type": "string",
+            "example": "2026-10-02T19:00:00+07:00",
+            "format": "date-time"
+          },
+          "basePrice": {
+            "type": "number",
+            "example": 190000,
+            "description": "Giá cơ bản override; bỏ trống để dùng pricing policy"
+          },
+          "vipMultiplier": {
+            "type": "number",
+            "example": 1.1,
+            "description": "Hệ số VIP override; mặc định 1.1"
+          },
+          "coupleMultiplier": {
+            "type": "number",
+            "example": 1.2,
+            "description": "Hệ số ghế đôi override; mặc định 1.2"
+          }
+        },
+        "required": [
+          "roomFormat",
+          "showtimeFormat",
+          "startsAt"
+        ]
+      },
+      "ShowtimePricingQuotePricesDto": {
+        "type": "object",
+        "properties": {
+          "standard": {
+            "type": "number",
+            "example": 190000
+          },
+          "vip": {
+            "type": "number",
+            "example": 209000
+          },
+          "couple": {
+            "type": "number",
+            "example": 250800
+          }
+        },
+        "required": [
+          "standard",
+          "vip",
+          "couple"
+        ]
+      },
+      "ShowtimePricingQuoteOverridesDto": {
+        "type": "object",
+        "properties": {
+          "basePrice": {
+            "type": "boolean",
+            "example": false
+          },
+          "vipMultiplier": {
+            "type": "boolean",
+            "example": false
+          },
+          "coupleMultiplier": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "basePrice",
+          "vipMultiplier",
+          "coupleMultiplier"
+        ]
+      },
+      "ShowtimePricingQuoteResponseDto": {
+        "type": "object",
+        "properties": {
+          "roomFormat": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "IMAX",
+              "FOUR_DX",
+              "SCREEN_X"
+            ],
+            "example": "IMAX"
+          },
+          "showtimeFormat": {
+            "type": "string",
+            "enum": [
+              "TWO_D_SUBTITLED",
+              "TWO_D_DUBBED",
+              "THREE_D_SUBTITLED",
+              "THREE_D_DUBBED"
+            ],
+            "example": "THREE_D_SUBTITLED"
+          },
+          "pricingDayType": {
+            "type": "string",
+            "enum": [
+              "WEEKDAY",
+              "WEEKEND"
+            ],
+            "example": "WEEKEND"
+          },
+          "basePrice": {
+            "type": "number",
+            "example": 190000
+          },
+          "vipMultiplier": {
+            "type": "number",
+            "example": 1.1
+          },
+          "coupleMultiplier": {
+            "type": "number",
+            "example": 1.2
+          },
+          "prices": {
+            "$ref": "#/components/schemas/ShowtimePricingQuotePricesDto"
+          },
+          "overridden": {
+            "$ref": "#/components/schemas/ShowtimePricingQuoteOverridesDto"
+          }
+        },
+        "required": [
+          "roomFormat",
+          "showtimeFormat",
+          "pricingDayType",
+          "basePrice",
+          "vipMultiplier",
+          "coupleMultiplier",
+          "prices",
+          "overridden"
+        ]
+      },
       "ShowtimeSeatsResponseDto": {
         "type": "object",
         "properties": {
@@ -5456,6 +6065,216 @@
           "startsAt",
           "endsAt",
           "seats"
+        ]
+      },
+      "CinemaBulkShowtimeDto": {
+        "type": "object",
+        "properties": {
+          "movieId": {
+            "type": "string",
+            "example": "clx123movie"
+          },
+          "cinemaId": {
+            "type": "string",
+            "example": "clx123cinema"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "count": {
+            "type": "number",
+            "example": 6,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "randomSeed": {
+            "type": "number",
+            "example": 12345,
+            "description": "Seed để preview và commit cho cùng một kết quả"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "TWO_D_SUBTITLED",
+              "TWO_D_DUBBED",
+              "THREE_D_SUBTITLED",
+              "THREE_D_DUBBED"
+            ],
+            "default": "TWO_D_SUBTITLED"
+          },
+          "turnaroundMinutes": {
+            "type": "number",
+            "example": 20,
+            "minimum": 0,
+            "maximum": 180
+          },
+          "basePrice": {
+            "type": "number",
+            "example": 100000,
+            "description": "Base price override for standard seats; omitted values use the centralized pricing policy"
+          },
+          "vipMultiplier": {
+            "type": "number",
+            "example": 1.1
+          },
+          "coupleMultiplier": {
+            "type": "number",
+            "example": 1.2
+          }
+        },
+        "required": [
+          "movieId",
+          "cinemaId",
+          "date",
+          "count",
+          "turnaroundMinutes"
+        ]
+      },
+      "CinemaBulkAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "example": "clx123room"
+          },
+          "roomName": {
+            "type": "string",
+            "example": "Phòng IMAX"
+          },
+          "roomFormat": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "IMAX",
+              "FOUR_DX",
+              "SCREEN_X"
+            ],
+            "example": "IMAX"
+          },
+          "pricingDayType": {
+            "type": "string",
+            "example": "WEEKEND",
+            "enum": [
+              "WEEKDAY",
+              "WEEKEND"
+            ]
+          },
+          "basePrice": {
+            "type": "number",
+            "example": 190000
+          },
+          "vipMultiplier": {
+            "type": "number",
+            "example": 1.1
+          },
+          "coupleMultiplier": {
+            "type": "number",
+            "example": 1.2
+          },
+          "prices": {
+            "$ref": "#/components/schemas/ShowtimePricingQuotePricesDto"
+          },
+          "startsAt": {
+            "type": "string",
+            "example": "2026-10-01T12:00:00.000Z",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "example": "2026-10-01T14:49:00.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "roomId",
+          "roomName",
+          "roomFormat",
+          "pricingDayType",
+          "basePrice",
+          "vipMultiplier",
+          "coupleMultiplier",
+          "prices",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "CinemaBulkShortageDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "example": "clx123room"
+          },
+          "roomName": {
+            "type": "string",
+            "example": "Phòng IMAX"
+          },
+          "availableSlots": {
+            "type": "number",
+            "example": 2
+          },
+          "assignedSlots": {
+            "type": "number",
+            "example": 2
+          }
+        },
+        "required": [
+          "roomId",
+          "roomName",
+          "availableSlots",
+          "assignedSlots"
+        ]
+      },
+      "CinemaBulkPreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "movieId": {
+            "type": "string",
+            "example": "clx123movie"
+          },
+          "cinemaId": {
+            "type": "string",
+            "example": "clx123cinema"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "requestedCount": {
+            "type": "number",
+            "example": 6
+          },
+          "schedulableCount": {
+            "type": "number",
+            "example": 6
+          },
+          "valid": {
+            "type": "boolean",
+            "example": true
+          },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CinemaBulkAssignmentDto"
+            }
+          },
+          "shortages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CinemaBulkShortageDto"
+            }
+          }
+        },
+        "required": [
+          "movieId",
+          "cinemaId",
+          "date",
+          "requestedCount",
+          "schedulableCount",
+          "valid",
+          "assignments",
+          "shortages"
         ]
       },
       "BulkShowtimeDto": {
@@ -5500,7 +6319,7 @@
           "basePrice": {
             "type": "number",
             "example": 100000,
-            "description": "Base price for standard seats"
+            "description": "Base price override for standard seats; omitted values use the centralized pricing policy"
           },
           "vipMultiplier": {
             "type": "number",
@@ -5518,8 +6337,7 @@
           "roomId",
           "firstStartsAt",
           "count",
-          "turnaroundMinutes",
-          "basePrice"
+          "turnaroundMinutes"
         ]
       },
       "BulkShowtimeConflictDto": {
@@ -5647,7 +6465,7 @@
           "basePrice": {
             "type": "number",
             "example": 100000,
-            "description": "Base price for standard seats"
+            "description": "Base price override for standard seats; omitted values use the centralized pricing policy"
           },
           "vipMultiplier": {
             "type": "number",
@@ -5663,8 +6481,7 @@
         "required": [
           "movieId",
           "roomId",
-          "startsAt",
-          "basePrice"
+          "startsAt"
         ]
       },
       "UpdateShowtimeDto": {
@@ -5696,7 +6513,7 @@
           "basePrice": {
             "type": "number",
             "example": 100000,
-            "description": "Base price for standard seats"
+            "description": "Base price override for standard seats; omitted values use the centralized pricing policy"
           },
           "vipMultiplier": {
             "type": "number",

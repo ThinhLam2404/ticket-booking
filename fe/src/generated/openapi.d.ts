@@ -452,6 +452,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/showtimes/cinemas/{cinemaId}/free-slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Showtimes_findCinemaFreeSlots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/showtimes/pricing/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Showtimes_quotePricing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/showtimes/{id}": {
         parameters: {
             query?: never;
@@ -478,6 +510,38 @@ export interface paths {
         get: operations["Showtimes_findSeats"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/showtimes/cinema-bulk/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Showtimes_previewCinemaBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/showtimes/cinema-bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Showtimes_createCinemaBulk"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1391,6 +1455,121 @@ export interface components {
             freeWindows: components["schemas"]["FreeSlotWindowDto"][];
             busy: components["schemas"]["BusySlotDto"][];
         };
+        CinemaFreeSlotDto: {
+            /** @example clx123room */
+            roomId: string;
+            /** @example Phòng IMAX */
+            roomName: string;
+            /**
+             * @example IMAX
+             * @enum {string}
+             */
+            roomFormat: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
+            /**
+             * Format: date-time
+             * @example 2026-10-01T12:00:00.000Z
+             */
+            startsAt: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-01T14:49:00.000Z
+             */
+            endsAt: string;
+        };
+        CinemaRoomFreeSlotsDto: {
+            /** @example clx123room */
+            roomId: string;
+            /** @example Phòng IMAX */
+            roomName: string;
+            /**
+             * @example IMAX
+             * @enum {string}
+             */
+            roomFormat: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
+            freeSlots: components["schemas"]["CinemaFreeSlotDto"][];
+        };
+        CinemaFreeSlotsResponseDto: {
+            /** @example clx123cinema */
+            cinemaId: string;
+            /** @example 2026-10-01 */
+            date: string;
+            /** @example 6 */
+            schedulableCount: number;
+            rooms: components["schemas"]["CinemaRoomFreeSlotsDto"][];
+        };
+        ShowtimePricingQuoteDto: {
+            /**
+             * @example IMAX
+             * @enum {string}
+             */
+            roomFormat: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
+            /**
+             * @example THREE_D_SUBTITLED
+             * @enum {string}
+             */
+            showtimeFormat: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
+            /**
+             * Format: date-time
+             * @example 2026-10-02T19:00:00+07:00
+             */
+            startsAt: string;
+            /**
+             * @description Giá cơ bản override; bỏ trống để dùng pricing policy
+             * @example 190000
+             */
+            basePrice?: number;
+            /**
+             * @description Hệ số VIP override; mặc định 1.1
+             * @example 1.1
+             */
+            vipMultiplier?: number;
+            /**
+             * @description Hệ số ghế đôi override; mặc định 1.2
+             * @example 1.2
+             */
+            coupleMultiplier?: number;
+        };
+        ShowtimePricingQuotePricesDto: {
+            /** @example 190000 */
+            standard: number;
+            /** @example 209000 */
+            vip: number;
+            /** @example 250800 */
+            couple: number;
+        };
+        ShowtimePricingQuoteOverridesDto: {
+            /** @example false */
+            basePrice: boolean;
+            /** @example false */
+            vipMultiplier: boolean;
+            /** @example false */
+            coupleMultiplier: boolean;
+        };
+        ShowtimePricingQuoteResponseDto: {
+            /**
+             * @example IMAX
+             * @enum {string}
+             */
+            roomFormat: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
+            /**
+             * @example THREE_D_SUBTITLED
+             * @enum {string}
+             */
+            showtimeFormat: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
+            /**
+             * @example WEEKEND
+             * @enum {string}
+             */
+            pricingDayType: "WEEKDAY" | "WEEKEND";
+            /** @example 190000 */
+            basePrice: number;
+            /** @example 1.1 */
+            vipMultiplier: number;
+            /** @example 1.2 */
+            coupleMultiplier: number;
+            prices: components["schemas"]["ShowtimePricingQuotePricesDto"];
+            overridden: components["schemas"]["ShowtimePricingQuoteOverridesDto"];
+        };
         ShowtimeSeatsResponseDto: {
             /** @example clx-showtime-id */
             showtimeId: string;
@@ -1405,6 +1584,96 @@ export interface components {
              */
             endsAt: string;
             seats: components["schemas"]["ShowtimeSeatResponseDto"][];
+        };
+        CinemaBulkShowtimeDto: {
+            /** @example clx123movie */
+            movieId: string;
+            /** @example clx123cinema */
+            cinemaId: string;
+            /** @example 2026-10-01 */
+            date: string;
+            /** @example 6 */
+            count: number;
+            /**
+             * @description Seed để preview và commit cho cùng một kết quả
+             * @example 12345
+             */
+            randomSeed?: number;
+            /**
+             * @default TWO_D_SUBTITLED
+             * @enum {string}
+             */
+            format: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
+            /** @example 20 */
+            turnaroundMinutes: number;
+            /**
+             * @description Base price override for standard seats; omitted values use the centralized pricing policy
+             * @example 100000
+             */
+            basePrice?: number;
+            /** @example 1.1 */
+            vipMultiplier?: number;
+            /** @example 1.2 */
+            coupleMultiplier?: number;
+        };
+        CinemaBulkAssignmentDto: {
+            /** @example clx123room */
+            roomId: string;
+            /** @example Phòng IMAX */
+            roomName: string;
+            /**
+             * @example IMAX
+             * @enum {string}
+             */
+            roomFormat: "STANDARD" | "IMAX" | "FOUR_DX" | "SCREEN_X";
+            /**
+             * @example WEEKEND
+             * @enum {string}
+             */
+            pricingDayType: "WEEKDAY" | "WEEKEND";
+            /** @example 190000 */
+            basePrice: number;
+            /** @example 1.1 */
+            vipMultiplier: number;
+            /** @example 1.2 */
+            coupleMultiplier: number;
+            prices: components["schemas"]["ShowtimePricingQuotePricesDto"];
+            /**
+             * Format: date-time
+             * @example 2026-10-01T12:00:00.000Z
+             */
+            startsAt: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-01T14:49:00.000Z
+             */
+            endsAt: string;
+        };
+        CinemaBulkShortageDto: {
+            /** @example clx123room */
+            roomId: string;
+            /** @example Phòng IMAX */
+            roomName: string;
+            /** @example 2 */
+            availableSlots: number;
+            /** @example 2 */
+            assignedSlots: number;
+        };
+        CinemaBulkPreviewResponseDto: {
+            /** @example clx123movie */
+            movieId: string;
+            /** @example clx123cinema */
+            cinemaId: string;
+            /** @example 2026-10-01 */
+            date: string;
+            /** @example 6 */
+            requestedCount: number;
+            /** @example 6 */
+            schedulableCount: number;
+            /** @example true */
+            valid: boolean;
+            assignments: components["schemas"]["CinemaBulkAssignmentDto"][];
+            shortages: components["schemas"]["CinemaBulkShortageDto"][];
         };
         BulkShowtimeDto: {
             /** @example clx123movie */
@@ -1429,10 +1698,10 @@ export interface components {
              */
             turnaroundMinutes: number;
             /**
-             * @description Base price for standard seats
+             * @description Base price override for standard seats; omitted values use the centralized pricing policy
              * @example 100000
              */
-            basePrice: number;
+            basePrice?: number;
             /**
              * @description VIP price multiplier, defaults to 1.1
              * @example 1.1
@@ -1505,10 +1774,10 @@ export interface components {
              */
             format: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
             /**
-             * @description Base price for standard seats
+             * @description Base price override for standard seats; omitted values use the centralized pricing policy
              * @example 100000
              */
-            basePrice: number;
+            basePrice?: number;
             /**
              * @description VIP price multiplier, defaults to 1.1
              * @example 1.1
@@ -1536,7 +1805,7 @@ export interface components {
              */
             format: "TWO_D_SUBTITLED" | "TWO_D_DUBBED" | "THREE_D_SUBTITLED" | "THREE_D_DUBBED";
             /**
-             * @description Base price for standard seats
+             * @description Base price override for standard seats; omitted values use the centralized pricing policy
              * @example 100000
              */
             basePrice?: number;
@@ -3608,6 +3877,113 @@ export interface operations {
             };
         };
     };
+    Showtimes_findCinemaFreeSlots: {
+        parameters: {
+            query: {
+                /** @description Calendar date in Asia/Ho_Chi_Minh (YYYY-MM-DD) */
+                date: string;
+                /** @description Movie duration in minutes */
+                durationMinutes: number;
+                /** @description Turnaround minutes kept clear around existing showtimes */
+                turnaroundMinutes?: components["schemas"]["Object"];
+            };
+            header?: never;
+            path: {
+                cinemaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CinemaFreeSlotsResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Showtimes_quotePricing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShowtimePricingQuoteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShowtimePricingQuoteResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
     Showtimes_findOne: {
         parameters: {
             query?: never;
@@ -3775,6 +4151,132 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Showtimes_previewCinemaBulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CinemaBulkShowtimeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CinemaBulkPreviewResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Showtimes_createCinemaBulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CinemaBulkShowtimeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShowtimeResponseDto"][];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

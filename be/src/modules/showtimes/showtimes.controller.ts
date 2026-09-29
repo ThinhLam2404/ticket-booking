@@ -23,6 +23,11 @@ import {
   FreeSlotsQueryDto,
   FreeSlotsResponseDto,
 } from './dto/free-slots.dto.js';
+import {
+  CinemaBulkPreviewResponseDto,
+  CinemaBulkShowtimeDto,
+  CinemaFreeSlotsResponseDto,
+} from './dto/cinema-bulk-showtime.dto.js';
 import { ApiErrorResponses } from '../../common/http/swagger.decorators.js';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
@@ -34,6 +39,7 @@ import {
   ListShowtimesDto,
 } from './dto/list-showtimes.dto.js';
 import { UpdateShowtimeDto } from './dto/update-showtime.dto.js';
+import { ShowtimePricingQuoteDto, ShowtimePricingQuoteResponseDto } from './dto/pricing-quote.dto.js';
 import { ShowtimesService } from './showtimes.service.js';
 
 @ApiTags('showtimes')
@@ -71,6 +77,29 @@ export class ShowtimesController {
     return this.showtimesService.findFreeSlots(roomId, query);
   }
 
+  @Get('cinemas/:cinemaId/free-slots')
+  @ApiResponse({ status: 200, type: CinemaFreeSlotsResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  findCinemaFreeSlots(
+    @Param('cinemaId') cinemaId: string,
+    @Query() query: FreeSlotsQueryDto,
+  ) {
+    return this.showtimesService.findCinemaFreeSlots(cinemaId, query);
+  }
+
+  @Post('pricing/quote')
+  @ApiResponse({ status: 201, type: ShowtimePricingQuoteResponseDto })
+  @ApiErrorResponses(400, 401, 403)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  quotePricing(@Body() dto: ShowtimePricingQuoteDto) {
+    return this.showtimesService.quotePricing(dto);
+  }
+
   @Get(':id')
   @ApiResponse({ status: 200, type: ShowtimeResponseDto })
   @ApiErrorResponses(404)
@@ -83,6 +112,26 @@ export class ShowtimesController {
   @ApiErrorResponses(404)
   findSeats(@Param('id') id: string) {
     return this.showtimesService.findSeats(id);
+  }
+
+  @Post('cinema-bulk/preview')
+  @ApiResponse({ status: 200, type: CinemaBulkPreviewResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  previewCinemaBulk(@Body() dto: CinemaBulkShowtimeDto) {
+    return this.showtimesService.previewCinemaBulk(dto);
+  }
+
+  @Post('cinema-bulk')
+  @ApiResponse({ status: 201, type: ShowtimeResponseDto, isArray: true })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  createCinemaBulk(@Body() dto: CinemaBulkShowtimeDto) {
+    return this.showtimesService.createCinemaBulk(dto);
   }
 
   @Post('bulk/preview')

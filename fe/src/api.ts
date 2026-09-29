@@ -57,6 +57,12 @@ import type {
   UpdateShowtimeRequest,
   BulkShowtimeRequest,
   BulkShowtimePreviewResponse,
+  CinemaBulkShowtimeRequest,
+  CinemaBulkPreviewResponse,
+  CinemaBulkResponse,
+  CinemaFreeSlotsResponse,
+  ShowtimePricingQuoteRequest,
+  ShowtimePricingQuoteResponse,
   BulkShowtimeResponse,
   ShowtimeMutationResponse,
   ShowtimeUpdateResponse,
@@ -333,11 +339,24 @@ export const api = {
   updateShowtime(id: string, body: UpdateShowtimeRequest) {
     return request<ShowtimeUpdateResponse>(`/showtimes/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   },
+  quoteShowtimePricing(body: ShowtimePricingQuoteRequest) {
+    return request<ShowtimePricingQuoteResponse>('/showtimes/pricing/quote', { method: 'POST', body: JSON.stringify(body) });
+  },
   previewBulkShowtimes(body: BulkShowtimeRequest) {
     return request<BulkShowtimePreviewResponse>('/showtimes/bulk/preview', { method: 'POST', body: JSON.stringify(body) });
   },
   createBulkShowtimes(body: BulkShowtimeRequest) {
     return request<BulkShowtimeResponse>('/showtimes/bulk', { method: 'POST', body: JSON.stringify(body) });
+  },
+  previewCinemaBulkShowtimes(body: CinemaBulkShowtimeRequest) {
+    return request<CinemaBulkPreviewResponse>('/showtimes/cinema-bulk/preview', { method: 'POST', body: JSON.stringify(body) });
+  },
+  createCinemaBulkShowtimes(body: CinemaBulkShowtimeRequest) {
+    return request<CinemaBulkResponse>('/showtimes/cinema-bulk', { method: 'POST', body: JSON.stringify(body) });
+  },
+  cinemaFreeSlots(cinemaId: string, query: { date: string; durationMinutes: number; turnaroundMinutes: number }, signal?: AbortSignal) {
+    const params = new URLSearchParams({ date: query.date, durationMinutes: String(query.durationMinutes), turnaroundMinutes: String(query.turnaroundMinutes) });
+    return request<CinemaFreeSlotsResponse>(`/showtimes/cinemas/${cinemaId}/free-slots?${params.toString()}`, { signal });
   },
   deleteShowtime(id: string) {
     return request<ShowtimeDeleteResponse>(`/showtimes/${id}`, { method: 'DELETE' });

@@ -1682,12 +1682,23 @@ sequenceDiagram
 - `endsAt` không nhận từ client; backend tự tính `startsAt + Movie.duration`.
 - Chỉ movie `PUBLISHED` mới được lập lịch.
 - Giờ vận hành rạp: suất chiếu chỉ được **bắt đầu từ 08:00 đến 23:00 hằng ngày (giờ Việt Nam)**; vi phạm trả `409 SHOWTIME_OUTSIDE_HOURS`. Suất bắt đầu đúng 23:00 được chấp nhận, phim được phép chiếu lố qua nửa đêm.
+- `basePrice`, `vipMultiplier` và `coupleMultiplier` là override tùy chọn. Khi bỏ trống, backend dùng centralized pricing policy theo `Room.format`, `Showtime.format` và ngày địa phương Việt Nam; pricing snapshot được lưu vào `Showtime` và `ShowtimeSeat`. Admin mặc định dùng policy; chỉ gửi override khi bật rõ chế độ ghi đè.
+
+#### `POST /api/v1/showtimes/pricing/quote`
+
+- Auth: Bearer JWT, role `ADMIN`.
+- Nhận `roomFormat`, `showtimeFormat`, `startsAt` và các override pricing tùy chọn; không ghi dữ liệu.
+- Cuối tuần được định nghĩa là **thứ Sáu–Chủ nhật** theo `Asia/Ho_Chi_Minh`.
+- Giá policy chuẩn (Standard / IMAX / ScreenX / 4DX; ngày thường / cuối tuần):
+  - 2D: `110.000 / 130.000`; `155.000 / 185.000`; `145.000 / 175.000`; `155.000 / 185.000`.
+  - 3D: `145.000 / 185.000`; `190.000 / 240.000`; `180.000 / 230.000`; `190.000 / 240.000`.
+- Mặc định `VIP = 1.10`, ghế đôi = `1.20` sau multiplier VIP. Response trả giá Standard/VIP/Couple và cờ cho biết trường nào đã override.
 
 #### `GET /api/v1/showtimes/rooms/:roomId/free-slots`
 
 - Auth: Bearer JWT, role `ADMIN`.
 - Query: `date=YYYY-MM-DD` (ngày giờ Việt Nam), `durationMinutes`, `turnaroundMinutes` (default `20`).
-- Trả các khung giờ trống trong `[08:00 → 23:00]` sau khi trừ suất đã chiếm và turnaround hai đầu, kèm danh sách suất bận để đối chiếu. Chỉ giữ khe đủ `durationMinutes`.
+- Trả các khung giờ trống có giờ bắt đầu trong `[08:00 → 23:00]` sau khi trừ suất đã chiếm và turnaround hai đầu, kèm danh sách suất bận để đối chiếu. Phim được phép kết thúc sau 23:00; chỉ giữ khe đủ `durationMinutes`.
 - Dùng trong form lập lịch để chọn giờ bắt đầu còn trống.
 
 #### `POST /api/v1/showtimes/bulk/preview`
@@ -1711,11 +1722,10 @@ sequenceDiagram
 {
   "movieId": "clx-movie-id",
   "roomId": "clx-room-id",
-  "startsAt": "2026-10-01T19:00:00+07:00",
+  "firstStartsAt": "2026-10-01T19:00:00+07:00",
   "format": "TWO_D_SUBTITLED",
-  "basePrice": 100000,
-  "vipMultiplier": 1.1,
-  "coupleMultiplier": 1.2
+  "count": 5,
+  "turnaroundMinutes": 20
 }
 ```
 
@@ -1732,6 +1742,30 @@ Rules:
 - Couple price trên mỗi ghế = `basePrice * vipMultiplier * coupleMultiplier`; default multiplier `1.2`.
 - Một cặp Couple gồm 2 `ShowtimeSeat`, giá cả cặp với ví dụ trên là `264000.00`.
 - Tạo một `ShowtimeSeat` cho mỗi seat của room.
+
+#### `GET /api/v1/showtimes/cinemas/:cinemaId/free-slots`
+
+- Auth: Bearer JWT, role `ADMIN`.
+- Query: `date=YYYY-MM-DD`, `durationMinutes` và `turnaroundMinutes`.
+- Khung giờ xét giờ bắt đầu từ `08:00` đến `23:00`; thời lượng phim có thể kết thúc sau `23:00` hoặc qua nửa đêm.
+- Mỗi room trả một lịch khung giờ tối đa có thể xếp đồng thời; các slot trong cùng room không overlap và đã giữ đủ turnaround.
+- `schedulableCount` là tổng sức chứa thực tế của tất cả room hợp lệ, không giới hạn hai suất mỗi room. Room không có layout hợp lệ có sức chứa bằng `0`.
+
+#### `POST /api/v1/showtimes/cinema-bulk/preview`
+
+- Auth: Bearer JWT, role `ADMIN`.
+- Nhận `movieId`, `cinemaId`, `date`, `count`, `format`, `turnaroundMinutes` và pricing override tùy chọn.
+- Không còn dùng seed random để quyết định thứ tự. Planner tạo lịch xác định, phân bổ vòng tròn giữa các room rồi trả assignments theo `startsAt` tăng dần.
+- `schedulableCount` là tổng capacity; `assignments.length` là số suất sẽ tạo (`count` nếu đủ capacity).
+- Mỗi assignment trả room format, loại ngày và giá Standard/VIP/Couple hiệu lực. Khi không gửi override, giá được tính riêng theo format của từng room.
+- Không ghi dữ liệu.
+
+#### `POST /api/v1/showtimes/cinema-bulk`
+
+- Auth: Bearer JWT, role `ADMIN`.
+- Rebuild plan trong transaction `Serializable`, tạo showtime và snapshot `ShowtimeSeat` cho từng assignment.
+- Nếu capacity không đủ, trả `409 SHOWTIME_BULK_SHORTAGE` và rollback toàn bộ.
+- Preview và commit dùng cùng planner; nếu availability thay đổi giữa hai request, commit tính lại trên snapshot mới thay vì tin preview cũ.
 
 #### `DELETE /api/v1/showtimes/:id`
 

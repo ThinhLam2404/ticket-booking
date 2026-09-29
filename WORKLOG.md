@@ -209,6 +209,17 @@
 - ĐÃ SỬA: Movie response từng trả Prisma `Decimal` của `rating` thành chuỗi, khiến Admin chỉ đổi status cũng gửi rating dạng string và API trả 400 (`rating must not be greater/less...`). MoviesService nay chuẩn hóa rating về number ở response boundary; MovieForm cũng normalize rating trước khi submit; đã thêm regression test.
 - CÒN LẠI: Browser verification live flow hold-expiry sau khi bật backend; tiếp tục rà format/price thật, filter catalogue và các copy cứng còn lại.
 
+## 2026-09-25 — Bulk scheduling đa phòng và seed lịch chiếu (đang thực hiện)
+
+- Đã thêm DTO/API cinema-bulk preview/commit theo `cinemaId`, ngày và số suất; planner xác định, phân bổ vòng tròn giữa các room và trả assignment theo thứ tự thời gian.
+- Đã thêm API free-slots cấp rạp, trả lịch tối đa có thể xếp riêng theo từng room và tổng `schedulableCount` thực tế; không còn giới hạn 2 suất mỗi room.
+- Đã regenerate OpenAPI/frontend types và thêm client API cho `cinema-bulk`.
+- Đã hoàn thiện Admin UI cinema-bulk: chọn phim/rạp/ngày/tổng số suất, ẩn seed nội bộ, xem khung giờ từng room không chồng lấn, xem shortage tổng, preview assignment theo room và giá policy/override hiệu lực.
+- Đã thêm seed deterministic/idempotent: 4 phim published, lịch 2 suất mỗi room cho ngày kế tiếp, phân bổ phim/2D-3D theo hash ổn định; chạy seed hai lần không nhân bản.
+- Database development sau seed: 45 phim, 50 cinema, 202 room, 433 showtime; 10 phim có suất chiếu.
+- Review follow-up: planner dùng Fisher–Yates seeded shuffle thay vì comparator random; DTO validate ngày `YYYY-MM-DD`; shortage response dùng code `SHOWTIME_BULK_SHORTAGE` để frontend hiển thị đúng thông báo chi tiết; date mặc định Admin dùng giờ địa phương.
+- Verification batch: lint, typecheck, build, unit `58/58`, FE `6/6`, E2E `6/6`, API check, Prisma deploy/seed và diff check pass. Integration review run bị Windows chặn port Redis `56379`, không phải assertion failure.
+
 ## 2026-09-25 — Email verification, ticket mail và seed format
 
 - Thêm migration `20260925100000_email_verification_and_mail_outbox`: `User.emailVerifiedAt`, one-time verification token và outbox email có trạng thái/retry/dedupe.
@@ -232,3 +243,12 @@
 - Đồng bộ OpenAPI và generated frontend types.
 - Review fixes: Admin update gửi cả `format`; seed chỉ cập nhật format khi file seed khai báo và bổ sung một phòng IMAX để có dữ liệu `SPECIAL`; thêm migration kiểm tra snapshot đủ mọi ghế vật lý; cinema `startingPrice` chỉ tính suất của movie `PUBLISHED`; DTO pricing response đồng bộ non-null; Quick Booking luôn dùng phim `NOW_SHOWING`, còn catalogue đặc biệt chỉ preview suất đặc biệt.
 - Verification batch: lint, typecheck, build, backend unit `58/58`, FE `6/6`, E2E `6/6`, API check, Prisma validate/deploy/seed và `git diff --check` pass; integration bị chặn bởi port Windows `55432`.
+
+## 2026-09-28 — Centralized showtime pricing policy
+
+- Thêm centralized pricing policy code theo `RoomFormat`, 2D/3D và ngày địa phương Việt Nam; cuối tuần là thứ Sáu–Chủ nhật.
+- Ma trận policy: Standard 2D `110000/130000`, Standard 3D `145000/185000`, IMAX 2D `155000/185000`, IMAX 3D `190000/240000`, ScreenX 2D `145000/175000`, ScreenX 3D `180000/230000`, 4DX 2D `155000/185000`, 4DX 3D `190000/240000` cho ngày thường/cuối tuần.
+- Các flow create, bulk single-room và cinema-bulk dùng policy khi pricing bị bỏ trống; cinema-bulk resolve giá riêng theo từng room. Override explicit vẫn được snapshot như trước.
+- Thêm `POST /showtimes/pricing/quote` cho Admin, frontend API/types và preview giá trong form lập lịch single-room/bulk.
+- Seed dùng cùng policy cho giá showtime và snapshot ghế.
+- Thêm regression coverage cho weekday/weekend, room/2D-3D matrix, quote override và create showtime không truyền giá.

@@ -12,6 +12,7 @@ import { api } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { useLocationContext } from "../auth/LocationContext";
 import {
+  Alert,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -27,6 +28,9 @@ import type {
   CreateSeatRequest,
   BulkShowtimePreviewResponse,
   BulkShowtimeRequest,
+  CinemaBulkPreviewResponse,
+  CinemaBulkShowtimeRequest,
+  CinemaFreeSlotsResponse,
   CreateShowtimeRequest,
   FreeSlotsResponse,
   Movie,
@@ -2015,22 +2019,29 @@ function ShowtimeForm({
     ? new Date(new Date(vietnameseDateTime(startsAt)).getTime() + selectedMovie.duration * 60 * 1000).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "medium", timeStyle: "short" })
     : "Chọn phim và giờ bắt đầu";
   const initialPricing = {
-    basePrice: showtime?.basePrice != null ? Number(showtime.basePrice) : 100000,
+    basePrice: showtime?.basePrice != null ? Number(showtime.basePrice) : 110000,
     vipMultiplier: showtime?.vipMultiplier != null ? Number(showtime.vipMultiplier) : 1.1,
     coupleMultiplier: showtime?.coupleMultiplier != null ? Number(showtime.coupleMultiplier) : 1.2,
   };
   const [basePrice, setBasePrice] = useState(initialPricing.basePrice);
   const [vipMultiplier, setVipMultiplier] = useState(initialPricing.vipMultiplier);
   const [coupleMultiplier, setCoupleMultiplier] = useState(initialPricing.coupleMultiplier);
-  const [pricingTouched, setPricingTouched] = useState({
-    basePrice: false,
-    vipMultiplier: false,
-    coupleMultiplier: false,
-  });
+  const [pricingOverridesEnabled, setPricingOverridesEnabled] = useState(mode === "edit" && Boolean(showtime));
   const roomsQuery = useQuery({
     queryKey: ["admin-showtime-rooms", cinemaId],
     queryFn: ({ signal }) => api.rooms(cinemaId, signal),
     enabled: Boolean(cinemaId),
+  });
+  const selectedRoom = roomsQuery.data?.find((room) => room.id === roomId);
+  const pricingQuote = useQuery({
+    queryKey: ["admin-showtime-pricing", selectedRoom?.format, format, startsAt, pricingOverridesEnabled, basePrice, vipMultiplier, coupleMultiplier],
+    queryFn: () => api.quoteShowtimePricing({
+      roomFormat: selectedRoom!.format,
+      showtimeFormat: format,
+      startsAt: vietnameseDateTime(startsAt),
+      ...(pricingOverridesEnabled && { basePrice, vipMultiplier, coupleMultiplier }),
+    }),
+    enabled: Boolean(selectedRoom?.format && startsAt.length >= 16),
   });
 
   async function submit(event: FormEvent) {
@@ -2041,10 +2052,9 @@ function ShowtimeForm({
         roomId,
         startsAt: vietnameseDateTime(startsAt),
         format,
-        basePrice,
-        vipMultiplier,
-        coupleMultiplier,
+        ...(pricingOverridesEnabled && { basePrice, vipMultiplier, coupleMultiplier }),
       });
+
       return;
     }
     await onSubmit({
@@ -2052,9 +2062,7 @@ function ShowtimeForm({
       roomId,
       startsAt: vietnameseDateTime(startsAt),
       format,
-      ...(pricingTouched.basePrice && { basePrice }),
-      ...(pricingTouched.vipMultiplier && { vipMultiplier }),
-      ...(pricingTouched.coupleMultiplier && { coupleMultiplier }),
+        ...(pricingOverridesEnabled && { basePrice, vipMultiplier, coupleMultiplier }),
     });
   }
 
@@ -2135,11 +2143,24 @@ function ShowtimeForm({
           <Field label="Kết thúc (tự tính theo thời lượng phim)">
             <input type="text" value={calculatedEndsAt} readOnly />
           </Field>
-          <NumberField label="Giá cơ bản" min={0} step={1000} value={basePrice} onChange={(value) => { setBasePrice(value); setPricingTouched((current) => ({ ...current, basePrice: true })); }} />
-          <NumberField label="Hệ số VIP" min={0} step={0.01} value={vipMultiplier} onChange={(value) => { setVipMultiplier(value); setPricingTouched((current) => ({ ...current, vipMultiplier: true })); }} />
-          <NumberField label="Phụ phí ghế đôi trên giá VIP" min={0} step={0.01} value={coupleMultiplier} onChange={(value) => { setCoupleMultiplier(value); setPricingTouched((current) => ({ ...current, coupleMultiplier: true })); }} />
+          <label className="admin-field admin-field-wide admin-checkbox-field">
+            <span>Giá vé</span>
+            <span className="admin-checkbox-control"><input type="checkbox" checked={pricingOverridesEnabled} onChange={(event) => setPricingOverridesEnabled(event.target.checked)} /> Ghi đè giá theo chính sách</span>
+          </label>
+          {pricingOverridesEnabled && <>
+            <NumberField label="Giá cơ bản override" min={0} step={1000} value={basePrice} onChange={setBasePrice} />
+            <NumberField label="Hệ số VIP override" min={0} step={0.01} value={vipMultiplier} onChange={setVipMultiplier} />
+            <NumberField label="Hệ số ghế đôi override" min={0} step={0.01} value={coupleMultiplier} onChange={setCoupleMultiplier} />
+          </>}
         </div>
-        {roomsQuery.isError && (
+        {pricingQuote.isPending && <p className="form-hint">Đang tính giá theo chính sách…</p>}
+        {pricingQuote.data && <p className="form-hint">Giá áp dụng ({pricingQuote.data.pricingDayType === "WEEKEND" ? "cuối tuần" : "ngày thường"}): Tiêu chuẩn {money(pricingQuote.data.prices.standard)} · VIP {money(pricingQuote.data.prices.vip)} · Ghế đôi {money(pricingQuote.data.prices.couple)}. {pricingOverridesEnabled ? "Đang dùng giá override." : "Đang dùng policy theo phòng và định dạng."}</p>}
+        {pricingQuote.isError && <p className="form-error">Không thể lấy báo giá chính sách.</p>}
+
+
+
+         {roomsQuery.isError && (
+
           <p className="form-error">Không thể tải phòng chiếu của cụm rạp.</p>
         )}
         {error && <p className="form-error">{error}</p>}
@@ -2170,9 +2191,10 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
   const [firstStartsAt, setFirstStartsAt] = useState("");
   const [count, setCount] = useState(5);
   const [turnaroundMinutes, setTurnaroundMinutes] = useState(20);
-  const [basePrice, setBasePrice] = useState(100000);
+  const [basePrice, setBasePrice] = useState(110000);
   const [vipMultiplier, setVipMultiplier] = useState(1.1);
   const [coupleMultiplier, setCoupleMultiplier] = useState(1.2);
+  const [pricingOverridesEnabled, setPricingOverridesEnabled] = useState(false);
   const [preview, setPreview] = useState<BulkShowtimePreviewResponse | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
@@ -2186,6 +2208,17 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
     queryFn: ({ signal }) => api.rooms(cinemaId, signal),
     enabled: Boolean(cinemaId),
   });
+  const selectedBulkRoom = roomsQuery.data?.find((room) => room.id === roomId);
+  const pricingQuote = useQuery({
+    queryKey: ["admin-bulk-pricing", selectedBulkRoom?.format, format, firstStartsAt, pricingOverridesEnabled, basePrice, vipMultiplier, coupleMultiplier],
+    queryFn: () => api.quoteShowtimePricing({
+      roomFormat: selectedBulkRoom!.format,
+      showtimeFormat: format,
+      startsAt: vietnameseDateTime(firstStartsAt),
+      ...(pricingOverridesEnabled && { basePrice, vipMultiplier, coupleMultiplier }),
+    }),
+    enabled: Boolean(selectedBulkRoom?.format && firstStartsAt.length >= 16),
+  });
   const body: BulkShowtimeRequest = {
     movieId,
     roomId,
@@ -2193,9 +2226,7 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
     format,
     count,
     turnaroundMinutes,
-    basePrice,
-    vipMultiplier,
-    coupleMultiplier,
+    ...(pricingOverridesEnabled && { basePrice, vipMultiplier, coupleMultiplier }),
   };
 
   async function previewSlots() {
@@ -2267,16 +2298,27 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
               {showtimeFormats.map((value) => <option key={value} value={value}>{showtimeFormatText[value]}</option>)}
             </select>
           </Field>
+          <label className="admin-field admin-field-wide admin-checkbox-field">
+            <span>Giá vé</span>
+            <span className="admin-checkbox-control"><input type="checkbox" checked={pricingOverridesEnabled} onChange={(event) => setPricingOverridesEnabled(event.target.checked)} /> Ghi đè giá theo chính sách</span>
+          </label>
           <Field label="Suất đầu tiên (giờ Việt Nam)">
             <input required type="datetime-local" value={firstStartsAt} onChange={(event) => { setFirstStartsAt(event.target.value); setPreview(null); }} />
           </Field>
           <NumberField label="Số suất" min={1} max={100} value={count} onChange={(value) => { setCount(value); setPreview(null); }} />
           <NumberField label="Thời gian nghỉ (phút)" min={0} max={180} value={turnaroundMinutes} onChange={(value) => { setTurnaroundMinutes(value); setPreview(null); }} />
-          <NumberField label="Giá cơ bản" min={0} step={1000} value={basePrice} onChange={setBasePrice} />
-          <NumberField label="Hệ số VIP" min={0} step={0.01} value={vipMultiplier} onChange={setVipMultiplier} />
-          <NumberField label="Hệ số ghế đôi" min={0} step={0.01} value={coupleMultiplier} onChange={setCoupleMultiplier} />
+           {pricingOverridesEnabled && <>
+             <NumberField label="Giá cơ bản override" min={0} step={1000} value={basePrice} onChange={setBasePrice} />
+             <NumberField label="Hệ số VIP override" min={0} step={0.01} value={vipMultiplier} onChange={setVipMultiplier} />
+             <NumberField label="Hệ số ghế đôi override" min={0} step={0.01} value={coupleMultiplier} onChange={setCoupleMultiplier} />
+           </>}
         </div>
-        {(roomsQuery.isError || previewError || error) && <p className="form-error">{previewError || error || "Không thể tải phòng chiếu."}</p>}
+        {pricingQuote.isPending && <p className="form-hint">Đang tính giá theo chính sách…</p>}
+
+        {pricingQuote.data && <p className="form-hint">Giá áp dụng ({pricingQuote.data.pricingDayType === "WEEKEND" ? "cuối tuần" : "ngày thường"}): Tiêu chuẩn {money(pricingQuote.data.prices.standard)} · VIP {money(pricingQuote.data.prices.vip)} · Ghế đôi {money(pricingQuote.data.prices.couple)}. {pricingOverridesEnabled ? "Đang dùng giá override." : "Đang dùng policy theo phòng và định dạng."}</p>}
+        {(roomsQuery.isError || previewError || error || pricingQuote.isError) && <p className="form-error">{previewError || error || (pricingQuote.isError ? "Không thể lấy báo giá chính sách." : "Không thể tải phòng chiếu.")}</p>}
+
+
         <div className="free-slots-box">
           <div className="free-slots-head">
             <strong>Khung giờ trống của phòng</strong>
@@ -2297,6 +2339,94 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
   );
 }
 
+function CinemaBulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit }: { movies: Movie[]; cinemas: Cinema[]; loading: boolean; error?: string; onCancel: () => void; onSubmit: (body: CinemaBulkShowtimeRequest) => Promise<void> }) {
+  const [movieId, setMovieId] = useState("");
+  const [cinemaId, setCinemaId] = useState("");
+  const [date, setDate] = useState(() => localDateTime(new Date(Date.now() + 86400000).toISOString()).slice(0, 10));
+  const [count, setCount] = useState(5);
+  const [format, setFormat] = useState<(typeof showtimeFormats)[number]>("TWO_D_SUBTITLED");
+  const [turnaroundMinutes, setTurnaroundMinutes] = useState(20);
+  const [pricingOverridesEnabled, setPricingOverridesEnabled] = useState(false);
+  const [basePrice, setBasePrice] = useState(110000);
+  const [vipMultiplier, setVipMultiplier] = useState(1.1);
+  const [coupleMultiplier, setCoupleMultiplier] = useState(1.2);
+  const [preview, setPreview] = useState<CinemaBulkPreviewResponse | null>(null);
+  const [freeSlots, setFreeSlots] = useState<CinemaFreeSlotsResponse | null>(null);
+  const [busy, setBusy] = useState<"preview" | "free" | null>(null);
+  const [localError, setLocalError] = useState("");
+  const selectedMovie = movies.find((movie) => movie.id === movieId);
+  const body: CinemaBulkShowtimeRequest = {
+    movieId,
+    cinemaId,
+    date,
+    count,
+    format,
+    turnaroundMinutes,
+    ...(pricingOverridesEnabled && { basePrice, vipMultiplier, coupleMultiplier }),
+  };
+
+  async function previewSchedule() {
+    setBusy("preview"); setLocalError("");
+    try { setPreview(await api.previewCinemaBulkShowtimes(body)); } catch (cause) { setLocalError(mutationMessage(cause)); setPreview(null); } finally { setBusy(null); }
+  }
+
+  async function loadFreeSlots() {
+    if (!cinemaId || !selectedMovie) return;
+    setBusy("free"); setLocalError("");
+    try { setFreeSlots(await api.cinemaFreeSlots(cinemaId, { date, durationMinutes: selectedMovie.duration, turnaroundMinutes })); } catch (cause) { setLocalError(errorMessage(cause, "Không thể tải khung giờ trống của rạp.")); setFreeSlots(null); } finally { setBusy(null); }
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!preview?.valid) { await previewSchedule(); return; }
+    await onSubmit(body);
+  }
+
+  return <Modal eyebrow="LẬP LỊCH ĐA PHÒNG" title="Tạo suất chiếu trong toàn rạp" onClose={onCancel} className="bulk-showtime-modal">
+    <form className="admin-form" onSubmit={(event) => void submit(event)}>
+      <div className="admin-form-grid">
+        <Field label="Phim" wide><select required value={movieId} onChange={(event) => { setMovieId(event.target.value); setPreview(null); }}><option value="">Chọn phim đã phát hành</option>{movies.filter((movie) => movie.status === "PUBLISHED").map((movie) => <option key={movie.id} value={movie.id}>{movie.title} · {movie.duration} phút</option>)}</select></Field>
+        <Field label="Cụm rạp" wide><select required value={cinemaId} onChange={(event) => { setCinemaId(event.target.value); setPreview(null); setFreeSlots(null); }}><option value="">Chọn cụm rạp</option>{cinemas.map((cinema) => <option key={cinema.id} value={cinema.id}>{cinema.name}</option>)}</select></Field>
+        <Field label="Ngày chiếu"><input required type="date" value={date} onChange={(event) => { setDate(event.target.value); setPreview(null); setFreeSlots(null); }} /></Field>
+        <NumberField label="Tổng số suất" min={1} max={100} value={count} onChange={(value) => { setCount(value); setPreview(null); }} />
+        <NumberField label="Thời gian nghỉ (phút)" min={0} max={180} value={turnaroundMinutes} onChange={(value) => { setTurnaroundMinutes(value); setPreview(null); setFreeSlots(null); }} />
+        <Field label="Định dạng suất chiếu"><select value={format} onChange={(event) => { setFormat(event.target.value as typeof format); setPreview(null); }}>{showtimeFormats.map((value) => <option key={value} value={value}>{showtimeFormatText[value]}</option>)}</select></Field>
+        <label className="admin-field admin-field-wide admin-checkbox-field">
+          <span>Giá vé</span>
+          <span className="admin-checkbox-control"><input type="checkbox" checked={pricingOverridesEnabled} onChange={(event) => { setPricingOverridesEnabled(event.target.checked); setPreview(null); }} /> Áp dụng một mức giá override cho toàn bộ phòng</span>
+        </label>
+        {pricingOverridesEnabled && <>
+          <NumberField label="Giá cơ bản override" min={0} step={1000} value={basePrice} onChange={(value) => { setBasePrice(value); setPreview(null); }} />
+          <NumberField label="Hệ số VIP override" min={0} step={0.01} value={vipMultiplier} onChange={(value) => { setVipMultiplier(value); setPreview(null); }} />
+          <NumberField label="Hệ số ghế đôi override" min={0} step={0.01} value={coupleMultiplier} onChange={(value) => { setCoupleMultiplier(value); setPreview(null); }} />
+        </>}
+       </div>
+       <p className="form-hint">Mặc định dùng chính sách theo từng phòng và ngày chiếu. Bật override chỉ khi muốn áp dụng cùng một mức giá cho toàn bộ suất.</p>
+
+
+      {(localError || error) && <p className="form-error">{localError || error}</p>}
+       <div className="free-slots-box">
+         <div className="free-slots-head"><strong>Khung giờ khả dụng theo phòng</strong><span>Các giờ bên dưới đã loại trừ suất bận và thời gian nghỉ; mỗi phòng chỉ hiện lịch có thể xếp liên tiếp.</span></div>
+         <div className="free-slots-controls"><button className="secondary" type="button" disabled={!cinemaId || !selectedMovie || busy !== null} onClick={() => void loadFreeSlots()}>{busy === "free" ? "Đang tìm…" : "Xem khung giờ từng phòng"}</button></div>
+         {freeSlots && <div className="free-slots-list">
+           {freeSlots.rooms.map((room) => <section className="free-room" key={room.roomId}>
+              <div className="free-room-heading"><strong>{room.roomName}</strong><span>{roomFormatText[room.roomFormat]} · {room.freeSlots.length} suất khả dụng</span></div>
+             {room.freeSlots.length ? <div className="free-room-slots">{room.freeSlots.map((slot) => <span className="free-slot-chip" key={`${room.roomId}-${slot.startsAt}`}><strong>{formatTime(slot.startsAt)} – {formatTime(slot.endsAt)}</strong></span>)}</div> : <p className="free-slots-empty">Không còn khung giờ phù hợp.</p>}
+           </section>)}
+         </div>}
+         {freeSlots && freeSlots.schedulableCount < count && <p className="form-error">Chỉ còn trống {freeSlots.schedulableCount} suất chiếu, không đủ {count} suất đã yêu cầu.</p>}
+       </div>
+       {preview && <div className={`bulk-preview ${preview.valid ? "valid" : "invalid"}`}>
+         <strong>{preview.valid ? `Sẵn sàng tạo ${preview.assignments.length} suất chiếu` : `Chỉ có thể tạo ${preview.assignments.length}/${preview.requestedCount} suất chiếu`}</strong>
+         <p className="bulk-preview-capacity">Tổng sức chứa theo lịch: {preview.schedulableCount} suất · Giá được tính theo từng phòng.</p>
+         <div className="bulk-preview-list">{preview.assignments.map((slot, index) => <span className="available" key={`${slot.roomId}-${slot.startsAt}`}><strong>Suất {index + 1} · {slot.roomName}</strong><span>{formatTime(slot.startsAt)} – {formatTime(slot.endsAt)} · {roomFormatText[slot.roomFormat]} · Standard {money(slot.prices.standard)} · VIP {money(slot.prices.vip)} · Đôi {money(slot.prices.couple)}</span></span>)}</div>
+       </div>}
+
+      <div className="form-actions"><button className="secondary" type="button" disabled={loading || busy !== null} onClick={onCancel}>Hủy</button><button className="secondary" type="button" disabled={!movieId || !cinemaId || busy !== null} onClick={() => void previewSchedule()}>{busy === "preview" ? "Đang kiểm tra…" : "Xem trước"}</button><button className="primary" disabled={loading || busy !== null || !preview?.valid}>{loading ? "Đang tạo…" : "Tạo toàn bộ suất"}</button></div>
+    </form>
+  </Modal>;
+}
+
 export function AdminShowtimesPage() {
   const queryClient = useQueryClient();
   const [movieId, setMovieId] = useState("");
@@ -2309,9 +2439,11 @@ export function AdminShowtimesPage() {
     showtime?: Showtime;
   } | null>(null);
   const [bulkModal, setBulkModal] = useState(false);
+  const [cinemaBulkModal, setCinemaBulkModal] = useState(false);
   const [detailId, setDetailId] = useState("");
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [mutationError, setMutationError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const moviesQuery = useQuery({
     queryKey: ["admin-movies", "showtime-options"],
     queryFn: ({ signal }) => api.adminMovies({ pageSize: 100 }, signal),
@@ -2346,18 +2478,30 @@ export function AdminShowtimesPage() {
         ? api.updateShowtime(id, body as UpdateShowtimeRequest)
         : api.createShowtime(body as CreateShowtimeRequest),
     onSuccess: () => {
+      const message = modal?.mode === "edit" ? "Đã cập nhật suất chiếu." : "Đã tạo suất chiếu.";
       void queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] });
       setModal(null);
       setDetailId("");
       setMutationError("");
+      setSuccessMessage(message);
+    },
+  });
+  const cinemaBulkMutation = useMutation({
+    mutationFn: (body: CinemaBulkShowtimeRequest) => api.createCinemaBulkShowtimes(body),
+    onSuccess: (created) => {
+      void queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] });
+      setCinemaBulkModal(false);
+      setMutationError("");
+      setSuccessMessage(`Đã tạo ${created.length} suất chiếu đa phòng.`);
     },
   });
   const bulkMutation = useMutation({
     mutationFn: (body: BulkShowtimeRequest) => api.createBulkShowtimes(body),
-    onSuccess: () => {
+    onSuccess: (created) => {
       void queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] });
       setBulkModal(false);
       setMutationError("");
+      setSuccessMessage(`Đã tạo ${created.length} suất chiếu.`);
     },
   });
   const deleteMutation = useMutation({
@@ -2365,6 +2509,7 @@ export function AdminShowtimesPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] });
       setConfirm(null);
+      setSuccessMessage("Đã xóa suất chiếu.");
     },
   });
   const showtimes = query.data?.data ?? [];
@@ -2379,6 +2524,16 @@ export function AdminShowtimesPage() {
       await saveMutation.mutateAsync({ id: modal?.showtime?.id, body });
     } catch (cause) {
       setMutationError(mutationMessage(cause));
+    }
+  }
+
+  async function createCinemaBulk(body: CinemaBulkShowtimeRequest) {
+    setMutationError("");
+    try {
+      await cinemaBulkMutation.mutateAsync(body);
+    } catch (cause) {
+      setMutationError(mutationMessage(cause));
+      throw cause;
     }
   }
 
@@ -2410,8 +2565,11 @@ export function AdminShowtimesPage() {
     <AdminPage>
       <PageHeader eyebrow="LỊCH VẬN HÀNH" title="Suất chiếu">
         <div className="admin-page-actions">
+          <button className="secondary" type="button" disabled={optionsPending} onClick={() => { setMutationError(""); setCinemaBulkModal(true); }}>
+            + Lập lịch đa phòng
+          </button>
           <button className="secondary" type="button" disabled={optionsPending} onClick={() => { setMutationError(""); setBulkModal(true); }}>
-            + Lập lịch hàng loạt
+            + Lập lịch một phòng
           </button>
           <button
             className="primary"
@@ -2427,7 +2585,9 @@ export function AdminShowtimesPage() {
          </button>
         </div>
        </PageHeader>
-      <Toolbar>
+       {successMessage && <Alert type="success" onClose={() => setSuccessMessage("")}>{successMessage}</Alert>}
+       <Toolbar>
+
         <select
           aria-label="Lọc phim"
           value={movieId}
@@ -2555,6 +2715,16 @@ export function AdminShowtimesPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {cinemaBulkModal && (
+        <CinemaBulkShowtimeForm
+          movies={movies}
+          cinemas={cinemas}
+          loading={cinemaBulkMutation.isPending}
+          error={mutationError}
+          onCancel={() => setCinemaBulkModal(false)}
+          onSubmit={createCinemaBulk}
+        />
       )}
       {bulkModal && (
         <BulkShowtimeForm

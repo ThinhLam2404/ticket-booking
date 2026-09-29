@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { ShowtimeSeatStatus } from '@prisma/client';
+import { RoomFormat, ShowtimeFormat, ShowtimeSeatStatus } from '@prisma/client';
+import { getPolicyBasePrice, getPricingDayType } from './showtime-policy.js';
 import { ShowtimesService } from './showtimes.service.js';
 
 function vnDatePart(date: Date): string {
@@ -18,6 +19,41 @@ function futureVnStartsAt(time: string): Date {
   }
   return candidate;
 }
+
+describe('Showtime pricing policy', () => {
+  it('uses Friday as the start of the weekend band', () => {
+    const friday = new Date('2026-10-02T19:00:00+07:00');
+
+    expect(getPricingDayType(friday)).toBe('WEEKEND');
+    expect(getPolicyBasePrice(RoomFormat.IMAX, ShowtimeFormat.THREE_D_SUBTITLED, friday)).toBe(240000);
+  });
+
+  it('uses room format and 2D/3D format independently', () => {
+    const monday = new Date('2026-09-28T19:00:00+07:00');
+
+    expect(getPolicyBasePrice(RoomFormat.STANDARD, ShowtimeFormat.TWO_D_SUBTITLED, monday)).toBe(110000);
+    expect(getPolicyBasePrice(RoomFormat.SCREEN_X, ShowtimeFormat.THREE_D_DUBBED, monday)).toBe(180000);
+  });
+
+  it('returns explicit quote overrides without changing the policy matrix', async () => {
+    const service = new ShowtimesService({} as never, { expireBookingsForShowtime: vi.fn() } as never);
+
+    await expect(service.quotePricing({
+      roomFormat: RoomFormat.STANDARD,
+      showtimeFormat: ShowtimeFormat.TWO_D_SUBTITLED,
+      startsAt: '2026-09-28T19:00:00+07:00',
+      basePrice: 125000,
+      vipMultiplier: 1.15,
+    })).resolves.toMatchObject({
+      pricingDayType: 'WEEKDAY',
+      basePrice: 125000,
+      vipMultiplier: 1.15,
+      coupleMultiplier: 1.2,
+      prices: { standard: 125000, vip: 143750, couple: 172500 },
+      overridden: { basePrice: true, vipMultiplier: true, coupleMultiplier: false },
+    });
+  });
+});
 
 describe('ShowtimesService expiry lifecycle', () => {
   it('delegates expired booking cleanup before reading a showtime', async () => {
@@ -141,6 +177,40 @@ describe('ShowtimesService scheduling', () => {
       data: expect.objectContaining({
         startsAt,
         endsAt: new Date(startsAt.getTime() + 120 * 60 * 1000),
+      }),
+    }));
+  });
+
+  it('uses policy pricing when a new showtime omits pricing overrides', async () => {
+    const seats = validRoomSeats();
+    const showtimeCreate = vi.fn().mockResolvedValue({ id: 'showtime-1' });
+    const prisma = {
+      movie: { findUnique: vi.fn().mockResolvedValue({ id: 'movie-1', duration: 120, status: 'PUBLISHED' }) },
+      room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1', format: RoomFormat.IMAX, seats }) },
+      showtime: { findFirst: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn(async (callback: (transaction: unknown) => unknown) => callback({
+        showtime: {
+          create: showtimeCreate,
+          findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'showtime-1' }),
+        },
+        showtimeSeat: { createMany: vi.fn().mockResolvedValue({ count: seats.length }) },
+      })),
+    };
+    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const startsAt = futureVnStartsAt('10:00:00');
+
+    await service.create({
+      movieId: 'movie-1',
+      roomId: 'room-1',
+      startsAt: startsAt.toISOString(),
+      format: ShowtimeFormat.THREE_D_SUBTITLED,
+    });
+
+    expect(showtimeCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        basePrice: `${getPolicyBasePrice(RoomFormat.IMAX, ShowtimeFormat.THREE_D_SUBTITLED, startsAt).toFixed(2)}`,
+        vipMultiplier: '1.10',
+        coupleMultiplier: '1.20',
       }),
     }));
   });
@@ -449,6 +519,80 @@ describe('ShowtimesService operating hours', () => {
   });
 });
 
+describe('ShowtimesService cinema scheduling', () => {
+  it('allocates more than two slots per room and returns chronological assignments', async () => {
+    const rooms = [
+      { id: 'room-standard', name: 'Phòng Standard', format: RoomFormat.STANDARD, seats: validRoomSeats() },
+      { id: 'room-imax', name: 'Phòng IMAX', format: RoomFormat.IMAX, seats: validRoomSeats() },
+    ];
+    const prisma = {
+      movie: { findUnique: vi.fn().mockResolvedValue({ id: 'movie-1', duration: 120, status: 'PUBLISHED' }) },
+      room: { findMany: vi.fn().mockResolvedValue(rooms) },
+      showtime: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+
+    const result = await service.previewCinemaBulk({
+      movieId: 'movie-1',
+      cinemaId: 'cinema-1',
+      date: '2099-10-05',
+      count: 7,
+      format: ShowtimeFormat.TWO_D_SUBTITLED,
+      turnaroundMinutes: 20,
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.schedulableCount).toBe(14);
+    expect(result.assignments).toHaveLength(7);
+    expect(result.assignments.filter((slot) => slot.roomId === 'room-standard')).toHaveLength(4);
+    expect(result.assignments.filter((slot) => slot.roomId === 'room-imax')).toHaveLength(3);
+    expect(result.assignments.map((slot) => slot.startsAt)).toEqual(
+      [...result.assignments]
+        .sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime())
+        .map((slot) => slot.startsAt),
+    );
+    expect(result.assignments.find((slot) => slot.roomId === 'room-imax')).toMatchObject({
+      roomFormat: RoomFormat.IMAX,
+      basePrice: getPolicyBasePrice(RoomFormat.IMAX, ShowtimeFormat.TWO_D_SUBTITLED, new Date('2099-10-05T08:00:00+07:00')),
+    });
+    expect(result.assignments.find((slot) => slot.roomId === 'room-standard')).toMatchObject({
+      roomFormat: RoomFormat.STANDARD,
+      basePrice: getPolicyBasePrice(RoomFormat.STANDARD, ShowtimeFormat.TWO_D_SUBTITLED, new Date('2099-10-05T08:00:00+07:00')),
+    });
+  });
+
+  it('returns the same maximum per-room schedule in cinema free slots', async () => {
+    const rooms = [
+      { id: 'room-standard', name: 'Phòng Standard', format: RoomFormat.STANDARD, seats: validRoomSeats() },
+      { id: 'room-imax', name: 'Phòng IMAX', format: RoomFormat.IMAX, seats: validRoomSeats() },
+    ];
+    const prisma = {
+      room: { findMany: vi.fn().mockResolvedValue(rooms) },
+      showtime: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+
+    const result = await service.findCinemaFreeSlots('cinema-1', {
+      date: '2099-10-05',
+      durationMinutes: 120,
+      turnaroundMinutes: 20,
+    });
+
+    expect(result.schedulableCount).toBe(14);
+    expect(result.rooms).toHaveLength(2);
+    expect(result.rooms[0]?.freeSlots).toHaveLength(7);
+    expect(result.rooms[1]?.freeSlots).toHaveLength(7);
+    expect(result.rooms[0]?.freeSlots.map((slot) => slot.startsAt)).toEqual(
+      [...(result.rooms[0]?.freeSlots ?? [])]
+        .sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime())
+        .map((slot) => slot.startsAt),
+    );
+    expect(result.rooms[0]?.freeSlots.at(-1)?.startsAt).toBe(
+      new Date('2099-10-05T23:00:00+07:00').toISOString(),
+    );
+  });
+});
+
 describe('ShowtimesService free slots', () => {
   it('returns free windows between busy showtimes with turnaround', async () => {
     const prisma = {
@@ -478,13 +622,20 @@ describe('ShowtimesService free slots', () => {
     expect(result.freeWindows[0]?.endsAt).toEqual(new Date('2026-10-05T13:40:00+07:00'));
     const last = result.freeWindows[result.freeWindows.length - 1];
     expect(last?.startsAt).toEqual(new Date('2026-10-05T16:20:00+07:00'));
-    expect(last?.endsAt).toEqual(new Date('2026-10-05T23:00:00+07:00'));
+    expect(last?.endsAt).toEqual(new Date('2026-10-06T01:00:00+07:00'));
   });
 
   it('drops windows shorter than the requested duration', async () => {
     const prisma = {
       room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1' }) },
-      showtime: { findMany: vi.fn().mockResolvedValue([]) },
+      showtime: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            startsAt: new Date('2026-10-05T22:00:00+07:00'),
+            endsAt: new Date('2026-10-05T23:00:00+07:00'),
+          },
+        ]),
+      },
     };
     const service = new ShowtimesService(
       prisma as never,
