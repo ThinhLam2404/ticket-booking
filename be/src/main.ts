@@ -4,6 +4,7 @@ import { configureApp } from './config/app.config.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
   configureApp(app);
   const configuredPort = Number(process.env.PORT);
   const port =

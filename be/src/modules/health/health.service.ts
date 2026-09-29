@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { RedisService } from '../redis/redis.service.js';
+import { MailWorkerSupervisor } from '../mail/mail-worker.supervisor.js';
 
 @Injectable()
 export class HealthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly mailWorker: MailWorkerSupervisor,
   ) {}
 
   liveness() {
@@ -37,6 +39,10 @@ export class HealthService {
       checks.redis = 'down';
       ready = false;
     }
+
+    const mailWorkerStatus = this.mailWorker.getStatus();
+    checks.mailWorker = mailWorkerStatus;
+    if (mailWorkerStatus === 'starting' || mailWorkerStatus === 'restarting') ready = false;
 
     return {
       status: ready ? 'ok' : 'degraded',

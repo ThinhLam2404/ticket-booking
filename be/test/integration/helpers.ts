@@ -67,6 +67,8 @@ export async function resetIntegrationState() {
       "Payment",
       "SepayTransaction",
       "SepayPaymentIntent",
+      "MailOutbox",
+      "EmailVerificationToken",
       "BookingItem",
       "ShowtimeSeat",
       "Booking",

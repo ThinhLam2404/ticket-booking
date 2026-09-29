@@ -83,7 +83,7 @@ File: `be/docker-compose.yml`; root scripts gọi file này từ repository root
 | PostgreSQL | `5432` | DB `ticket_booking`, user `ticket_booking`, password local `ticket_booking` |
 | Redis      | `6379` | Seat lock                                                                   |
 
-Application hiện chạy trực tiếp bằng Node/NestJS và Vite; chỉ PostgreSQL/Redis chạy bằng Docker Compose. Email dùng SMTP provider cấu hình qua biến môi trường. Chưa có Dockerfile cho API hoặc frontend.
+Application hiện chạy trực tiếp bằng Node/NestJS và Vite; chỉ PostgreSQL/Redis chạy bằng Docker Compose. Email dùng SMTP provider cấu hình qua biến môi trường. Mail gửi bất đồng bộ bằng Worker Thread đọc `MailOutbox`; request chỉ chờ transaction outbox commit, không chờ SMTP. Worker được đánh thức ngay sau commit bằng message `wake` và vẫn polling fallback theo chu kỳ. Chưa có Dockerfile cho API hoặc frontend.
 
 ### 2.3. URL API
 
@@ -260,6 +260,10 @@ SMTP_USER=your-smtp-username
 SMTP_PASSWORD=your-smtp-password
 SMTP_FROM=CineBook <no-reply@example.com>
 PUBLIC_APP_URL=http://localhost:5173
+MAIL_WORKER_ENABLED=true
+MAIL_WORKER_POLL_MS=10000
+MAIL_WORKER_STALE_LOCK_MS=300000
+MAIL_WORKER_SHUTDOWN_TIMEOUT_MS=15000
 TMDB_ACCESS_TOKEN=<tmdb-api-read-access-token>
 SEED_ADMIN_EMAIL=admin@example.com
 SEED_ADMIN_PASSWORD=change-this-seed-password
@@ -281,7 +285,11 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `SMTP_USER`              | Không    | SMTP username nếu provider yêu cầu                             |
 | `SMTP_PASSWORD`          | Không    | SMTP password nếu provider yêu cầu                             |
 | `SMTP_FROM`              | Không    | Địa chỉ gửi email                                               |
-| `PUBLIC_APP_URL`         | Không    | Base URL frontend dùng trong link xác thực                     |
+| `PUBLIC_APP_URL`         | Không    | Base URL frontend dùng trong link xác thực và link xem vé     |
+| `MAIL_WORKER_ENABLED`    | Không    | Bật Worker Thread gửi mail; test/OpenAPI nên để `false`       |
+| `MAIL_WORKER_POLL_MS`    | Không    | Chu kỳ polling fallback khi outbox rỗng, default `10000`      |
+| `MAIL_WORKER_STALE_LOCK_MS` | Không | Thời gian reclaim lock PROCESSING, default `300000`           |
+| `MAIL_WORKER_SHUTDOWN_TIMEOUT_MS` | Không | Timeout graceful shutdown, default `15000`              |
 | `TMDB_ACCESS_TOKEN`      | Không    | TMDB API Read Access Token; cần nếu Admin tìm hoặc nhập phim  |
 | `SEED_ADMIN_EMAIL`       | Seed     | Email admin bootstrap, default `admin@example.com`             |
 | `SEED_ADMIN_PASSWORD`    | Seed     | Password admin bootstrap, bắt buộc khi seed                    |
@@ -914,6 +922,9 @@ Bổ sung phân loại phòng/suất và chuẩn hóa giá theo từng suất:
 - Thêm `User.emailVerifiedAt`; user hiện có được backfill là đã xác thực.
 - Thêm token xác thực email dùng một lần với hash, expiry và `consumedAt`.
 - Thêm `MailOutbox` để gửi email bất đồng bộ, dedupe theo nghiệp vụ và retry khi SMTP lỗi.
+- Mail worker chạy trong Node.js Worker Thread riêng, không dùng Nest `@Cron`; worker xử lý drain liên tục, sleep bằng polling fallback khi rỗng, và nhận `wake` sau khi transaction tạo outbox commit.
+- Worker có graceful shutdown, restart với backoff khi crash, stale-lock recovery, stable `Message-ID` theo outbox và readiness status.
+- Email xác thực tài khoản dùng template CineBook Cobalt Editorial HTML/table inline CSS và plain-text fallback. Email vé gồm thông tin phim/rạp/suất, tổng tiền, từng mã vé, QR inline CID và link xem vé.
 
 ### 6.2. Seed
 
@@ -1923,7 +1934,7 @@ Khi webhook SePay khớp payment code, số tiền và intent còn hạn:
 2. Payment được tạo hoặc cập nhật với `provider: "SEPAY"`, `status: "SUCCEEDED"` và reference `SEPAY-<sepayId>`.
 3. Booking chuyển sang `CONFIRMED`, ghế chuyển sang `SOLD`, ticket được upsert và Redis lock được giải phóng.
 4. Gửi lại cùng `sepayId` trả thành công idempotently nhờ unique constraint.
-5. Tạo một mail outbox `TICKETS_ISSUED` theo booking; worker SMTP gửi một email chứa toàn bộ vé và QR inline. SMTP lỗi không rollback booking/payment, outbox sẽ retry.
+5. Tạo một mail outbox `TICKETS_ISSUED` theo booking; Worker Thread render template CineBook, tạo QR inline và gửi một email chứa toàn bộ vé. SMTP lỗi không rollback booking/payment, outbox sẽ retry. Sau khi transaction commit, API đánh thức worker; polling fallback vẫn bảo đảm không bỏ sót.
 
 Giao dịch không khớp mã, sai tiền hoặc đến sau khi intent hết hạn được lưu `REVIEW_REQUIRED`; hệ thống không tự cấp vé.
 ### 8.13. Tickets API
@@ -2498,7 +2509,7 @@ Khi reset database, chạy migration rồi chạy `npm run prisma:seed`. Seed kh
 
 ### 15.1. Limitations hiện tại
 
-- Email phụ thuộc SMTP provider được cấu hình qua `SMTP_*`; cần kiểm tra credentials và network access trước khi chạy worker.
+- Email phụ thuộc SMTP provider được cấu hình qua `SMTP_*`; cần kiểm tra credentials và network access trước khi chạy Worker Thread. Worker dùng at-least-once delivery, dedupe theo outbox và có thể gửi lại nếu process crash sau SMTP thành công nhưng trước khi ghi `SENT`.
 - Chưa có webhook signature verification.
 - Chưa có refund flow dù enum `REFUNDED` đã tồn tại.
 - Chưa có ticket check-in/consume.

@@ -1,5 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import {
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -82,6 +83,22 @@ class EnvironmentVariables {
   @IsOptional()
   @IsUrl({ require_tld: false })
   PUBLIC_APP_URL = 'http://localhost:5173';
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  MAIL_WORKER_ENABLED?: string;
+
+  @IsOptional()
+  @IsString()
+  MAIL_WORKER_POLL_MS = '10000';
+
+  @IsOptional()
+  @IsString()
+  MAIL_WORKER_STALE_LOCK_MS = '300000';
+
+  @IsOptional()
+  @IsString()
+  MAIL_WORKER_SHUTDOWN_TIMEOUT_MS = '15000';
 }
 
 export function validateEnvironment(config: Record<string, unknown>) {

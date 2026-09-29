@@ -45,6 +45,7 @@ describe('SepayService', () => {
       prisma as never,
       bookingsService as never,
       config as never,
+      { queueTicketEmail: vi.fn(), wakeWorker: vi.fn() } as never,
     );
 
     return { service, prisma, bookingsService, config };

@@ -244,6 +244,15 @@
 - Review fixes: Admin update gửi cả `format`; seed chỉ cập nhật format khi file seed khai báo và bổ sung một phòng IMAX để có dữ liệu `SPECIAL`; thêm migration kiểm tra snapshot đủ mọi ghế vật lý; cinema `startingPrice` chỉ tính suất của movie `PUBLISHED`; DTO pricing response đồng bộ non-null; Quick Booking luôn dùng phim `NOW_SHOWING`, còn catalogue đặc biệt chỉ preview suất đặc biệt.
 - Verification batch: lint, typecheck, build, backend unit `58/58`, FE `6/6`, E2E `6/6`, API check, Prisma validate/deploy/seed và `git diff --check` pass; integration bị chặn bởi port Windows `55432`.
 
+## 2026-09-29 — Mail Worker Thread và email templates
+
+- Bỏ `@Cron` khỏi `MailService`; thêm Worker Thread riêng với Prisma/Nodemailer connection riêng.
+- Worker hỗ trợ claim outbox có điều kiện, drain liên tục, polling fallback, `wake` sau transaction commit, retry/backoff, stale lock, stable Message-ID, restart backoff và graceful shutdown.
+- Tách template xác thực và ticket thành pure TypeScript functions, HTML inline/table, plain-text fallback, HTML escaping, thông tin booking/tổng tiền/mã vé và QR inline.
+- Thêm cấu hình `MAIL_WORKER_*`, readiness check và shutdown hooks; test/OpenAPI mặc định không spawn worker.
+- Thêm unit tests template, facade enqueue/dedupe/wake; integration reset dọn thêm outbox/token tables.
+- Chưa commit.
+
 ## 2026-09-28 — Centralized showtime pricing policy
 
 - Thêm centralized pricing policy code theo `RoomFormat`, 2D/3D và ngày địa phương Việt Nam; cuối tuần là thứ Sáu–Chủ nhật.

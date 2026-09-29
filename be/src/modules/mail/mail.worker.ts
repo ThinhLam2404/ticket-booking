@@ -1,0 +1,214 @@
+import { parentPort, workerData } from 'node:worker_threads';
+import { PrismaClient, MailOutboxStatus, MailOutboxType, Prisma } from '@prisma/client';
+import * as nodemailer from 'nodemailer';
+import QRCode from 'qrcode';
+import type { MailWorkerData } from './mail-worker.supervisor.js';
+import { renderTicketEmail } from './templates/ticket-email.template.js';
+import { renderVerificationEmail } from './templates/verification-email.template.js';
+
+const data = workerData as MailWorkerData;
+const prisma = new PrismaClient({ datasources: { db: { url: data.databaseUrl } } });
+const transporter = nodemailer.createTransport({
+  host: data.smtpHost,
+  port: data.smtpPort,
+  secure: data.smtpSecure,
+  connectionTimeout: 15000,
+  socketTimeout: 30000,
+  ...(data.smtpUser && { auth: { user: data.smtpUser, pass: data.smtpPassword ?? '' } }),
+});
+const retryDelaysMs = [60000, 300000, 1800000, 7200000];
+let timer: NodeJS.Timeout | undefined;
+let running = false;
+let stopping = false;
+let closed = false;
+
+parentPort?.on('message', (message: { type: string }) => {
+  if (message.type === 'wake') {
+    if (timer) clearTimeout(timer);
+    void drain();
+  }
+  if (message.type === 'shutdown') {
+    stopping = true;
+    if (timer) clearTimeout(timer);
+    if (!running) void shutdown();
+  }
+});
+
+void bootstrap().catch(async (error) => {
+  parentPort?.postMessage({
+    type: 'error',
+    message: error instanceof Error ? error.message : String(error),
+  });
+  try {
+    transporter.close();
+  } catch (error) {
+    parentPort?.postMessage({
+      type: 'error',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+  await prisma.$disconnect().catch(() => undefined);
+  process.exit(1);
+});
+
+async function bootstrap() {
+  await prisma.$connect();
+  parentPort?.postMessage({ type: 'ready' });
+  await drain();
+}
+
+async function drain(): Promise<void> {
+  if (running || stopping) {
+    if (stopping && !running) await shutdown();
+    return;
+  }
+  running = true;
+  try {
+    while (!stopping) {
+      const outbox = await claimNext();
+      if (!outbox) break;
+      parentPort?.postMessage({ type: 'processing', outboxId: outbox.id });
+      await processOutbox(outbox);
+    }
+    parentPort?.postMessage({ type: 'idle' });
+  } catch (error) {
+    parentPort?.postMessage({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+  } finally {
+    running = false;
+    if (stopping) await shutdown();
+    else schedulePoll();
+  }
+}
+
+async function claimNext() {
+  const now = new Date();
+  const staleLockAt = new Date(now.getTime() - data.staleLockMs);
+  const readyWhere: Prisma.MailOutboxWhereInput = {
+    OR: [
+      { status: { in: [MailOutboxStatus.PENDING, MailOutboxStatus.FAILED] }, nextAttemptAt: { lte: now } },
+      { status: MailOutboxStatus.PROCESSING, lockedAt: { lt: staleLockAt } },
+    ],
+  };
+  const candidate = await prisma.mailOutbox.findFirst({ where: readyWhere, orderBy: { createdAt: 'asc' } });
+  if (!candidate) return null;
+  const locked = await prisma.mailOutbox.updateMany({
+    where: { id: candidate.id, ...readyWhere },
+    data: { status: MailOutboxStatus.PROCESSING, lockedAt: now },
+  });
+  return locked.count === 1 ? candidate : null;
+}
+
+async function processOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
+  try {
+    const rendered = await renderOutbox(outbox);
+    await transporter.sendMail({
+      from: data.smtpFrom,
+      to: outbox.recipient,
+      subject: rendered.subject,
+      text: rendered.text,
+      html: rendered.html,
+      attachments: rendered.attachments,
+      messageId: `<cinebook-${outbox.id}@cinebook>`,
+    });
+    await prisma.mailOutbox.update({
+      where: { id: outbox.id },
+      data: {
+        status: MailOutboxStatus.SENT,
+        sentAt: new Date(),
+        lockedAt: null,
+        ...(outbox.type === MailOutboxType.EMAIL_VERIFICATION && {
+          payload: { sent: true },
+        }),
+      },
+    });
+  } catch (error) {
+    const attemptCount = outbox.attemptCount + 1;
+    const delay = retryDelaysMs[Math.min(attemptCount - 1, retryDelaysMs.length - 1)] ?? retryDelaysMs.at(-1)!;
+    await prisma.mailOutbox.update({
+      where: { id: outbox.id },
+      data: {
+        status: MailOutboxStatus.FAILED,
+        attemptCount,
+        nextAttemptAt: new Date(Date.now() + delay),
+        lastError: error instanceof Error ? error.message : String(error),
+        lockedAt: null,
+      },
+    });
+  }
+}
+
+async function renderOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
+  if (outbox.type === MailOutboxType.EMAIL_VERIFICATION) {
+    const payload = outbox.payload as { fullName: string; token: string };
+    return renderVerificationEmail({
+      fullName: payload.fullName,
+      verificationUrl: `${data.publicAppUrl}/verify-email?token=${encodeURIComponent(payload.token)}`,
+      expiresInHours: 24,
+    });
+  }
+  const payload = outbox.payload as { bookingId: string };
+  const booking = await prisma.booking.findUnique({
+    where: { id: payload.bookingId },
+    include: {
+      user: true,
+      showtime: { include: { movie: true, room: { include: { cinema: true } } } },
+      items: { include: { showtimeSeat: { include: { seat: true } }, ticket: true } },
+      tickets: true,
+    },
+  });
+  if (!booking || booking.status !== 'CONFIRMED') throw new Error('Confirmed booking not found');
+  const attachments = await Promise.all(booking.tickets.map(async (ticket) => ({
+    filename: `${ticket.code}.png`,
+    content: (await QRCode.toBuffer(`cinebook-ticket:v1:${ticket.code}`, { errorCorrectionLevel: 'M', margin: 1, width: 220, color: { dark: '#101820', light: '#ffffff' } })).toString('base64'),
+    encoding: 'base64' as const,
+    cid: `ticket-${ticket.code}@cinebook`,
+  })));
+  return renderTicketEmail({
+    fullName: booking.user.fullName,
+    appUrl: data.publicAppUrl,
+    bookingId: booking.id,
+    totalAmount: booking.totalAmount.toString(),
+    movieTitle: booking.showtime.movie.title,
+    cinemaName: booking.showtime.room.cinema.name,
+    cinemaAddress: booking.showtime.room.cinema.address,
+    roomName: booking.showtime.room.name,
+    startsAt: booking.showtime.startsAt,
+    endsAt: booking.showtime.endsAt,
+    tickets: booking.tickets.map((ticket) => {
+      const item = booking.items.find((bookingItem) => bookingItem.ticket?.id === ticket.id);
+      const seat = item?.showtimeSeat.seat;
+      return { code: ticket.code, seatLabel: `${seat?.row ?? ''}${seat?.number ?? ''}`, price: item?.price.toString() ?? '0', qrCid: `ticket-${ticket.code}@cinebook` };
+    }),
+    attachments,
+  });
+}
+
+function schedulePoll() {
+  timer = setTimeout(() => {
+    timer = undefined;
+    void drain();
+  }, data.pollMs);
+  timer.unref?.();
+}
+
+async function shutdown() {
+  if (closed) return;
+  closed = true;
+  try {
+    transporter.close();
+  } catch (error) {
+    parentPort?.postMessage({
+      type: 'error',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+  try {
+    await prisma.$disconnect();
+  } catch (error) {
+    parentPort?.postMessage({
+      type: 'error',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+  parentPort?.postMessage({ type: 'stopped' });
+}

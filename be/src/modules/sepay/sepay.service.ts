@@ -21,6 +21,7 @@ import { isUniqueConstraintError } from '../../common/database/prisma-errors.js'
 import { BookingsService } from '../bookings/bookings.service.js';
 import { SepayWebhookDto } from './dto/sepay-webhook.dto.js';
 import { SHOWTIME_BUFFER_SECONDS } from '../bookings/booking-policy.js';
+import { MailService } from '../mail/mail.service.js';
 
 const PAYMENT_CODE_PREFIX = 'CB';
 const PAYMENT_CODE_LENGTH = 8;
@@ -33,6 +34,7 @@ export class SepayService {
     private readonly prisma: PrismaService,
     private readonly bookingsService: BookingsService,
     private readonly config: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   async checkout(userId: string, bookingId: string) {
@@ -331,22 +333,17 @@ export class SepayService {
           where: { sepayId },
           data: { status: SepayTransactionStatus.CONFIRMED },
         });
-
-        await tx.mailOutbox.upsert({
-          where: { dedupeKey: `TICKETS_ISSUED:${booking.id}` },
-          create: {
-            type: 'TICKETS_ISSUED',
-            recipient: intent.booking.user.email,
-            dedupeKey: `TICKETS_ISSUED:${booking.id}`,
-            payload: { bookingId: booking.id },
-          },
-          update: {},
-        });
+        await this.mailService.queueTicketEmail(
+          booking.id,
+          intent.booking.user.email,
+          tx,
+        );
 
         return current;
       });
 
       if (confirmed) {
+        this.mailService.wakeWorker();
         await this.bookingsService.releaseSeatLocks(
           booking.showtimeId,
           booking.items.map((i) => i.showtimeSeatId),

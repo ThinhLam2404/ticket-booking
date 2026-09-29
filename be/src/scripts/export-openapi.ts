@@ -21,6 +21,7 @@ const generationEnvironment = {
   JWT_REFRESH_SECRET: 'openapi-generation-refresh-secret',
   JWT_ACCESS_EXPIRES_IN: '15m',
   JWT_REFRESH_EXPIRES_IN: '7d',
+  MAIL_WORKER_ENABLED: 'false',
 };
 
 for (const [key, value] of Object.entries(generationEnvironment)) {

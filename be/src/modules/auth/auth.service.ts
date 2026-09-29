@@ -68,6 +68,7 @@ export class AuthService {
         });
         await this.mailService.queueVerificationEmail(user, token, transaction);
       });
+      this.mailService.wakeWorker();
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         throw new ConflictException('Email is already registered');
@@ -112,6 +113,7 @@ export class AuthService {
         transaction,
       );
     });
+    this.mailService.wakeWorker();
     return { sent: true };
   }
 
