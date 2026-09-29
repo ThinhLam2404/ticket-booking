@@ -2321,7 +2321,8 @@ npm run check:ci
 - `npm run api:check` kiểm tra generated artifacts có deterministic và up to date.
 - `npm run check` chạy lint, typecheck, build, unit test và E2E test cho backend/frontend.
 - `npm run test:integration` dùng PostgreSQL/Redis test riêng, deploy migrations và tự teardown containers.
-- `npm run check:ci` thêm API drift check và integration suite.
+- `npm run check:ci` thêm API drift check và integration suite; baseline gần nhất pass với unit backend `68/68`, frontend `6/6`, E2E `6/6`, integration `14/14`.
+- Provider smoke với SMTP/SePay thật không chạy trong development; cần sandbox/test provider ở staging để kiểm tra register → verify → checkout → webhook → ticket email.
 
 Generated API artifacts:
 
@@ -2349,9 +2350,10 @@ E2E test:
 - Auth payload validation.
 - OpenAPI response contracts cho pagination, seat map, SePay checkout/webhook và error schema.
 
-Integration test với PostgreSQL/Redis thật:
+Integration test với PostgreSQL/Redis thật — baseline `14/14`:
 
 - Readiness database/Redis.
+- Resend email verification trong cooldown không tạo token/outbox mới.
 - Hai user giữ cùng seat đồng thời.
 - Retry cùng hold idempotency key, bao gồm concurrent retry.
 - Cùng idempotency key nhưng payload khác.
@@ -2359,23 +2361,23 @@ Integration test với PostgreSQL/Redis thật:
 - Cancel retry trả kết quả canonical và giải phóng seat/Redis lock.
 - Checkout SePay tạo intent và payment code trên booking đang giữ ghế.
 - Webhook SePay đúng mã/số tiền chuyển booking thành công và phát hành ticket.
+- Booking nhiều ghế phát hành và trả đủ ticket qua API.
 - Webhook SePay lặp hoặc concurrent không tạo transaction/payment/ticket trùng.
 - Webhook sai tiền vào `REVIEW_REQUIRED` và không cấp vé.
 - Booking expiry/cancel giải phóng seat và cập nhật intent.
-- TMDB response normalization và đánh dấu movie đã import.
-- TMDB import lặp lại không tạo movie duplicate.
-- TMDB detail ưu tiên video tiếng Việt, fallback video tiếng Anh khi thiếu candidate phù hợp.
-- TMDB resync chỉ cập nhật media/trailer có giá trị và giữ nguyên trường biên tập.
+- Bulk showtime overlap và concurrent scheduling không commit trùng.
 
-Frontend test:
+Frontend test — baseline `6/6`:
 
 - `npm run test:fe` chạy Vitest cho bounded queue concurrency 3, partial failure, giới hạn 20 và patch toàn bộ cache `tmdb-movies`.
+- Theme storage/resolution cho system/light/dark và storage failure.
 
-Test chưa có trong Sprint 1:
+Còn thiếu theo roadmap:
 
-- Hai showtime overlap cùng room.
-- Migration backfill trên dữ liệu cũ.
-- Refresh token rotation concurrent.
+- Browser/component coverage đầy đủ cho auth resend, booking confirmed redirect, multi-ticket UI, Couple seat và checkout states.
+- Migration backfill trên dữ liệu production-like.
+- Refresh token rotation concurrent và token reuse.
+- Full provider smoke với SMTP/SePay sandbox hoặc test provider.
 
 ## 14. Cách chạy project
 
@@ -2458,12 +2460,16 @@ Có thể đổi bằng `fe/.env`:
 VITE_API_URL=http://localhost:3000/api/v1
 ```
 
-Kiểm tra nhanh:
+Kiểm tra nhanh sau khi backend và infrastructure đã chạy:
 
 ```bash
 curl http://localhost:3000/api/v1/health
+curl http://localhost:3000/api/v1/health/ready
 curl http://localhost:3000/api/v1/movies
+curl http://localhost:3000/api/docs-json
 ```
+
+Baseline smoke đã xác nhận các endpoint trên trả `200` với PostgreSQL, Redis và Mail Worker development. Flow register/verify email, SePay webhook và ticket email cần SMTP/SePay sandbox hoặc test provider; không chạy giao dịch/email thật từ development database.
 
 Các màn hình MVP:
 

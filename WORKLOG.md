@@ -245,6 +245,36 @@ Không coi dự án là production-ready nếu thiếu:
 - Payment reconciliation/refund policy rõ ràng.
 - Smoke test customer flow trên staging với SMTP/SePay sandbox hoặc test provider.
 
+## Sprint 0 completion record — 2026-09-29
+
+### Release checklist v0
+
+- [x] `be/.env` tồn tại và các biến local cần thiết đã được kiểm tra theo set/missing.
+- [ ] `fe/.env` được tạo từ `fe/.env.example` khi cần override API URL.
+- [x] PostgreSQL và Redis development chạy healthy.
+- [x] Migrations đã deploy; seed chạy idempotent.
+- [x] OpenAPI artifacts không drift.
+- [x] Lint, typecheck, build, unit, frontend, E2E và integration pass.
+- [x] Liveness/readiness, catalog và Swagger JSON smoke pass.
+- [ ] SMTP sandbox/test provider smoke pass.
+- [ ] SePay sandbox/test webhook smoke pass.
+- [ ] Staging backup/restore và rollback drill pass.
+- [ ] Production secrets, domain/CORS allowlist và monitoring đã cấu hình.
+
+### Baseline result
+
+Đã hoàn thành baseline và release contract:
+
+- `npm run check:ci` pass: OpenAPI artifact check, lint, typecheck, build, backend unit `68/68`, frontend `6/6`, E2E `6/6`, integration `14/14`.
+- Development PostgreSQL/Redis đã khởi động bằng `npm run infra:up`; migration không còn pending và `npm run prisma:seed` chạy thành công.
+- Runtime smoke pass với backend development: `/api/v1/health` `200`, `/api/v1/health/ready` `200` với `database=up`, `redis=up`, `mailWorker=up`; `/api/v1/movies` và `/api/docs-json` trả `200`.
+- Browser smoke pass ở Home desktop và Home/Cinema mobile `390px`; không có console error trong các route đã kiểm tra.
+- Đã kiểm tra trạng thái cấu hình `be/.env` theo set/missing, không in secret; `fe/.env` chưa tồn tại và có thể tạo từ `fe/.env.example` khi chạy frontend ngoài local default.
+- Full provider smoke `register → verify email → login → SePay → ticket email` chưa chạy với provider thật để tránh gửi email/giao dịch từ môi trường development; cần SMTP/SePay sandbox hoặc test provider ở Sprint 2 staging.
+- Known warnings không chặn baseline: Prisma báo `package.json#prisma` sẽ deprecated ở Prisma 7; Vite cảnh báo bundle frontend lớn hơn 500 kB.
+
+Trạng thái: Sprint 0 hoàn thành phần baseline/documentation/release contract; provider smoke được ghi nhận là staging gate chưa thực hiện. Roadmap tiếp theo là Sprint 1 — Frontend architecture và component extraction.
+
 ## Verification commands
 
 ```bash
@@ -256,6 +286,7 @@ npm run test:fe
 npm run test:e2e
 npm run test:integration
 npm run api:check
+npm run check:ci
 git diff --check
 ```
 
