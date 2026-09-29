@@ -267,10 +267,10 @@ export function BookingPage() {
   }, [booking?.status, countdown.isExpired, navigate, queryClient, refetchBooking]);
 
   useEffect(() => {
-    if (booking?.status === 'CONFIRMED' && booking.tickets[0]) {
-      navigate(`/tickets/${booking.tickets[0].id}`);
-    }
-  }, [booking?.status, booking?.tickets, navigate]);
+    if (booking?.status !== 'CONFIRMED') return;
+    void queryClient.invalidateQueries({ queryKey: ['tickets'] });
+    navigate('/tickets', { replace: true });
+  }, [booking?.status, navigate, queryClient]);
 
   if (bookingQuery.isPending) return <LoadingState label="Đang tải booking…" />;
   if (bookingQuery.isError) return <ErrorState cause={bookingQuery.error} fallback="Không thể tải booking." onRetry={() => void bookingQuery.refetch()} />;

@@ -28,6 +28,8 @@ export interface AuthResponse {
   refreshToken: string;
 }
 
+const EMAIL_RESEND_COOLDOWN_MS = 60_000;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -94,9 +96,15 @@ export class AuthService {
         where: { id: user.id },
       });
       if (!lockedUser || lockedUser.emailVerifiedAt) return;
+      const latestToken = await transaction.emailVerificationToken.findFirst({
+        where: { userId: lockedUser.id },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      });
+      if (latestToken && Date.now() - latestToken.createdAt.getTime() < EMAIL_RESEND_COOLDOWN_MS) return;
       //NOTE - vô hiệu hoá token cũ
       await transaction.emailVerificationToken.updateMany({
-        where: { userId: user.id, consumedAt: null },
+        where: { userId: lockedUser.id, consumedAt: null },
         data: { consumedAt: new Date() },
       });
       await transaction.emailVerificationToken.create({

@@ -98,6 +98,27 @@ describe('Booking flow integration', () => {
     });
   });
 
+  it('does not enqueue another verification email during the resend cooldown', async () => {
+    const email = `resend-${Date.now()}@example.com`;
+    await request(appA.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ fullName: 'Resend Customer', email, password: 'Password123!' })
+      .expect(201);
+
+    const before = await Promise.all([
+      adminPrisma.emailVerificationToken.count(),
+      adminPrisma.mailOutbox.count(),
+    ]);
+    const resend = await request(appA.getHttpServer())
+      .post('/api/v1/auth/email/resend')
+      .send({ email })
+      .expect(200);
+
+    expect(resend.body).toEqual({ sent: true });
+    expect(await adminPrisma.emailVerificationToken.count()).toBe(before[0]);
+    expect(await adminPrisma.mailOutbox.count()).toBe(before[1]);
+  });
+
   it('creates bulk showtimes from movie duration and rolls back on overlap', async () => {
     const firstStartsAt = vnMorningStartsAt(2).toISOString();
     const body = {
@@ -296,6 +317,13 @@ describe('Booking flow integration', () => {
 
     expect(await adminPrisma.payment.count({ where: { bookingId: held.body.id } })).toBe(1);
     expect(await adminPrisma.ticket.count({ where: { bookingId: held.body.id } })).toBe(2);
+    const tickets = await request(appA.getHttpServer())
+      .get('/api/v1/tickets')
+      .set('Authorization', `Bearer ${fixture.customerA.token}`)
+      .expect(200);
+    expect(tickets.body).toHaveLength(2);
+    expect(tickets.body.every((ticket: { bookingId: string }) => ticket.bookingId === held.body.id)).toBe(true);
+    expect(new Set(tickets.body.map((ticket: { bookingItem?: { id?: string } }) => ticket.bookingItem?.id)).size).toBe(2);
     expect(await adminPrisma.booking.findUnique({ where: { id: held.body.id } })).toMatchObject({ status: BookingStatus.CONFIRMED });
     expect(await adminPrisma.sepayTransaction.findUnique({ where: { sepayId: 2001 } })).toMatchObject({
       status: SepayTransactionStatus.CONFIRMED,

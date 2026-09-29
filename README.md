@@ -1186,7 +1186,7 @@ sequenceDiagram
 
 - Auth: public.
 - Body: `{ "email": "customer@example.com" }`.
-- Success luôn trả `{ "sent": true }` để không làm lộ email tồn tại; tài khoản chưa xác thực sẽ nhận mail mới.
+- Success luôn trả `{ "sent": true }` để không làm lộ email tồn tại; tài khoản chưa xác thực sẽ nhận mail mới nếu lần gửi trước đã cách ít nhất 60 giây. Các request sớm hơn vẫn trả success generic nhưng không tạo token hoặc mail outbox mới.
 
 #### `POST /api/v1/auth/login`
 
@@ -1204,6 +1204,7 @@ sequenceDiagram
 - Side effect: tạo refresh token record.
 - User chưa xác thực email nhận `403 AUTH_EMAIL_NOT_VERIFIED`; credential sai nhận `401`.
 - Refresh cũng bị chặn với user chưa xác thực.
+- Auth modal frontend giữ email đăng nhập và cho phép gửi lại email xác thực ngay sau lỗi `AUTH_EMAIL_NOT_VERIFIED`; sau mỗi lần gửi nút bị khóa 60 giây và hiển thị đếm ngược. Thông báo thành công là `Email xác thực mới đã được gửi, vui lòng kiểm tra email`.
 
 #### `POST /api/v1/auth/refresh`
 
@@ -1875,7 +1876,7 @@ Errors: `400`, `401`, `404`, `409`, `503`.
   - Seat hold → `AVAILABLE`.
   - Release Redis lock.
 - Errors: `401`, `404`, `409`.
-- Frontend trang thanh toán: khi booking còn `PENDING`, nút Back trình duyệt, link rời trang và đóng tab đều hỏi xác nhận rồi tự gọi cancel để nhả ghế; redirect sang vé khi `CONFIRMED` không bị chặn.
+- Frontend trang thanh toán: khi booking còn `PENDING`, nút Back trình duyệt, link rời trang và đóng tab đều hỏi xác nhận rồi tự gọi cancel để nhả ghế; khi `CONFIRMED`, frontend invalidate danh sách vé và chuyển tới `/tickets` để hiển thị toàn bộ vé của booking, không chỉ vé đầu tiên.
 
 ### 8.12. Payments API
 

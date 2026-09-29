@@ -232,6 +232,14 @@
 - Review fixes: outbox tự reclaim lock `PROCESSING` bị stale, register/resend gộp user-token-outbox trong transaction, resend khóa user để token cũ bị vô hiệu hóa, email dùng timezone `Asia/Ho_Chi_Minh`, frontend verify chống duplicate effect của React Strict Mode và quick publish hiển thị lỗi mutation.
 - Verification: migration deploy, seed, lint, typecheck, build, unit `58/58`, FE `6/6`, E2E `6/6`, integration `13/13`, API check và diff check pass.
 
+## 2026-09-29 — Hiển thị đủ vé sau thanh toán và resend email xác thực
+
+- Sau khi booking `CONFIRMED`, frontend invalidate query `tickets` và chuyển tới `/tickets` thay vì mở `booking.tickets[0]`, bảo đảm booking nhiều ghế hiển thị toàn bộ ticket đã phát hành.
+- Bổ sung integration assertion: booking hai ghế phải trả đúng hai ticket thuộc cùng booking qua `GET /api/v1/tickets`.
+- Auth modal nhận diện `AUTH_EMAIL_NOT_VERIFIED`, giữ email đăng nhập và hiển thị nút gửi lại email với trạng thái loading/success/error; thông báo thành công là `Email xác thực mới đã được gửi, vui lòng kiểm tra email`.
+- Resend verification được giới hạn một lần mỗi 60 giây ở cả backend (transaction/row lock) và frontend (đếm ngược, khóa nút); request sớm không tạo token hoặc outbox mới.
+- Cập nhật README mô tả redirect sau thanh toán và resend action.
+
 ## 2026-09-24 — Room/showtime format, catalogue category và giá thật
 
 - Thêm `RoomFormat`: `STANDARD`, `IMAX`, `FOUR_DX`, `SCREEN_X`; thêm `ShowtimeFormat` cho 2D/3D phụ đề/lồng tiếng.
