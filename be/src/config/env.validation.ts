@@ -5,12 +5,13 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
   validateSync,
 } from 'class-validator';
 
 class EnvironmentVariables {
   @IsOptional()
-  @IsString()
+  @IsIn(['development', 'test', 'production'])
   NODE_ENV = 'development';
 
   @IsNotEmpty()
@@ -90,6 +91,34 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  CORS_ORIGINS?: string;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  SWAGGER_ENABLED?: string;
+
+  @IsOptional()
+  @Matches(/^(true|false|[0-9]+)$/)
+  TRUST_PROXY = 'false';
+
+  @IsOptional()
+  @IsString()
+  REQUEST_BODY_LIMIT = '256kb';
+
+  @IsOptional()
+  @IsString()
+  REFRESH_TOKEN_RETENTION_DAYS = '30';
+
+  @IsOptional()
+  @IsString()
+  VERIFICATION_TOKEN_RETENTION_DAYS = '2';
+
+  @IsOptional()
+  @IsString()
+  MAIL_OUTBOX_RETENTION_DAYS = '90';
+
+  @IsOptional()
+  @IsString()
   MAIL_WORKER_POLL_MS = '10000';
 
   @IsOptional()
@@ -127,6 +156,19 @@ export function validateEnvironment(config: Record<string, unknown>) {
       validated.JWT_REFRESH_SECRET.length < 32)
   ) {
     throw new Error('JWT secrets must be at least 32 characters in production');
+  }
+
+  if (validated.NODE_ENV === 'production') {
+    const requiredProductionValues = [
+      ['SEPAY_WEBHOOK_API_KEY', validated.SEPAY_WEBHOOK_API_KEY],
+      ['CORS_ORIGINS', validated.CORS_ORIGINS],
+    ] as const;
+    const missing = requiredProductionValues
+      .filter(([, value]) => !value?.trim())
+      .map(([key]) => key);
+    if (missing.length) {
+      throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+    }
   }
 
   return validated;

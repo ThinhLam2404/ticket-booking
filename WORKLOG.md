@@ -29,12 +29,12 @@ CineBook là personal project với hai mục tiêu song song:
 
 Các giới hạn production chính:
 
-- Chưa có rate limiting, Helmet/security headers, structured logging, metrics/tracing và CI/CD.
-- CORS đang mở rộng; Swagger chưa có production gate.
+- Structured logging, metrics/tracing và CI/CD chưa có.
+- Rate limiting Redis, CORS allowlist, Helmet/security headers và Swagger production gate đã được triển khai trong Sprint 2.
 - Chưa có refund/reconciliation flow hoàn chỉnh.
 - Booking/ticket/payment list chưa có pagination chuẩn hóa.
 - Chưa có Dockerfile/deployment recipe và backup/restore runbook.
-- Refresh-token concurrent rotation, migration backfill và một số overlap edge case chưa đủ coverage.
+- Provider-specific SePay signature/IP verification vẫn phụ thuộc provider capability.
 - Chưa có admin user management và audit log.
 
 ## Roadmap
@@ -131,6 +131,20 @@ Definition of done:
 - Concurrent refresh chỉ chấp nhận một rotation hợp lệ.
 - Production config không thể khởi động với secret/security setting thiếu.
 - Cleanup job chạy idempotent và không xóa dữ liệu nghiệp vụ còn cần.
+
+## Sprint 2 completion record — 2026-09-30
+
+Đã hoàn thành security và correctness hardening:
+
+- Redis atomic rate limiting cho login, register, resend, verify, refresh, SePay webhook và admin mutations; auth abuse có unit và HTTP-level `429` coverage.
+- CORS allowlist, Helmet, request-body limit, production Swagger gate và production fail-fast cho `SEPAY_WEBHOOK_API_KEY`.
+- Refresh-token family rotation có row lock, `replacedByJti`, reuse detection, revoke family và migration backfill cho token legacy.
+- Maintenance scheduler chạy hàng ngày để cleanup refresh token, verification token và chỉ mail outbox `SENT` quá retention; delete predicates idempotent và giữ mail pending/failed.
+- Verification: lint pass, typecheck pass, build pass, backend unit `75/75`, E2E `7/7`, integration `15/15`, API artifact check pass và `git diff --check` pass.
+- Migration `20260930013408_refresh_token_reuse_hardening`, `20260930021640_backfill_refresh_token_families` và `20260930030000_backfill_refresh_token_families` đã deploy ở development và isolated integration database.
+- Chưa chạy provider-specific SMTP/SePay sandbox; signature/IP verification vẫn cần xác nhận theo capability của provider.
+
+Trạng thái: Sprint 2 hoàn thành. Commit message đề xuất: `security(be): harden rate limits and refresh token rotation`.
 
 ### Sprint 3 — Container, CI/CD và observability
 

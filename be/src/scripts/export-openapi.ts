@@ -44,7 +44,7 @@ const moduleFixture = await Test.createTestingModule({
   .useValue({})
   .compile();
 
-const app = moduleFixture.createNestApplication();
+const app = moduleFixture.createNestApplication({ bodyParser: false });
 configureApp(app);
 const document = createOpenApiDocument(app);
 await writeFile(outputPath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');

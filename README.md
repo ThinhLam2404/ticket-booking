@@ -65,9 +65,10 @@ Một ghế theo một suất chiếu chỉ được bán một lần. Hệ th�
 | Authentication | JWT + `jsonwebtoken`                   | Access token/refresh token                        |
 | Password       | Node `crypto.scrypt`                   | Hash password                                     |
 | Validation     | `class-validator`, `class-transformer` | Validate body/query                               |
-| Documentation  | `@nestjs/swagger`                      | OpenAPI/Swagger UI                                |
+| Documentation  | `@nestjs/swagger`                      | OpenAPI/Swagger UI, production-gated              |
+| Security       | `helmet`, Redis atomic counters        | Security headers, CORS allowlist, rate limiting   |
 | Movie source   | TMDB API v3                            | Tìm kiếm và nhập metadata phim cho Admin          |
-| Scheduler      | `@nestjs/schedule`                     | Expire booking mỗi phút                           |
+| Scheduler      | `@nestjs/schedule`                     | Expire booking và cleanup retention mỗi ngày     |
 | Frontend      | React 19, Vite 8, TypeScript             | Customer UI và API client                         |
 | Frontend data  | Fetch API, sessionStorage                | HTTP request, token session và refresh            |
 | Unit/E2E test  | Vitest, Supertest                      | Kiểm thử backend                                  |
@@ -83,16 +84,16 @@ File: `be/docker-compose.yml`; root scripts gọi file này từ repository root
 | PostgreSQL | `5432` | DB `ticket_booking`, user `ticket_booking`, password local `ticket_booking` |
 | Redis      | `6379` | Seat lock                                                                   |
 
-Application hiện chạy trực tiếp bằng Node/NestJS và Vite; chỉ PostgreSQL/Redis chạy bằng Docker Compose. Email dùng SMTP provider cấu hình qua biến môi trường. Mail gửi bất đồng bộ bằng Worker Thread đọc `MailOutbox`; request chỉ chờ transaction outbox commit, không chờ SMTP. Worker được đánh thức ngay sau commit bằng message `wake` và vẫn polling fallback theo chu kỳ. Chưa có Dockerfile cho API hoặc frontend.
+Application hiện chạy trực tiếp bằng Node/NestJS và Vite; chỉ PostgreSQL/Redis chạy bằng Docker Compose. API dùng Helmet, CORS allowlist và giới hạn JSON/urlencoded body theo environment. Rate limit dùng Redis atomic counter cho auth, SePay webhook và admin mutation; test/integration vẫn có thể kiểm tra abuse vì guard không bypass theo `NODE_ENV`. Email dùng SMTP provider cấu hình qua biến môi trường. Mail gửi bất đồng bộ bằng Worker Thread đọc `MailOutbox`; request chỉ chờ transaction outbox commit, không chờ SMTP. Worker được đánh thức ngay sau commit bằng message `wake` và vẫn polling fallback theo chu kỳ. Chưa có Dockerfile cho API hoặc frontend.
 
 ### 2.3. URL API
 
 - Base URL: `http://localhost:3000`
 - API prefix: `/api/v1`
 - API root: `http://localhost:3000/api/v1`
-- Swagger UI: `http://localhost:3000/api/docs`
+- Swagger UI: `http://localhost:3000/api/docs` khi Swagger được bật
 
-Global prefix, CORS, validation pipe và Swagger được cấu hình tại `be/src/config/app.config.ts`. Frontend đọc API URL từ `fe/.env` qua biến `VITE_API_URL`.
+Global prefix, CORS allowlist, Helmet, body limit, trusted proxy, validation pipe và Swagger gate được cấu hình tại `be/src/config/app.config.ts`. Frontend đọc API URL từ `fe/.env` qua biến `VITE_API_URL`. Khi không cấu hình `SWAGGER_ENABLED`, Swagger mặc định bật ở development/test và tắt ở production; `true` luôn bật, `false` luôn tắt.
 
 ### 2.4. Kiến trúc hệ thống
 
@@ -264,6 +265,13 @@ MAIL_WORKER_ENABLED=true
 MAIL_WORKER_POLL_MS=10000
 MAIL_WORKER_STALE_LOCK_MS=300000
 MAIL_WORKER_SHUTDOWN_TIMEOUT_MS=15000
+CORS_ORIGINS=http://localhost:5173
+SWAGGER_ENABLED=false
+TRUST_PROXY=false
+REQUEST_BODY_LIMIT=256kb
+REFRESH_TOKEN_RETENTION_DAYS=30
+VERIFICATION_TOKEN_RETENTION_DAYS=2
+MAIL_OUTBOX_RETENTION_DAYS=90
 TMDB_ACCESS_TOKEN=<tmdb-api-read-access-token>
 SEED_ADMIN_EMAIL=admin@example.com
 SEED_ADMIN_PASSWORD=change-this-seed-password
@@ -290,13 +298,20 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `MAIL_WORKER_POLL_MS`    | Không    | Chu kỳ polling fallback khi outbox rỗng, default `10000`      |
 | `MAIL_WORKER_STALE_LOCK_MS` | Không | Thời gian reclaim lock PROCESSING, default `300000`           |
 | `MAIL_WORKER_SHUTDOWN_TIMEOUT_MS` | Không | Timeout graceful shutdown, default `15000`              |
+| `CORS_ORIGINS`            | Production | Comma-separated browser origins được phép gọi API       |
+| `SWAGGER_ENABLED`         | Không    | `true` bật Swagger, `false` tắt Swagger ở mọi môi trường |
+| `TRUST_PROXY`             | Không    | `false`, `true` hoặc số hop proxy để tính đúng client IP |
+| `REQUEST_BODY_LIMIT`      | Không    | Giới hạn JSON/urlencoded body, default `256kb`          |
+| `REFRESH_TOKEN_RETENTION_DAYS` | Không | Retention token đã revoke, default `30` ngày          |
+| `VERIFICATION_TOKEN_RETENTION_DAYS` | Không | Retention token xác thực, default `2` ngày          |
+| `MAIL_OUTBOX_RETENTION_DAYS` | Không | Retention mail đã gửi, default `90` ngày              |
 | `TMDB_ACCESS_TOKEN`      | Không    | TMDB API Read Access Token; cần nếu Admin tìm hoặc nhập phim  |
 | `SEED_ADMIN_EMAIL`       | Seed     | Email admin bootstrap, default `admin@example.com`             |
 | `SEED_ADMIN_PASSWORD`    | Seed     | Password admin bootstrap, bắt buộc khi seed                    |
 | `SEPAY_BANK_CODE`        | Không    | Mã ngân hàng SePay/VietQR (ví dụ: `MB`, `VCB`, `ACB`)          |
 | `SEPAY_ACCOUNT_NUMBER`   | Không    | Số tài khoản ngân hàng nhận tiền                              |
 | `SEPAY_ACCOUNT_NAME`     | Không    | Tên chủ tài khoản nhận tiền                                    |
-| `SEPAY_WEBHOOK_API_KEY`  | Không    | Khóa xác thực webhook từ SePay (header `Authorization: Apikey <KEY>`) |
+| `SEPAY_WEBHOOK_API_KEY`  | Production | Khóa xác thực webhook từ SePay (header `Authorization: Apikey <KEY>`) |
 
 ### Security rules
 
@@ -548,9 +563,12 @@ Constraints/indexes:
 | ----------- | ----------- | ----------- | ------------------- | ---------------------- |
 | `id`        | `String`    | REQ         | PK, `cuid()`        | ID record database     |
 | `jti`       | `String`    | REQ         | UQ                  | JWT ID nằm trong token |
-| `tokenHash` | `String`    | REQ         | —                   | Hash refresh token     |
+| `tokenHash` | `String`    | REQ         | —                   | Hash refresh token |
+| `familyId`  | `String`    | REQ         | Rotation family     | Nhóm token của một session |
 | `expiresAt` | `DateTime`  | REQ         | —                   | Hạn token              |
 | `revokedAt` | `DateTime?` | OPT         | —                   | Thời điểm revoke       |
+| `replacedByJti` | `String?` | OPT      | —                   | JTI token kế tiếp sau rotation |
+| `reuseDetectedAt` | `DateTime?` | OPT | —                | Thời điểm phát hiện reuse |
 | `userId`    | `String`    | REQ         | FK → `User.id`      | User sở hữu token      |
 | `user`      | `User`      | Relation    | `onDelete: Cascade` | User cha               |
 | `createdAt` | `DateTime`  | REQ         | `now()`             | Thời điểm tạo          |
@@ -559,7 +577,10 @@ Indexes:
 
 - `jti` unique.
 - `@@index([userId, revokedAt])`.
+- `@@index([familyId, revokedAt])`.
 - `@@index([expiresAt])`.
+
+Khi refresh thành công, token cũ được revoke và ghi `replacedByJti`. Nếu token đã bị thay thế được dùng lại, chính token đó được ghi `reuseDetectedAt`, toàn bộ family còn active bị revoke và cũng ghi nhận thời điểm reuse. Các migration `20260930021640` và `20260930030000` bảo đảm token legacy bắt đầu ở một family riêng.
 
 `id` là ID nội bộ; `jti` là ID của token trong JWT và được dùng để lookup/revoke đúng session.
 
@@ -925,6 +946,12 @@ Bổ sung phân loại phòng/suất và chuẩn hóa giá theo từng suất:
 - Mail worker chạy trong Node.js Worker Thread riêng, không dùng Nest `@Cron`; worker xử lý drain liên tục, sleep bằng polling fallback khi rỗng, và nhận `wake` sau khi transaction tạo outbox commit.
 - Worker có graceful shutdown, restart với backoff khi crash, stale-lock recovery, stable `Message-ID` theo outbox và readiness status.
 - Email xác thực tài khoản dùng template CineBook Cobalt Editorial HTML/table inline CSS và plain-text fallback. Email vé gồm thông tin phim/rạp/suất, tổng tiền, từng mã vé, QR inline CID và link xem vé.
+
+#### `20260930013408_refresh_token_reuse_hardening`, `20260930021640_backfill_refresh_token_families` và `20260930030000_backfill_refresh_token_families`
+
+- Thêm refresh-token family, `replacedByJti` và `reuseDetectedAt`.
+- Migration `20260930021640` bỏ default tạm; migration `20260930030000` backfill family cho token hiện hữu bằng JTI của chính token đó.
+- Concurrent refresh serialize trên row source; token reuse revoke toàn bộ family còn active và ghi nhận thời điểm reuse.
 
 ### 6.2. Seed
 
@@ -2215,7 +2242,17 @@ Một số request có thể gọi expiry cho booking mục tiêu trước khi �
 
 `ShowtimesService` không tự đổi `ShowtimeSeat` nữa; expiry trung tâm đồng bộ booking, payment, DB seat và Redis lock. Scheduler vẫn là cơ chế chính để cleanup toàn hệ thống.
 
-### 11.3. Redis lifecycle
+### 11.3. Retention cleanup scheduler
+
+File: `be/src/modules/maintenance/maintenance.scheduler.ts`.
+
+- Cron: 03:00 mỗi ngày.
+- Xóa refresh token đã hết hạn hoặc đã revoke quá `REFRESH_TOKEN_RETENTION_DAYS`.
+- Xóa email verification token đã hết hạn hoặc consumed quá `VERIFICATION_TOKEN_RETENTION_DAYS`.
+- Chỉ xóa mail outbox có status `SENT` và quá `MAIL_OUTBOX_RETENTION_DAYS`; giữ `PENDING`, `PROCESSING` và `FAILED` cho retry/điều tra.
+- Các thao tác dùng `deleteMany`, có thể chạy lại an toàn.
+
+### 11.4. Redis lifecycle
 
 `RedisService`:
 
@@ -2517,7 +2554,7 @@ Khi reset database, chạy migration rồi chạy `npm run prisma:seed`. Seed kh
 ### 15.1. Limitations hiện tại
 
 - Email phụ thuộc SMTP provider được cấu hình qua `SMTP_*`; cần kiểm tra credentials và network access trước khi chạy Worker Thread. Worker dùng at-least-once delivery, dedupe theo outbox và có thể gửi lại nếu process crash sau SMTP thành công nhưng trước khi ghi `SENT`.
-- Chưa có webhook signature verification.
+- SePay webhook hiện xác thực bằng `Authorization: Apikey <SEPAY_WEBHOOK_API_KEY>`; provider-specific signature/IP verification chưa có.
 - Chưa có refund flow dù enum `REFUNDED` đã tồn tại.
 - Chưa có ticket check-in/consume; đây là chủ ý ngoài scope roadmap hiện tại, QR chỉ dùng để khách xuất trình tại rạp.
 - Chưa có admin user management.
@@ -2528,10 +2565,10 @@ Khi reset database, chạy migration rồi chạy `npm run prisma:seed`. Seed kh
 - Response DTO và public response mapper đã được chuẩn hóa cho API contract hiện tại.
 - OpenAPI JSON và frontend declarations được sinh từ backend contract qua root scripts.
 - Custom error format đã được thêm với `code`, `details`, `path`, `requestId` và `timestamp`.
-- Integration/concurrency suite đã có cho hold, idempotency, expiry và payment; các case migration backfill/showtime overlap/refresh rotation vẫn chưa có.
+- Integration/concurrency suite đã có cho hold, idempotency, expiry và payment; Sprint 2 bổ sung migration backfill, refresh rotation/reuse, rate limit và retention cleanup coverage.
 - Chưa có Dockerfile cho API.
 - Chưa có CI/CD.
-- Chưa có rate limiting, Helmet, structured logging và tracing.
+- Structured logging, metrics/tracing và CI/CD chưa có; rate limiting, Helmet và CORS allowlist đã có ở API layer.
 - `prisma:seed` cập nhật admin role/name nhưng không đổi password nếu admin đã tồn tại.
 
 ### 15.2. Roadmap đề xuất

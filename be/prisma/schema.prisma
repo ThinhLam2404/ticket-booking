@@ -203,16 +203,20 @@ model ShowtimeSeat {
 }
 
 model RefreshToken {
-  id        String    @id @default(cuid())
-  jti       String    @unique
-  tokenHash String
-  expiresAt DateTime
-  revokedAt DateTime?
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
+  id               String    @id @default(cuid())
+  jti              String    @unique
+  tokenHash        String
+  familyId         String
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  replacedByJti    String?
+  reuseDetectedAt  DateTime?
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime  @default(now())
 
   @@index([userId, revokedAt])
+  @@index([familyId, revokedAt])
   @@index([expiresAt])
 }
 

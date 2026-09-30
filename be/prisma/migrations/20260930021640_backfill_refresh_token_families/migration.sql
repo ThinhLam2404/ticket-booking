@@ -1,0 +1,1 @@
+ALTER TABLE "RefreshToken" ALTER COLUMN "familyId" DROP DEFAULT;

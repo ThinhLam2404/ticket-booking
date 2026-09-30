@@ -32,7 +32,7 @@ export async function createIntegrationApp(): Promise<INestApplication> {
     .useValue({ expirePendingBookings: async () => undefined })
     .compile();
 
-  const app = moduleFixture.createNestApplication();
+  const app = moduleFixture.createNestApplication({ bodyParser: false });
   configureApp(app);
   await app.init();
   return app;

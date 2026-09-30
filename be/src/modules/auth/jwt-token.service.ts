@@ -11,6 +11,7 @@ const JWT_AUDIENCE = 'ticket-booking-client';
 export interface RefreshTokenPayload extends JwtPayload {
   sub: string;
   jti: string;
+  familyId?: string;
   type: 'refresh';
 }
 
@@ -55,9 +56,9 @@ export class JwtTokenService {
     );
   }
 
-  createRefreshToken(userId: string): string {
+  createRefreshToken(userId: string, familyId: string = randomUUID()): string {
     return jwt.sign(
-      { sub: userId, jti: randomUUID(), type: 'refresh' },
+      { sub: userId, jti: randomUUID(), familyId, type: 'refresh' },
       this.refreshSecret,
       {
         algorithm: 'HS256',

@@ -119,6 +119,57 @@ describe('Booking flow integration', () => {
     expect(await adminPrisma.mailOutbox.count()).toBe(before[1]);
   });
 
+  it('rotates refresh tokens atomically and revokes the family after reuse', async () => {
+    const email = `refresh-${Date.now()}@example.com`;
+    const password = 'Password123!';
+    await request(appA.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ fullName: 'Refresh Customer', email, password })
+      .expect(201);
+    const user = await adminPrisma.user.update({
+      where: { email },
+      data: { emailVerifiedAt: new Date() },
+    });
+    const login = await request(appA.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email, password })
+      .expect(200);
+    const originalRefreshToken = login.body.refreshToken as string;
+
+    const concurrent = await Promise.all([
+      request(appA.getHttpServer())
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken: originalRefreshToken }),
+      request(appB.getHttpServer())
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken: originalRefreshToken }),
+    ]);
+
+    expect(concurrent.map((response) => response.status).sort()).toEqual([200, 401]);
+    const rotated = concurrent.find((response) => response.status === 200);
+    expect(rotated?.body.refreshToken).toBeTruthy();
+    expect(
+      await adminPrisma.refreshToken.count({
+        where: { userId: user.id, revokedAt: null },
+      }),
+    ).toBe(0);
+    expect(
+      await adminPrisma.refreshToken.count({
+        where: { userId: user.id, reuseDetectedAt: { not: null } },
+      }),
+    ).toBeGreaterThan(0);
+
+    await request(appA.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken: rotated?.body.refreshToken })
+      .expect(401);
+    expect(
+      await adminPrisma.refreshToken.count({
+        where: { userId: user.id, reuseDetectedAt: { not: null } },
+      }),
+    ).toBeGreaterThan(0);
+  });
+
   it('creates bulk showtimes from movie duration and rolls back on overlap', async () => {
     const firstStartsAt = vnMorningStartsAt(2).toISOString();
     const body = {

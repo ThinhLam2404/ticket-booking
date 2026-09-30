@@ -3,7 +3,7 @@ import { AppModule } from './app.module.js';
 import { configureApp } from './config/app.config.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.enableShutdownHooks();
   configureApp(app);
   const configuredPort = Number(process.env.PORT);

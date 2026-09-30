@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma, type User, type UserRole } from '@prisma/client';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { MailService } from '../mail/mail.service.js';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { PrismaService } from '../../database/prisma.service.js';
@@ -101,7 +101,11 @@ export class AuthService {
         orderBy: { createdAt: 'desc' },
         select: { createdAt: true },
       });
-      if (latestToken && Date.now() - latestToken.createdAt.getTime() < EMAIL_RESEND_COOLDOWN_MS) return;
+      if (
+        latestToken &&
+        Date.now() - latestToken.createdAt.getTime() < EMAIL_RESEND_COOLDOWN_MS
+      )
+        return;
       //NOTE - vô hiệu hoá token cũ
       await transaction.emailVerificationToken.updateMany({
         where: { userId: lockedUser.id, consumedAt: null },
@@ -195,10 +199,27 @@ export class AuthService {
     if (
       !storedToken ||
       storedToken.userId !== payload.sub ||
-      storedToken.revokedAt ||
+      (payload.familyId && storedToken.familyId !== payload.familyId) ||
       storedToken.expiresAt <= new Date() ||
       !(await verifyPassword(dto.refreshToken, storedToken.tokenHash))
     ) {
+      throw new UnauthorizedException('Refresh token is invalid or revoked');
+    }
+    //NOTE - bảo vệ khi refresh token bị đánh cắp: nếu token đã bị revoke và replace bởi token khác mà vẫn dùng
+    if (storedToken.revokedAt) {
+      if (storedToken.replacedByJti) {
+        const reuseDetectedAt = new Date();
+        //NOTE -update token reuse là hiện tại
+        await this.prisma.refreshToken.updateMany({
+          where: { id: storedToken.id },
+          data: { reuseDetectedAt },
+        });
+        //NOTE - revoke tất cả token trong cùng family
+        await this.prisma.refreshToken.updateMany({
+          where: { familyId: storedToken.familyId, revokedAt: null },
+          data: { revokedAt: reuseDetectedAt, reuseDetectedAt },
+        });
+      }
       throw new UnauthorizedException('Refresh token is invalid or revoked');
     }
 
@@ -208,34 +229,84 @@ export class AuthService {
         'Email verification is required before login',
       );
     }
-    return this.prisma.$transaction(async (transaction) => {
+    const familyId = storedToken.familyId || randomUUID();
+    //NOTE - lock row mục đích là 2 req đồng thời thì db chỉ cho một transaction lock trước
+    const result = await this.prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "RefreshToken" WHERE "id" = ${storedToken.id} FOR UPDATE`,
+      );
+      //NOTE - đọc lại token vì có thể req khác đã thay đổi row
+      const currentToken = await transaction.refreshToken.findUnique({
+        where: { id: storedToken.id },
+      });
+      const now = new Date();
+
+      if (!currentToken || currentToken.expiresAt <= now) {
+        return { kind: 'invalid' as const };
+      }
+
+      if (currentToken.revokedAt) {
+        if (currentToken.replacedByJti) {
+          const reuseDetectedAt = new Date();
+          await transaction.refreshToken.updateMany({
+            where: { id: currentToken.id },
+            data: { reuseDetectedAt },
+          });
+          await transaction.refreshToken.updateMany({
+            where: { familyId: currentToken.familyId, revokedAt: null },
+            data: { revokedAt: reuseDetectedAt, reuseDetectedAt },
+          });
+        }
+        return { kind: 'invalid' as const };
+      }
+      //NOTE - tạo token mới
+      const accessToken = this.tokenService.createAccessToken(user);
+      const refreshToken = this.tokenService.createRefreshToken(
+        user.id,
+        familyId,
+      );
+      const refreshPayload = this.tokenService.verifyRefreshToken(refreshToken);
+      const revokedAt = new Date();
+      //NOTE - revoked token cũ
       const revoked = await transaction.refreshToken.updateMany({
-        where: { id: storedToken.id, revokedAt: null },
-        data: { revokedAt: new Date() },
+        where: {
+          id: currentToken.id,
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { revokedAt, replacedByJti: refreshPayload.jti },
       });
 
       if (revoked.count !== 1) {
-        throw new UnauthorizedException('Refresh token is invalid or revoked');
+        return { kind: 'invalid' as const };
       }
-
-      const accessToken = this.tokenService.createAccessToken(user);
-      const refreshToken = this.tokenService.createRefreshToken(user.id);
-      const refreshPayload = this.tokenService.verifyRefreshToken(refreshToken);
+      //NOTE - lưu token mới vào db
       await transaction.refreshToken.create({
         data: {
           jti: refreshPayload.jti,
           tokenHash: await hashPassword(refreshToken),
+          familyId,
           expiresAt: this.tokenService.getRefreshTokenExpiry(refreshToken),
           userId: user.id,
         },
       });
 
       return {
+        kind: 'success' as const,
         user: this.toPublicUser(user),
         accessToken,
         refreshToken,
       };
     });
+
+    if (result.kind !== 'success') {
+      throw new UnauthorizedException('Refresh token is invalid or revoked');
+    }
+    return {
+      user: result.user,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    };
   }
 
   async logout(refreshToken: string): Promise<void> {
@@ -262,13 +333,18 @@ export class AuthService {
   private async issueTokens(user: User): Promise<AuthResponse> {
     const publicUser = this.toPublicUser(user);
     const accessToken = this.tokenService.createAccessToken(publicUser);
-    const refreshToken = this.tokenService.createRefreshToken(user.id);
+    const familyId = randomUUID();
+    const refreshToken = this.tokenService.createRefreshToken(
+      user.id,
+      familyId,
+    );
     const refreshPayload = this.tokenService.verifyRefreshToken(refreshToken);
 
     await this.prisma.refreshToken.create({
       data: {
         jti: refreshPayload.jti,
         tokenHash: await hashPassword(refreshToken),
+        familyId,
         expiresAt: this.tokenService.getRefreshTokenExpiry(refreshToken),
         userId: user.id,
       },

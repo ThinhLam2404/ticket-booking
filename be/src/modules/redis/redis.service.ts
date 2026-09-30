@@ -37,6 +37,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.set(key, value, 'EX', ttlSeconds, 'NX');
   }
 
+  async incrementWithExpiry(key: string, ttlSeconds: number): Promise<number> {
+    //NOTE - incr lên 1 mỗi lần, và chỉ set TTL ở lần đầu tiên
+    //NOTE - dùng lua script để incr + expire được xử lí atomic tránh tình trạng incr, xong bị crash -> ko có ttl -> tồn tại mãi mãi
+    const result = await this.client.eval(
+      "local count = redis.call('incr', KEYS[1]); if count == 1 then redis.call('expire', KEYS[1], ARGV[1]); end; return count",
+      1,
+      key,
+      ttlSeconds,
+    );
+    return Number(result);
+  }
+
   async releaseIfOwned(key: string, value: string): Promise<number> {
     const result = await this.client.eval(
       "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",

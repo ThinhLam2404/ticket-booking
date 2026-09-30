@@ -213,6 +213,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
         return 'RESOURCE_NOT_FOUND';
       case HttpStatus.CONFLICT:
         return 'CONFLICT';
+      case HttpStatus.TOO_MANY_REQUESTS:
+        return 'RATE_LIMITED';
       case HttpStatus.SERVICE_UNAVAILABLE:
         return 'SERVICE_UNAVAILABLE';
       default:

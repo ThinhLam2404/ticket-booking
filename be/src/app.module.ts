@@ -19,6 +19,9 @@ import { RedisModule } from './modules/redis/redis.module.js';
 import { LocationsModule } from './modules/locations/locations.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
 import { validateEnvironment } from './config/env.validation.js';
+import { RateLimitGuard } from './common/auth/rate-limit.guard.js';
+import { MaintenanceModule } from './modules/maintenance/maintenance.module.js';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -42,8 +45,15 @@ import { validateEnvironment } from './config/env.validation.js';
     SepayModule,
     TicketsModule,
     MailModule,
+    MaintenanceModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
+  ],
 })
 export class AppModule {}

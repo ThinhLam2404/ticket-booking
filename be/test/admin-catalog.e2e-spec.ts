@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/config/app.config.js';
@@ -35,16 +36,32 @@ describe('Admin catalog authorization (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
+      .overrideProvider(ConfigService)
+      .useValue({
+        get: <T>(key: string) =>
+          ({
+            NODE_ENV: 'test',
+            JWT_ACCESS_SECRET: 'test-access-secret',
+            JWT_REFRESH_SECRET: 'test-refresh-secret',
+            JWT_ACCESS_EXPIRES_IN: '15m',
+            JWT_REFRESH_EXPIRES_IN: '7d',
+            CORS_ORIGINS: 'http://localhost:5173',
+            SWAGGER_ENABLED: 'false',
+            REQUEST_BODY_LIMIT: '256kb',
+            TRUST_PROXY: 'false',
+          }[key] as T | undefined),
+      })
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(RedisService)
       .useValue({
         ping: vi.fn().mockResolvedValue('PONG'),
+        incrementWithExpiry: vi.fn().mockResolvedValue(1),
         onModuleDestroy: vi.fn(),
       })
       .compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication({ bodyParser: false });
     configureApp(app);
     await app.init();
   });

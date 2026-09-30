@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/config/app.config.js';
@@ -13,6 +14,21 @@ describe('Application (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
+      .overrideProvider(ConfigService)
+      .useValue({
+        get: <T>(key: string) =>
+          ({
+            NODE_ENV: 'test',
+            JWT_ACCESS_SECRET: 'test-access-secret',
+            JWT_REFRESH_SECRET: 'test-refresh-secret',
+            JWT_ACCESS_EXPIRES_IN: '15m',
+            JWT_REFRESH_EXPIRES_IN: '7d',
+            CORS_ORIGINS: 'http://localhost:5173',
+            SWAGGER_ENABLED: 'true',
+            REQUEST_BODY_LIMIT: '256kb',
+            TRUST_PROXY: 'false',
+          }[key] as T | undefined),
+      })
       .overrideProvider(PrismaService)
       .useValue({
         $connect: async () => undefined,
@@ -22,11 +38,12 @@ describe('Application (e2e)', () => {
       .overrideProvider(RedisService)
       .useValue({
         ping: async () => 'PONG',
+        incrementWithExpiry: async () => 1,
         onModuleDestroy: () => undefined,
       })
       .compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication({ bodyParser: false });
     configureApp(app);
     await app.init();
   });
@@ -53,6 +70,19 @@ describe('Application (e2e)', () => {
       .post('/api/v1/auth/register')
       .send({ email: 'invalid' })
       .expect(400);
+  });
+
+  it('returns 429 when Redis reports an exhausted login window', async () => {
+    const redis = app.get(RedisService);
+    vi.spyOn(redis, 'incrementWithExpiry').mockResolvedValue(11);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: 'user@example.com', password: 'Password123!' })
+      .expect(429)
+      .expect(({ body }) => {
+        expect(body.code).toBe('RATE_LIMITED');
+      });
   });
 
   it('publishes the frontend-facing OpenAPI response contracts', async () => {
