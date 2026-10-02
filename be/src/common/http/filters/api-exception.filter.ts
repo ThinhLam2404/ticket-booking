@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
+import { getRequestId } from '../../logging/request-logger.middleware.js';
 
 interface ErrorResponse {
   statusCode: number;
@@ -223,7 +223,6 @@ export class ApiExceptionFilter implements ExceptionFilter {
   }
 
   private getRequestId(request: Request): string {
-    const header = request.header('X-Request-Id');
-    return header?.trim() || `req_${randomUUID()}`;
+    return getRequestId(request);
   }
 }

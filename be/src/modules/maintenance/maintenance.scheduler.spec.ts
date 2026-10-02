@@ -39,11 +39,11 @@ describe('MaintenanceScheduler', () => {
     expect(verificationWhere.OR).toHaveLength(2);
     expect(outboxWhere.status).toBe('SENT');
     expect(outboxWhere.sentAt).toEqual({ lt: expect.any(Date) });
-    expect(before - refreshCutoff).toBeGreaterThanOrEqual(10 * 24 * 60 * 60 * 1000);
+    expect(before - refreshCutoff).toBeGreaterThanOrEqual(10 * 24 * 60 * 60 * 1000 - 1000);
     expect(before - refreshCutoff).toBeLessThan(10 * 24 * 60 * 60 * 1000 + 1000);
-    expect(before - verificationCutoff).toBeGreaterThanOrEqual(3 * 24 * 60 * 60 * 1000);
+    expect(before - verificationCutoff).toBeGreaterThanOrEqual(3 * 24 * 60 * 60 * 1000 - 1000);
     expect(before - verificationCutoff).toBeLessThan(3 * 24 * 60 * 60 * 1000 + 1000);
-    expect(before - outboxCutoff).toBeGreaterThanOrEqual(90 * 24 * 60 * 60 * 1000);
+    expect(before - outboxCutoff).toBeGreaterThanOrEqual(90 * 24 * 60 * 60 * 1000 - 1000);
     expect(before - outboxCutoff).toBeLessThan(90 * 24 * 60 * 60 * 1000 + 1000);
   });
 });

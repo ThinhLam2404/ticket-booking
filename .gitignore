@@ -1,8 +1,16 @@
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
 .env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
 *.log
+*.dump
+*.backup
 .stitch-key
 .prisma/
 

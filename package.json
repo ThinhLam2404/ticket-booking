@@ -20,9 +20,9 @@
     "typecheck:be": "npm --prefix be run typecheck",
     "typecheck:fe": "npm --prefix fe run typecheck",
     "format": "npm --prefix be run format",
-  "test": "npm --prefix be run test",
-  "test:fe": "npm --prefix fe run test",
-  "test:e2e": "npm --prefix be run test:e2e",
+    "test": "npm --prefix be run test",
+    "test:fe": "npm --prefix fe run test",
+    "test:e2e": "npm --prefix be run test:e2e",
     "test:cov": "npm --prefix be run test:cov",
     "test:all": "npm run test && npm run test:fe && npm run test:e2e",
     "test:integration": "npm --prefix be run test:integration",
@@ -39,7 +39,10 @@
     "api:spec": "npm --prefix be run openapi:export -- ../openapi/ticket-booking.openapi.json",
     "api:types": "openapi-typescript openapi/ticket-booking.openapi.json --output fe/src/generated/openapi.d.ts",
     "api:generate": "npm run api:spec && npm run api:types",
-    "api:check": "node scripts/check-api-artifacts.mjs"
+    "api:check": "node scripts/check-api-artifacts.mjs",
+    "docker:up": "docker compose --env-file be/.env -f docker-compose.app.yml up --build -d --wait",
+    "docker:down": "docker compose --env-file be/.env -f docker-compose.app.yml down",
+    "docker:logs": "docker compose --env-file be/.env -f docker-compose.app.yml logs -f --tail=100"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",

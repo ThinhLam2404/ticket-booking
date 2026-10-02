@@ -40,6 +40,20 @@ describe('validateEnvironment', () => {
     );
   });
 
+  it('rejects public placeholder JWT secrets in production', () => {
+    expect(() =>
+      validateEnvironment(
+        validEnvironment({
+          NODE_ENV: 'production',
+          JWT_ACCESS_SECRET: 'local-access-secret-change-me-32-chars-minimum',
+          JWT_REFRESH_SECRET: 'local-refresh-secret-change-me-32-chars-minimum',
+          SEPAY_WEBHOOK_API_KEY: 'sepay-secret',
+          CORS_ORIGINS: 'https://cinebook.example.com',
+        }),
+      ),
+    ).toThrow('JWT secrets must not use example or placeholder values in production');
+  });
+
   it('accepts production settings with distinct long JWT secrets', () => {
     expect(
       validateEnvironment(

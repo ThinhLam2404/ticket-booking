@@ -5,7 +5,7 @@ Backend NestJS của hệ thống đặt vé phim. Tài liệu system/API dùng 
 ## Công nghệ
 
 - NestJS 12, Express và TypeScript
-- PostgreSQL 17 và Prisma 6.19.3
+- PostgreSQL 17 và Prisma 6.19.3; có thể chuyển sang Prisma Cloud qua `DATABASE_URL`
 - Redis 7
 - JWT authentication và role authorization
 - Swagger/OpenAPI
@@ -64,4 +64,4 @@ Có thể chạy trực tiếp trong thư mục `be` bằng các scripts trong `
 - Swagger: `http://localhost:3000/api/docs`
 - Readiness: `http://localhost:3000/api/v1/health/ready`
 
-PostgreSQL và Redis được khai báo trong `be/docker-compose.yml`. Thanh toán dùng SePay webhook; cấu hình `SEPAY_*` là tùy chọn ở local và bắt buộc khi bật flow thanh toán thật.
+PostgreSQL và Redis development được khai báo trong `be/docker-compose.yml`, với thông tin kết nối khớp `be/.env.example`. Có thể dùng Prisma Cloud bằng cách thay `DATABASE_URL` trong `.env`. Thanh toán dùng SePay webhook; cấu hình `SEPAY_*` là tùy chọn ở local và bắt buộc khi bật flow thanh toán thật.

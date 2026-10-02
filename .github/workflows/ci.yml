@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Static checks and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ticket_booking_test:ticket_booking_test@127.0.0.1:5432/ticket_booking_test?schema=public
+      REDIS_URL: redis://127.0.0.1:6379/0
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      CORS_ORIGINS: http://localhost:5173
+      SWAGGER_ENABLED: "false"
+      TRUST_PROXY: "false"
+      MAIL_WORKER_ENABLED: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            be/package-lock.json
+            fe/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci --prefix be
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix fe
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+      - name: Run build
+        run: npm run build
+
+      - name: Check OpenAPI artifacts
+        run: npm run api:check
+
+      - name: Run backend unit tests
+        run: npm test
+
+      - name: Run frontend tests
+        run: npm run test:fe
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Validate deployment configuration
+        run: |
+          cp be/.env.example be/.env
+          docker compose --env-file be/.env -f docker-compose.app.yml config -q
+          sh -n be/docker-entrypoint.sh
+          rm be/.env
+
+      - name: Build backend Docker image
+        run: docker build --file be/Dockerfile --tag cinebook-api:ci .
+
+      - name: Build frontend Docker image
+        run: docker build --file fe/Dockerfile --tag cinebook-frontend:ci .
+
+      - name: Check diff whitespace
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            git diff-tree --check --root -r "$HEAD_SHA"
+          else
+            git diff --check "$BASE_SHA" "$HEAD_SHA"
+          fi
+
+  integration:
+    name: PostgreSQL and Redis integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            be/package-lock.json
+            fe/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci --prefix be
+
+      - name: Run isolated integration suite
+        run: npm run test:integration

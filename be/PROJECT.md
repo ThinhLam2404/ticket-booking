@@ -13,7 +13,7 @@ Backend phục vụ hệ thống đặt vé rạp chiếu phim. MVP hỗ trợ q
 - Redis cho khóa giữ ghế có thời hạn
 - Swagger/OpenAPI
 - Vitest và Supertest
-- Docker Compose cho PostgreSQL và Redis
+- Docker Compose cho PostgreSQL và Redis local; có thể dùng Prisma Cloud qua `DATABASE_URL`
 
 Frontend MVP nằm trong project sibling `../fe/`, sử dụng React, Vite và TypeScript. Root `../package.json` cung cấp command runner để chạy cả backend và frontend.
 
@@ -119,4 +119,4 @@ npm run test:e2e
 npm run check
 ```
 
-Scheduler expire booking chạy mỗi phút. Test unit hiện bao phủ password, JWT và scheduler; E2E bao phủ prefix API, health liveness và validation auth. Integration/concurrency test với PostgreSQL và Redis thật cần chạy khi Docker Desktop hoạt động.
+Scheduler expire booking chạy mỗi phút. Test unit hiện bao phủ password, JWT và scheduler; E2E bao phủ prefix API, health liveness và validation auth. Integration/concurrency test dùng PostgreSQL/Redis test cô lập; development mặc định dùng PostgreSQL/Redis local từ `be/docker-compose.yml` và có thể chuyển sang Prisma Cloud bằng `DATABASE_URL`.

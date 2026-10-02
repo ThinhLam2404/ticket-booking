@@ -79,12 +79,12 @@ Dependencies được khai báo tại `be/package.json`, `fe/package.json` và r
 
 File: `be/docker-compose.yml`; root scripts gọi file này từ repository root.
 
-| Service    |   Port | Thông tin                                                                   |
-| ---------- | -----: | --------------------------------------------------------------------------- |
-| PostgreSQL | `5432` | DB `ticket_booking`, user `ticket_booking`, password local `ticket_booking` |
-| Redis      | `6379` | Seat lock                                                                   |
+| Service | Port | Thông tin |
+| ------- | ---: | --------- |
+| PostgreSQL | `5432` | DB `ticket_booking`, user/password local `ticket_booking` |
+| Redis | `6379` | Seat lock local |
 
-Application hiện chạy trực tiếp bằng Node/NestJS và Vite; chỉ PostgreSQL/Redis chạy bằng Docker Compose. API dùng Helmet, CORS allowlist và giới hạn JSON/urlencoded body theo environment. Rate limit dùng Redis atomic counter cho auth, SePay webhook và admin mutation; test/integration vẫn có thể kiểm tra abuse vì guard không bypass theo `NODE_ENV`. Email dùng SMTP provider cấu hình qua biến môi trường. Mail gửi bất đồng bộ bằng Worker Thread đọc `MailOutbox`; request chỉ chờ transaction outbox commit, không chờ SMTP. Worker được đánh thức ngay sau commit bằng message `wake` và vẫn polling fallback theo chu kỳ. Chưa có Dockerfile cho API hoặc frontend.
+Application có thể chạy trực tiếp bằng Node/NestJS và Vite cho development, hoặc bằng Docker production-like stack. `be/docker-compose.yml` cung cấp PostgreSQL và Redis local cho lần đầu clone; có thể chuyển development sang Prisma Cloud bằng cách thay `DATABASE_URL` trong `be/.env`. `docker-compose.app.yml` chạy API, frontend và Redis, còn API kết nối PostgreSQL external qua `be/.env`. API dùng Helmet, CORS allowlist và giới hạn JSON/urlencoded body theo environment. Rate limit dùng Redis atomic counter cho auth, SePay webhook và admin mutation; test/integration vẫn có thể kiểm tra abuse vì guard không bypass theo `NODE_ENV`. Email dùng SMTP provider cấu hình qua biến môi trường. Mail gửi bất đồng bộ bằng Worker Thread đọc `MailOutbox`; request chỉ chờ transaction outbox commit, không chờ SMTP. Worker được đánh thức ngay sau commit bằng message `wake` và vẫn polling fallback theo chu kỳ.
 
 ### 2.3. URL API
 
@@ -231,12 +231,18 @@ Customer UI hiện có:
 .
 ├── package.json
 ├── README.md
+├── docker-compose.app.yml
+├── .github/workflows/ci.yml
 ├── be/
+│   ├── Dockerfile
+│   ├── docker-entrypoint.sh
 │   ├── package.json
 │   ├── docker-compose.yml
 │   ├── prisma/
 │   └── src/
 └── fe/
+    ├── Dockerfile
+    ├── nginx.conf
     ├── package.json
     └── src/
 ```
@@ -272,6 +278,9 @@ REQUEST_BODY_LIMIT=256kb
 REFRESH_TOKEN_RETENTION_DAYS=30
 VERIFICATION_TOKEN_RETENTION_DAYS=2
 MAIL_OUTBOX_RETENTION_DAYS=90
+DOCKER_PUBLIC_APP_URL=http://localhost:8080
+DOCKER_CORS_ORIGINS=http://localhost:8080
+DOCKER_MAIL_WORKER_ENABLED=false
 TMDB_ACCESS_TOKEN=<tmdb-api-read-access-token>
 SEED_ADMIN_EMAIL=admin@example.com
 SEED_ADMIN_PASSWORD=change-this-seed-password
@@ -305,6 +314,9 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `REFRESH_TOKEN_RETENTION_DAYS` | Không | Retention token đã revoke, default `30` ngày          |
 | `VERIFICATION_TOKEN_RETENTION_DAYS` | Không | Retention token xác thực, default `2` ngày          |
 | `MAIL_OUTBOX_RETENTION_DAYS` | Không | Retention mail đã gửi, default `90` ngày              |
+| `DOCKER_PUBLIC_APP_URL` | Docker | Ghi đè `PUBLIC_APP_URL` trong production-like Compose; default `http://localhost:8080` |
+| `DOCKER_CORS_ORIGINS` | Docker | Ghi đè `CORS_ORIGINS` trong production-like Compose; default `http://localhost:8080` |
+| `DOCKER_MAIL_WORKER_ENABLED` | Docker | Bật/tắt Mail Worker trong production-like Compose; default `false` |
 | `TMDB_ACCESS_TOKEN`      | Không    | TMDB API Read Access Token; cần nếu Admin tìm hoặc nhập phim  |
 | `SEED_ADMIN_EMAIL`       | Seed     | Email admin bootstrap, default `admin@example.com`             |
 | `SEED_ADMIN_PASSWORD`    | Seed     | Password admin bootstrap, bắt buộc khi seed                    |
@@ -317,7 +329,7 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 
 - Không commit `.env` thật.
 - Không lưu plaintext password hoặc refresh token.
-- Production yêu cầu mỗi JWT secret dài tối thiểu 32 ký tự.
+- Production yêu cầu mỗi JWT secret dài tối thiểu 32 ký tự và không được dùng giá trị mẫu/placeholder trong `.env.example`.
 - Access và refresh secret phải khác nhau.
 - `TMDB_ACCESS_TOKEN` chỉ nằm ở backend `.env`; không truyền token sang frontend hoặc commit vào repository.
 - TMDB là nguồn dữ liệu ngoài. Chỉ phim đã được Admin nhập vào catalog nội bộ mới có thể publish, tạo showtime và booking.
@@ -1164,7 +1176,7 @@ sequenceDiagram
 #### `GET /api/v1/health/ready`
 
 - Auth: public.
-- Response `200` nếu PostgreSQL và Redis đều hoạt động.
+- Response `200` nếu PostgreSQL được cấu hình và Redis đều hoạt động.
 - Response `503` nếu một dependency down.
 
 ```json
@@ -2358,7 +2370,8 @@ npm run check:ci
 - `npm run api:check` kiểm tra generated artifacts có deterministic và up to date.
 - `npm run check` chạy lint, typecheck, build, unit test và E2E test cho backend/frontend.
 - `npm run test:integration` dùng PostgreSQL/Redis test riêng, deploy migrations và tự teardown containers.
-- `npm run check:ci` thêm API drift check và integration suite; baseline gần nhất pass với unit backend `68/68`, frontend `6/6`, E2E `6/6`, integration `14/14`.
+- `npm run check:ci` thêm API drift check và integration suite; verification gần nhất pass với backend unit `78/78`, frontend `10/10`, E2E `7/7`, integration `15/15`.
+- GitHub Actions tại `.github/workflows/ci.yml` chạy lại các quality gates và build cả backend/frontend Docker image trên máy sạch cho mỗi push vào `main` và mỗi pull request.
 - Provider smoke với SMTP/SePay thật không chạy trong development; cần sandbox/test provider ở staging để kiểm tra register → verify → checkout → webhook → ticket email.
 
 Generated API artifacts:
@@ -2387,7 +2400,7 @@ E2E test:
 - Auth payload validation.
 - OpenAPI response contracts cho pagination, seat map, SePay checkout/webhook và error schema.
 
-Integration test với PostgreSQL/Redis thật — baseline `14/14`:
+Integration test với PostgreSQL/Redis thật — verification gần nhất `15/15`:
 
 - Readiness database/Redis.
 - Resend email verification trong cooldown không tạo token/outbox mới.
@@ -2404,7 +2417,7 @@ Integration test với PostgreSQL/Redis thật — baseline `14/14`:
 - Booking expiry/cancel giải phóng seat và cập nhật intent.
 - Bulk showtime overlap và concurrent scheduling không commit trùng.
 
-Frontend test — baseline `6/6`:
+Frontend test — verification gần nhất `10/10`:
 
 - `npm run test:fe` chạy Vitest cho bounded queue concurrency 3, partial failure, giới hạn 20 và patch toàn bộ cache `tmdb-movies`.
 - Theme storage/resolution cho system/light/dark và storage failure.
@@ -2421,6 +2434,14 @@ Còn thiếu theo roadmap:
 Tất cả lệnh trong phần này chạy từ repository root `ticket-booking/`.
 
 ### 14.1. Setup lần đầu
+
+Nếu dùng Node.js 22 từ package hệ thống Fedora, cài dữ liệu ICU đầy đủ trước khi chạy Prisma CLI. Nếu thiếu gói này, `prisma migrate deploy` có thể làm `node-22` crash tại `Intl.Segmenter`:
+
+```bash
+sudo dnf install nodejs22-full-i18n
+```
+
+Prisma Client được generate cho cả Fedora/RHEL và Debian-compatible runtime vì project có thể được chạy từ host Fedora, terminal VS Code Flatpak hoặc container. Sau khi thay đổi Prisma schema hoặc cài lại dependencies, chạy lại `npm run prisma:generate` trước khi start backend.
 
 Linux/macOS/Git Bash:
 
@@ -2450,6 +2471,8 @@ npm run prisma:seed
 
 Root `package.json` điều phối commands nhưng không gộp dependency: `be/package-lock.json` và `fe/package-lock.json` vẫn là lockfile độc lập.
 
+`be/.env.example` khớp PostgreSQL/Redis local từ `npm run infra:up`, nên quy trình trên chạy được ngay sau khi thay các secret mẫu cần thiết. Nếu muốn dùng Prisma Cloud, chỉ thay `DATABASE_URL` trong `be/.env` bằng URL Cloud rồi chạy `npm run prisma:deploy`; không chạy `prisma migrate dev` hoặc `db push` trên Cloud.
+
 ### 14.2. Root scripts
 
 | Lệnh | Tác dụng |
@@ -2457,17 +2480,20 @@ Root `package.json` điều phối commands nhưng không gộp dependency: `be/
 | `npm run dev` | Chạy backend watch và frontend Vite song song |
 | `npm run dev:be` | Chỉ chạy backend watch |
 | `npm run dev:fe` | Chỉ chạy frontend Vite |
-| `npm run dev:all` | Bật PostgreSQL/Redis rồi chạy cả hai app |
+| `npm run dev:all` | Bật PostgreSQL/Redis local rồi chạy backend/frontend |
 | `npm run build` | Build backend và frontend |
 | `npm run lint` | Lint backend và frontend |
 | `npm run typecheck` | Typecheck backend và frontend |
 | `npm run check` | Lint, typecheck, build, unit test và E2E test |
 | `npm run check:ci` | API drift check, static checks và integration test |
+| `npm run docker:up` | Build và chạy local production-like API/frontend/Redis stack với PostgreSQL external từ `be/.env` |
+| `npm run docker:down` | Dừng local production-like stack |
+| `npm run docker:logs` | Theo dõi log của local production-like stack |
 | `npm run api:generate` | Export OpenAPI và sinh frontend types |
 | `npm run api:check` | Kiểm tra generated API artifacts deterministic |
 | `npm run test:integration` | Chạy integration test với PostgreSQL/Redis test riêng |
-| `npm run infra:up` | Start PostgreSQL và Redis |
-| `npm run infra:down` | Stop PostgreSQL và Redis |
+| `npm run infra:up` | Start PostgreSQL và Redis local |
+| `npm run infra:down` | Stop PostgreSQL và Redis local |
 | `npm run prisma:generate` | Generate Prisma Client |
 | `npm run prisma:deploy` | Apply migrations |
 | `npm run prisma:seed` | Seed catalog/admin data |
@@ -2476,7 +2502,54 @@ Root `package.json` điều phối commands nhưng không gộp dependency: `be/
 
 Nếu muốn cài dependency sau clone, chạy `npm install` ở root và `npm run install:all`.
 
-### 14.3. Runtime URL và cấu hình frontend
+### 14.3. Container và CI cho người mới
+
+#### Chạy stack bằng Docker
+
+```bash
+npm run docker:up
+```
+
+Lệnh này build và chạy:
+
+- `api`: NestJS production build ở port nội bộ `3000`, đọc `DATABASE_URL` từ `be/.env`.
+- `frontend`: Nginx ở `http://localhost:8080`.
+- `redis`: lock/rate-limit store nội bộ trong container.
+- PostgreSQL không nằm trong production-like compose này; API kết nối database external có thể truy cập từ container, ví dụ Prisma Cloud.
+
+Mở `http://localhost:8080`; frontend gọi `/api/v1` qua Nginx proxy. API container chạy `prisma migrate deploy` trước khi start, nên migration phải được review và apply đúng database external. Trước `npm run docker:up`, cần có `be/.env` chứa `DATABASE_URL` mà container truy cập được, JWT secrets, `SEPAY_WEBHOOK_API_KEY` và các config bắt buộc. URL `localhost:5432` mặc định dành cho backend chạy trực tiếp trên host và không dùng được từ API container; production-like stack nên dùng Prisma Cloud hoặc một PostgreSQL external phù hợp. Compose mặc định tắt Mail Worker (`DOCKER_MAIL_WORKER_ENABLED=false`); muốn gửi email phải cấu hình SMTP và bật biến này có chủ đích. API chỉ nhận traffic từ frontend proxy trên network nội bộ; `TRUST_PROXY=1` dùng đúng client IP do Nginx chuyển tiếp. Dừng stack bằng:
+
+```bash
+npm run docker:down
+```
+
+Xem log:
+
+```bash
+npm run docker:logs
+```
+
+Compose không chứa database password/JWT/SePay secret; root Docker scripts truyền `be/.env` bằng `--env-file`, nên cả nội suy Compose và environment của API container dùng cùng một nguồn cấu hình. Ba biến `DOCKER_PUBLIC_APP_URL`, `DOCKER_CORS_ORIGINS` và `DOCKER_MAIL_WORKER_ENABLED` tách cấu hình production-like Docker khỏi các giá trị development tương ứng, tránh phải sửa qua lại URL `5173`/`8080`. File `.env` thật không được commit. `npm run dev:all` là đường chạy mặc định sau khi clone và dùng PostgreSQL/Redis local. Nếu đổi `DATABASE_URL` sang Prisma Cloud thì development dùng Cloud mà không cần sửa source. Kiểm tra database URL và các URL/origin trước khi chạy production-like stack để tránh thao tác nhầm database hoặc tạo link frontend sai.
+
+#### CI pipeline hoạt động thế nào
+
+Workflow `.github/workflows/ci.yml` chạy trên GitHub Actions:
+
+1. Checkout source.
+2. Cài Node.js 22 và cache npm.
+3. `npm ci` cài dependency đúng theo lockfile.
+4. Lint phát hiện lỗi style/static.
+5. Typecheck phát hiện lỗi TypeScript.
+6. Build kiểm tra source có build được.
+7. API check phát hiện OpenAPI/generated types drift.
+8. Unit/frontend/E2E test kiểm tra behavior.
+9. Deployment validation kiểm tra Compose và shell entrypoint syntax.
+10. Build backend và frontend Docker image để phát hiện lỗi containerization.
+11. Integration job dựng PostgreSQL/Redis cô lập bằng Docker và chạy migration + integration suite.
+
+Pull request bị đánh dấu failed nếu một bước failed. CI hiện chưa deploy app; đó là CD và sẽ làm sau khi có staging, secrets và approval.
+
+### 14.4. Runtime URL và cấu hình frontend
 
 Backend:
 
@@ -2519,27 +2592,28 @@ Các màn hình MVP:
 - Booking history.
 - Ticket history.
 
-### 14.4. Manual flow mẫu
+### 14.5. Manual flow mẫu
 
 1. Copy `be/.env.example` thành `be/.env`.
-2. Đặt TMDB API Read Access Token vào `TMDB_ACCESS_TOKEN` trong `be/.env`; không đặt token ở `fe/.env`.
-3. Seed admin.
-4. Login admin qua `/api/v1/auth/login`.
-5. Dùng `Authorize` trên Swagger với access token.
-6. Gọi `GET /api/v1/movies/admin/tmdb` hoặc mở Admin > Phim > Nhập từ TMDB.
-7. Tìm phim bằng `search` hoặc xem danh sách now playing.
-8. Gọi `PUT /api/v1/movies/admin/tmdb/:tmdbId/import` cho phim được chọn.
-9. Kiểm tra phim trong `GET /api/v1/movies/admin`; phim mới có trạng thái `DRAFT`.
-10. Dùng `PATCH /api/v1/movies/:id` để chuyển phim sang `PUBLISHED` sau khi kiểm tra.
-11. Tạo cinema, room, seats, showtime cho movie nội bộ bằng `id`.
-12. Register/login customer.
-13. Lấy showtime seats; chọn một ghế Couple sẽ chọn cả cặp.
-14. Hold một hoặc nhiều ghế; backend canonicalize cặp Couple và giới hạn 10 ghế vật lý.
-15. Checkout booking để lấy mã thanh toán và QR.
-16. Chuyển khoản theo đúng số tiền/nội dung payment code.
-17. Chờ webhook SePay xác nhận rồi lấy ticket.
+2. Đổi `JWT_ACCESS_SECRET` và `JWT_REFRESH_SECRET` thành giá trị thật; không dùng nguyên placeholder trong file mẫu.
+3. Đặt TMDB API Read Access Token vào `TMDB_ACCESS_TOKEN` trong `be/.env`; không đặt token ở `fe/.env`.
+4. Seed admin bằng `npm run prisma:deploy` rồi `npm run prisma:seed`.
+5. Login admin qua `/api/v1/auth/login`.
+6. Dùng `Authorize` trên Swagger với access token.
+7. Gọi `GET /api/v1/movies/admin/tmdb` hoặc mở Admin > Phim > Nhập từ TMDB.
+8. Tìm phim bằng `search` hoặc xem danh sách now playing.
+9. Gọi `PUT /api/v1/movies/admin/tmdb/:tmdbId/import` cho phim được chọn.
+10. Kiểm tra phim trong `GET /api/v1/movies/admin`; phim mới có trạng thái `DRAFT`.
+11. Dùng `PATCH /api/v1/movies/:id` để chuyển phim sang `PUBLISHED` sau khi kiểm tra.
+12. Tạo cinema, room, seats, showtime cho movie nội bộ bằng `id`.
+13. Register/login customer.
+14. Lấy showtime seats; chọn một ghế Couple sẽ chọn cả cặp.
+15. Hold một hoặc nhiều ghế; backend canonicalize cặp Couple và giới hạn 10 ghế vật lý.
+16. Checkout booking để lấy mã thanh toán và QR.
+17. Chuyển khoản theo đúng số tiền/nội dung payment code.
+18. Chờ webhook SePay xác nhận rồi lấy ticket.
 
-### 14.5. Dữ liệu cinema seed tĩnh
+### 14.6. Dữ liệu cinema seed tĩnh
 
 `be/prisma/data/cinemas.seed.json` là file dữ liệu tĩnh được chuẩn bị một lần từ nguồn dữ liệu bản đồ đã rà soát. File chỉ chứa dữ liệu nghiệp vụ cần phục hồi:
 
@@ -2547,7 +2621,14 @@ Các màn hình MVP:
 - `id`, `name` và tùy chọn layout của room.
 - Layout ghế được `be/prisma/seed.ts` sinh bằng `buildSeatLayout()`.
 
-Khi reset database, chạy migration rồi chạy `npm run prisma:seed`. Seed không gọi mạng và không phụ thuộc OSM runtime. Nếu phân phối dữ liệu bản đồ gốc hoặc phái sinh, cần giữ attribution và tuân thủ ODbL.
+Khi reset database hoặc tạo Prisma Cloud database mới, chạy migration trước rồi mới seed:
+
+```bash
+npm run prisma:deploy
+npm run prisma:seed
+```
+
+Không chạy `prisma migrate dev` trên Prisma Cloud/production; dùng `prisma migrate deploy` để apply các migration đã commit. Seed không gọi mạng và không phụ thuộc OSM runtime. Nếu phân phối dữ liệu bản đồ gốc hoặc phái sinh, cần giữ attribution và tuân thủ ODbL.
 
 ## 15. Known limitations và roadmap
 
@@ -2566,9 +2647,8 @@ Khi reset database, chạy migration rồi chạy `npm run prisma:seed`. Seed kh
 - OpenAPI JSON và frontend declarations được sinh từ backend contract qua root scripts.
 - Custom error format đã được thêm với `code`, `details`, `path`, `requestId` và `timestamp`.
 - Integration/concurrency suite đã có cho hold, idempotency, expiry và payment; Sprint 2 bổ sung migration backfill, refresh rotation/reuse, rate limit và retention cleanup coverage.
-- Chưa có Dockerfile cho API.
-- Chưa có CI/CD.
-- Structured logging, metrics/tracing và CI/CD chưa có; rate limiting, Helmet và CORS allowlist đã có ở API layer.
+- Dockerfile, local production-like Compose stack, structured request logging và GitHub Actions CI đã có; CD deploy staging/production, metrics/tracing và alerts chưa có.
+- Chưa có backup/restore script hoặc rollback drill cho production; cần thiết kế với direct database URL và kiểm chứng trên database cô lập trước khi vận hành thật.
 - `prisma:seed` cập nhật admin role/name nhưng không đổi password nếu admin đã tồn tại.
 
 ### 15.2. Roadmap đề xuất
@@ -2578,7 +2658,7 @@ Roadmap chi tiết được lưu trong [`WORKLOG.md`](./WORKLOG.md). Mục tiêu
 1. **Baseline và release contract:** đồng bộ tài liệu, production checklist, smoke test customer flow thật và browser verification.
 2. **Frontend architecture và component extraction:** tách page monolith theo feature, shared components, hooks và state boundaries; giữ nguyên route/API/query key/behavior, plain CSS và design system.
 3. **Security/correctness hardening:** Redis rate limiting, CORS allowlist, Helmet/security headers, production Swagger gate, webhook hardening, refresh-token reuse detection, cleanup jobs và concurrency tests.
-4. **Container/CI/CD/observability:** Dockerfile, staging, CI quality gate, structured logs, request ID, metrics, alerts, backup/restore và rollback runbook.
+4. **Container/CI/CD/observability:** Dockerfile, staging, CI quality gate, structured logs, request ID, metrics, alerts, backup/restore và rollback runbook đã kiểm chứng.
 5. **Payment reconciliation/refund:** hoàn thiện state transition SePay/payment/booking/ticket, manual reconciliation, refund idempotency và audit trail; chưa cần payment abstraction provider thứ hai.
 6. **Pagination/query performance:** chuẩn hóa pagination/filter/sort cho booking, ticket, payment và các list tăng trưởng; kiểm tra index, query plan và load test.
 7. **Automated critical journeys:** browser/component/contract tests cho auth, seat hold, checkout, webhook, nhiều ticket, responsive và light/dark.

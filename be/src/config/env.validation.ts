@@ -158,6 +158,17 @@ export function validateEnvironment(config: Record<string, unknown>) {
     throw new Error('JWT secrets must be at least 32 characters in production');
   }
 
+  if (
+    validated.NODE_ENV === 'production' &&
+    [validated.JWT_ACCESS_SECRET, validated.JWT_REFRESH_SECRET].some((secret) =>
+      /(?:change[-_ ]?me|example|replace[-_ ]?with|your[-_ ]|local[-_ ]|password)/i.test(
+        secret,
+      ),
+    )
+  ) {
+    throw new Error('JWT secrets must not use example or placeholder values in production');
+  }
+
   if (validated.NODE_ENV === 'production') {
     const requiredProductionValues = [
       ['SEPAY_WEBHOOK_API_KEY', validated.SEPAY_WEBHOOK_API_KEY],
