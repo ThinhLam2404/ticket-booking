@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -104,6 +104,9 @@ SELECT concat(
 `;
 
 mkdirSync(dumpDirectory, { recursive: true });
+// The dump is created by a non-root postgres container. Make the bind-mounted
+// workspace writable for that UID while keeping the generated archive private.
+chmodSync(dumpDirectory, 0o777);
 rmSync(dumpFile, { force: true });
 
 try {
