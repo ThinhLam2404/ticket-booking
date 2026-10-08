@@ -69,6 +69,7 @@ import type {
   ShowtimeDeleteResponse,
   FreeSlotsResponse,
   ProvincesResponse,
+  OperationsStatus,
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1';
@@ -410,6 +411,9 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
+  },
+  adminOperationsStatus(signal?: AbortSignal) {
+    return request<OperationsStatus>('/admin/operations/status', { signal });
   },
 };
 

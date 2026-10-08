@@ -1,5 +1,10 @@
 import { parentPort, workerData } from 'node:worker_threads';
-import { PrismaClient, MailOutboxStatus, MailOutboxType, Prisma } from '@prisma/client';
+import {
+  PrismaClient,
+  MailOutboxStatus,
+  MailOutboxType,
+  Prisma,
+} from '@prisma/client';
 import * as nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
 import type { MailWorkerData } from './mail-worker.supervisor.js';
@@ -7,14 +12,18 @@ import { renderTicketEmail } from './templates/ticket-email.template.js';
 import { renderVerificationEmail } from './templates/verification-email.template.js';
 
 const data = workerData as MailWorkerData;
-const prisma = new PrismaClient({ datasources: { db: { url: data.databaseUrl } } });
+const prisma = new PrismaClient({
+  datasources: { db: { url: data.databaseUrl } },
+});
 const transporter = nodemailer.createTransport({
   host: data.smtpHost,
   port: data.smtpPort,
   secure: data.smtpSecure,
   connectionTimeout: 15000,
   socketTimeout: 30000,
-  ...(data.smtpUser && { auth: { user: data.smtpUser, pass: data.smtpPassword ?? '' } }),
+  ...(data.smtpUser && {
+    auth: { user: data.smtpUser, pass: data.smtpPassword ?? '' },
+  }),
 });
 const retryDelaysMs = [60000, 300000, 1800000, 7200000];
 let timer: NodeJS.Timeout | undefined;
@@ -72,7 +81,10 @@ async function drain(): Promise<void> {
     }
     parentPort?.postMessage({ type: 'idle' });
   } catch (error) {
-    parentPort?.postMessage({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+    parentPort?.postMessage({
+      type: 'error',
+      message: error instanceof Error ? error.message : String(error),
+    });
   } finally {
     running = false;
     if (stopping) await shutdown();
@@ -85,11 +97,17 @@ async function claimNext() {
   const staleLockAt = new Date(now.getTime() - data.staleLockMs);
   const readyWhere: Prisma.MailOutboxWhereInput = {
     OR: [
-      { status: { in: [MailOutboxStatus.PENDING, MailOutboxStatus.FAILED] }, nextAttemptAt: { lte: now } },
+      {
+        status: { in: [MailOutboxStatus.PENDING, MailOutboxStatus.FAILED] },
+        nextAttemptAt: { lte: now },
+      },
       { status: MailOutboxStatus.PROCESSING, lockedAt: { lt: staleLockAt } },
     ],
   };
-  const candidate = await prisma.mailOutbox.findFirst({ where: readyWhere, orderBy: { createdAt: 'asc' } });
+  const candidate = await prisma.mailOutbox.findFirst({
+    where: readyWhere,
+    orderBy: { createdAt: 'asc' },
+  });
   if (!candidate) return null;
   const locked = await prisma.mailOutbox.updateMany({
     where: { id: candidate.id, ...readyWhere },
@@ -121,9 +139,12 @@ async function processOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
         }),
       },
     });
+    parentPort?.postMessage({ type: 'sent', outboxId: outbox.id });
   } catch (error) {
     const attemptCount = outbox.attemptCount + 1;
-    const delay = retryDelaysMs[Math.min(attemptCount - 1, retryDelaysMs.length - 1)] ?? retryDelaysMs.at(-1)!;
+    const delay =
+      retryDelaysMs[Math.min(attemptCount - 1, retryDelaysMs.length - 1)] ??
+      retryDelaysMs.at(-1)!;
     await prisma.mailOutbox.update({
       where: { id: outbox.id },
       data: {
@@ -133,6 +154,11 @@ async function processOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
         lastError: error instanceof Error ? error.message : String(error),
         lockedAt: null,
       },
+    });
+    parentPort?.postMessage({
+      type: 'failed',
+      outboxId: outbox.id,
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 }
@@ -151,18 +177,32 @@ async function renderOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
     where: { id: payload.bookingId },
     include: {
       user: true,
-      showtime: { include: { movie: true, room: { include: { cinema: true } } } },
-      items: { include: { showtimeSeat: { include: { seat: true } }, ticket: true } },
+      showtime: {
+        include: { movie: true, room: { include: { cinema: true } } },
+      },
+      items: {
+        include: { showtimeSeat: { include: { seat: true } }, ticket: true },
+      },
       tickets: true,
     },
   });
-  if (!booking || booking.status !== 'CONFIRMED') throw new Error('Confirmed booking not found');
-  const attachments = await Promise.all(booking.tickets.map(async (ticket) => ({
-    filename: `${ticket.code}.png`,
-    content: (await QRCode.toBuffer(`cinebook-ticket:v1:${ticket.code}`, { errorCorrectionLevel: 'M', margin: 1, width: 220, color: { dark: '#101820', light: '#ffffff' } })).toString('base64'),
-    encoding: 'base64' as const,
-    cid: `ticket-${ticket.code}@cinebook`,
-  })));
+  if (!booking || booking.status !== 'CONFIRMED')
+    throw new Error('Confirmed booking not found');
+  const attachments = await Promise.all(
+    booking.tickets.map(async (ticket) => ({
+      filename: `${ticket.code}.png`,
+      content: (
+        await QRCode.toBuffer(`cinebook-ticket:v1:${ticket.code}`, {
+          errorCorrectionLevel: 'M',
+          margin: 1,
+          width: 220,
+          color: { dark: '#101820', light: '#ffffff' },
+        })
+      ).toString('base64'),
+      encoding: 'base64' as const,
+      cid: `ticket-${ticket.code}@cinebook`,
+    })),
+  );
   return renderTicketEmail({
     fullName: booking.user.fullName,
     appUrl: data.publicAppUrl,
@@ -175,9 +215,16 @@ async function renderOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
     startsAt: booking.showtime.startsAt,
     endsAt: booking.showtime.endsAt,
     tickets: booking.tickets.map((ticket) => {
-      const item = booking.items.find((bookingItem) => bookingItem.ticket?.id === ticket.id);
+      const item = booking.items.find(
+        (bookingItem) => bookingItem.ticket?.id === ticket.id,
+      );
       const seat = item?.showtimeSeat.seat;
-      return { code: ticket.code, seatLabel: `${seat?.row ?? ''}${seat?.number ?? ''}`, price: item?.price.toString() ?? '0', qrCid: `ticket-${ticket.code}@cinebook` };
+      return {
+        code: ticket.code,
+        seatLabel: `${seat?.row ?? ''}${seat?.number ?? ''}`,
+        price: item?.price.toString() ?? '0',
+        qrCid: `ticket-${ticket.code}@cinebook`,
+      };
     }),
     attachments,
   });

@@ -4,6 +4,7 @@ dist/
 **/dist/
 coverage/
 **/coverage/
+.tmp/
 .env
 **/.env
 .env.*
@@ -21,3 +22,5 @@ coverage/
 .playwright-mcp/
 *.log
 verification-*.png
+# Archify diagrams, receipts, and browser evidence — regenerable local artifacts.
+/.archify/

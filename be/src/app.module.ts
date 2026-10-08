@@ -22,6 +22,7 @@ import { validateEnvironment } from './config/env.validation.js';
 import { RateLimitGuard } from './common/auth/rate-limit.guard.js';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module.js';
 import { APP_GUARD } from '@nestjs/core';
+import { ObservabilityModule } from './modules/observability/observability.module.js';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { APP_GUARD } from '@nestjs/core';
     TicketsModule,
     MailModule,
     MaintenanceModule,
+    ObservabilityModule,
   ],
   controllers: [AppController],
   providers: [

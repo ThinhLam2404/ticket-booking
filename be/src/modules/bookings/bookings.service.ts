@@ -17,10 +17,12 @@ import { isUniqueConstraintError } from '../../common/database/prisma-errors.js'
 import { PrismaService } from '../../database/prisma.service.js';
 import { RedisService } from '../redis/redis.service.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
+import { SHOWTIME_BUFFER_SECONDS, computeHoldTtl } from './booking-policy.js';
+import { logOperationalEvent } from '../../common/logging/operational-logger.js';
 import {
-  SHOWTIME_BUFFER_SECONDS,
-  computeHoldTtl,
-} from './booking-policy.js';
+  recordBookingExpired,
+  recordHoldConflict,
+} from '../observability/metrics.service.js';
 
 const IDEMPOTENCY_KEY_MAX_LENGTH = 100;
 
@@ -149,6 +151,7 @@ export class BookingsService {
           if (existingBooking) {
             return toPublicResponse(existingBooking);
           }
+          recordHoldConflict();
           throw new ConflictException('One or more seats are being held');
         }
         acquiredSeatIds.push(seatId);
@@ -180,6 +183,7 @@ export class BookingsService {
           include: { seat: true },
         });
         if (availableSeats.length !== canonicalSeatIds.length) {
+          recordHoldConflict();
           throw new ConflictException(
             'One or more seats are no longer available',
           );
@@ -221,6 +225,7 @@ export class BookingsService {
           },
         });
         if (claimedSeats.count !== canonicalSeatIds.length) {
+          recordHoldConflict();
           throw new ConflictException(
             'One or more seats are no longer available',
           );
@@ -232,6 +237,11 @@ export class BookingsService {
         });
       });
 
+      logOperationalEvent('info', 'booking_held', {
+        bookingId: booking.id,
+        showtimeId: booking.showtimeId,
+        seatCount: booking.items.length,
+      });
       return toPublicResponse(booking);
     } catch (error) {
       //NOTE - nếu lỗi thì nhả lock redis
@@ -350,6 +360,10 @@ export class BookingsService {
       booking.holdToken,
     );
 
+    logOperationalEvent('info', 'booking_cancelled', {
+      bookingId: cancelled.id,
+      showtimeId: cancelled.showtimeId,
+    });
     return toPublicResponse(cancelled);
   }
 
@@ -443,6 +457,11 @@ export class BookingsService {
     });
 
     if (expired) {
+      recordBookingExpired();
+      logOperationalEvent('info', 'booking_expired', {
+        bookingId: booking.id,
+        showtimeId: booking.showtimeId,
+      });
       await this.releaseSeatLocks(
         booking.showtimeId,
         booking.items.map((item) => item.showtimeSeatId),

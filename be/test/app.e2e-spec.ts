@@ -27,13 +27,19 @@ describe('Application (e2e)', () => {
             SWAGGER_ENABLED: 'true',
             REQUEST_BODY_LIMIT: '256kb',
             TRUST_PROXY: 'false',
-          }[key] as T | undefined),
+            METRICS_TOKEN: 'test-metrics-token',
+          })[key] as T | undefined,
       })
       .overrideProvider(PrismaService)
       .useValue({
         $connect: async () => undefined,
         $disconnect: async () => undefined,
         $queryRaw: async () => [{ '?column?': 1 }],
+        mailOutbox: {
+          count: async () => 0,
+          findFirst: async () => null,
+        },
+        sepayTransaction: { count: async () => 0 },
       })
       .overrideProvider(RedisService)
       .useValue({
@@ -65,6 +71,20 @@ describe('Application (e2e)', () => {
       });
   });
 
+  it('protects and serves Prometheus metrics', async () => {
+    await request(app.getHttpServer()).get('/api/v1/metrics').expect(401);
+
+    await request(app.getHttpServer())
+      .get('/api/v1/metrics')
+      .set('Authorization', 'Bearer test-metrics-token')
+      .expect('Content-Type', /text\/plain/)
+      .expect(200)
+      .expect(({ text }) => {
+        expect(text).toContain('cinebook_http_requests_total');
+        expect(text).toContain('cinebook_dependency_up');
+      });
+  });
+
   it('validates auth payloads', () => {
     return request(app.getHttpServer())
       .post('/api/v1/auth/register')
@@ -90,47 +110,56 @@ describe('Application (e2e)', () => {
       .get('/api/docs-json')
       .expect(200);
 
-    expect(response.body.paths['/api/v1/movies'].get.responses['200'])
-      .toMatchObject({
-        content: {
-          'application/json': {
-            schema: {
-              $ref: '#/components/schemas/PaginatedMoviesResponseDto',
-            },
+    expect(
+      response.body.paths['/api/v1/movies'].get.responses['200'],
+    ).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/PaginatedMoviesResponseDto',
           },
         },
-      });
-    expect(response.body.paths['/api/v1/showtimes'].get.responses['200'])
-      .toMatchObject({
-        content: {
-          'application/json': {
-            schema: {
-              $ref: '#/components/schemas/PaginatedShowtimesResponseDto',
-            },
+      },
+    });
+    expect(
+      response.body.paths['/api/v1/showtimes'].get.responses['200'],
+    ).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/PaginatedShowtimesResponseDto',
           },
         },
-      });
-    expect(response.body.paths['/api/v1/showtimes/{id}/seats'].get.responses['200'])
-      .toMatchObject({
-        content: {
-          'application/json': {
-            schema: {
-              $ref: '#/components/schemas/ShowtimeSeatsResponseDto',
-            },
+      },
+    });
+    expect(
+      response.body.paths['/api/v1/showtimes/{id}/seats'].get.responses['200'],
+    ).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/ShowtimeSeatsResponseDto',
           },
         },
-      });
-    expect(response.body.paths['/api/v1/payments/bookings/{bookingId}/checkout'].post.responses['201'])
-      .toMatchObject({
-        content: {
-          'application/json': {
-            schema: {
-              $ref: '#/components/schemas/SepayCheckoutResponseDto',
-            },
+      },
+    });
+    expect(
+      response.body.paths['/api/v1/payments/bookings/{bookingId}/checkout'].post
+        .responses['201'],
+    ).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/SepayCheckoutResponseDto',
           },
         },
-      });
-    expect(response.body.paths['/api/v1/payments/sepay/webhook'].post.responses['201']).toBeDefined();
+      },
+    });
+    expect(
+      response.body.paths['/api/v1/payments/sepay/webhook'].post.responses[
+        '201'
+      ],
+    ).toBeDefined();
     expect(response.body.components.schemas.ApiErrorResponseDto).toBeDefined();
   });
 

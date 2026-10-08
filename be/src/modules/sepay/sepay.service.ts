@@ -22,6 +22,8 @@ import { BookingsService } from '../bookings/bookings.service.js';
 import { SepayWebhookDto } from './dto/sepay-webhook.dto.js';
 import { SHOWTIME_BUFFER_SECONDS } from '../bookings/booking-policy.js';
 import { MailService } from '../mail/mail.service.js';
+import { logOperationalEvent } from '../../common/logging/operational-logger.js';
+import { recordPaymentReviewRequired } from '../observability/metrics.service.js';
 
 const PAYMENT_CODE_PREFIX = 'CB';
 const PAYMENT_CODE_LENGTH = 8;
@@ -109,6 +111,10 @@ export class SepayService {
       },
     });
 
+    logOperationalEvent('info', 'payment_intent_created', {
+      bookingId,
+      paymentIntentId: intent.id,
+    });
     return this.buildCheckoutResponse(intent);
   }
 
@@ -125,8 +131,11 @@ export class SepayService {
         Object.values(error.constraints ?? {}),
       );
       this.logger.error(
-        `SePay webhook payload rejected: ${details.join('; ')} | body=${JSON.stringify(rawBody)}`,
+        `SePay webhook payload rejected: ${details.join('; ')}`,
       );
+      logOperationalEvent('warn', 'payment_webhook_rejected', {
+        validationErrorCount: details.length,
+      });
       throw new BadRequestException(details);
     }
     if (dto.transferType !== 'in') {
@@ -135,9 +144,8 @@ export class SepayService {
 
     const configuredAccount = this.config.get<string>('SEPAY_ACCOUNT_NUMBER');
     if (configuredAccount && dto.accountNumber !== configuredAccount) {
-      this.logger.warn(
-        `Webhook for unknown account ${dto.accountNumber}, ignoring`,
-      );
+      this.logger.warn('Webhook for unknown account, ignoring');
+      logOperationalEvent('warn', 'payment_webhook_unknown_account');
       return { success: true };
     }
 
@@ -193,6 +201,11 @@ export class SepayService {
     }
 
     if (!matched || !intent) {
+      recordPaymentReviewRequired();
+      logOperationalEvent('warn', 'payment_review_required', {
+        sepayTransactionId: String(dto.id),
+        paymentIntentId: intent?.id,
+      });
       this.logger.warn(
         `SePay transaction ${dto.id} status=${txStatus} intentId=${intent?.id ?? 'none'}`,
       );
@@ -349,6 +362,11 @@ export class SepayService {
           booking.items.map((i) => i.showtimeSeatId),
           booking.holdToken,
         );
+        logOperationalEvent('info', 'booking_confirmed', {
+          bookingId: booking.id,
+          paymentIntentId: intent.id,
+          sepayTransactionId: String(sepayId),
+        });
         this.logger.log(`Booking ${booking.id} confirmed via SePay webhook`);
       } else {
         await this.prisma.sepayTransaction.updateMany({
@@ -357,6 +375,12 @@ export class SepayService {
             status: SepayTransactionStatus.MATCHED,
           },
           data: { status: SepayTransactionStatus.REVIEW_REQUIRED },
+        });
+        recordPaymentReviewRequired();
+        logOperationalEvent('warn', 'payment_review_required', {
+          bookingId: booking.id,
+          paymentIntentId: intent.id,
+          sepayTransactionId: String(sepayId),
         });
         this.logger.warn(
           `Booking ${booking.id} could not be confirmed — marked for review`,

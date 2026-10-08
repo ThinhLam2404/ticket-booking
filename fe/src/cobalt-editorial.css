@@ -1743,6 +1743,116 @@
   background: var(--success-text);
 }
 
+.admin-shell .admin-ops-overview {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  box-shadow: 0 5px 18px rgba(14, 27, 53, .06);
+}
+
+.admin-shell .admin-ops-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 15px;
+}
+
+.admin-shell .admin-ops-heading h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--display-font);
+  font-size: 1rem;
+}
+
+.admin-shell .admin-ops-heading time {
+  color: var(--text-muted);
+  font-size: .66rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-shell .admin-ops-overview > .state-card {
+  min-height: 92px;
+  margin: 0;
+}
+
+.admin-shell .admin-ops-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-shell .admin-ops-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 7px;
+  align-items: center;
+  gap: 10px;
+  min-height: 82px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.admin-shell .admin-ops-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--accent);
+  font-family: var(--display-font);
+  font-size: .68rem;
+  font-weight: 700;
+}
+
+.admin-shell .admin-ops-card div {
+  min-width: 0;
+}
+
+.admin-shell .admin-ops-card small,
+.admin-shell .admin-ops-card strong,
+.admin-shell .admin-ops-card em {
+  display: block;
+}
+
+.admin-shell .admin-ops-card small {
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: .6rem;
+}
+
+.admin-shell .admin-ops-card strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: .69rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+.admin-shell .admin-ops-card em {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: .56rem;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.admin-shell .admin-ops-card > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.admin-shell .admin-ops-card.healthy > i { background: var(--success-text); }
+.admin-shell .admin-ops-card.warning > i { background: var(--warning-text); }
+.admin-shell .admin-ops-card.danger > i { background: var(--danger-text); }
+
 .admin-shell .admin-dashboard-grid {
   grid-template-columns: minmax(0, 1.4fr) minmax(300px, .6fr);
   gap: 18px;
@@ -1918,6 +2028,10 @@
   .admin-shell .admin-operation-status {
     display: none;
   }
+
+  .admin-shell .admin-ops-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -1927,6 +2041,20 @@
   }
 
   .admin-shell .admin-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell .admin-ops-overview {
+    padding: 14px;
+  }
+
+  .admin-shell .admin-ops-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .admin-shell .admin-ops-grid {
     grid-template-columns: 1fr;
   }
 

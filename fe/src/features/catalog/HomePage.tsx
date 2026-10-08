@@ -34,7 +34,10 @@ export function HomePage() {
   const catalogShowtimes = useMemo(() => catalogCategory === 'SPECIAL'
     ? showtimes.filter((showtime) => showtime.room.format !== 'STANDARD' || showtime.format === 'THREE_D_SUBTITLED' || showtime.format === 'THREE_D_DUBBED')
     : catalogCategory === 'COMING_SOON' ? [] : showtimes, [catalogCategory, showtimes]);
-  const featuredMovie = bookingMovies[0];
+  const featuredMovie = bookingMovies.reduce<typeof bookingMovies[number] | undefined>((featured, movie) => {
+    if (!featured || (movie.rating ?? -1) > (featured.rating ?? -1)) return movie;
+    return featured;
+  }, undefined);
   const catalogLabel = catalogCategory === 'COMING_SOON' ? 'PHIM SẮP CHIẾU' : catalogCategory === 'SPECIAL' ? 'SUẤT CHIẾU ĐẶC BIỆT' : 'PHIM ĐANG CHIẾU';
 
   useEffect(() => {

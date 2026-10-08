@@ -106,3 +106,4 @@ export type FreeSlotWindow = FreeSlotsResponse['freeWindows'][number];
 export type SepayTransactionsResponse = JsonResponse<'/api/v1/payments/admin/sepay/transactions', 'get'>;
 export type SepayTransaction = components['schemas']['SepayTransactionResponseDto'];
 export type UpdateSepayTransactionRequest = RequestBody<'/api/v1/payments/admin/sepay/transactions/{id}', 'patch'>;
+export type OperationsStatus = JsonResponse<'/api/v1/admin/operations/status', 'get'>;

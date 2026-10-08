@@ -42,7 +42,8 @@
     "api:check": "node scripts/check-api-artifacts.mjs",
     "docker:up": "docker compose --env-file be/.env -f docker-compose.app.yml up --build -d --wait",
     "docker:down": "docker compose --env-file be/.env -f docker-compose.app.yml down",
-    "docker:logs": "docker compose --env-file be/.env -f docker-compose.app.yml logs -f --tail=100"
+    "docker:logs": "docker compose --env-file be/.env -f docker-compose.app.yml logs -f --tail=100",
+    "ops:backup-restore-drill": "node scripts/ops/run-backup-restore-drill.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",

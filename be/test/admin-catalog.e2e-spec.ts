@@ -24,6 +24,11 @@ function createPrismaMock() {
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
+    mailOutbox: {
+      count: vi.fn().mockResolvedValue(0),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    sepayTransaction: { count: vi.fn().mockResolvedValue(0) },
   };
   return prisma;
 }
@@ -49,7 +54,7 @@ describe('Admin catalog authorization (e2e)', () => {
             SWAGGER_ENABLED: 'false',
             REQUEST_BODY_LIMIT: '256kb',
             TRUST_PROXY: 'false',
-          }[key] as T | undefined),
+          })[key] as T | undefined,
       })
       .overrideProvider(PrismaService)
       .useValue(prisma)
@@ -67,9 +72,7 @@ describe('Admin catalog authorization (e2e)', () => {
   });
 
   it('rejects unauthenticated and customer access to the admin movie list', async () => {
-    await request(app.getHttpServer())
-      .get('/api/v1/movies/admin')
-      .expect(401);
+    await request(app.getHttpServer()).get('/api/v1/movies/admin').expect(401);
 
     prisma.user.findUnique.mockResolvedValue({
       id: 'customer-1',
@@ -110,6 +113,55 @@ describe('Admin catalog authorization (e2e)', () => {
       .expect(200)
       .expect(({ body }) => {
         expect(body.meta).toMatchObject({ page: 1, pageSize: 20, total: 0 });
+      });
+  });
+
+  it('protects the operational status and returns it to admins', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/operations/status')
+      .expect(401);
+
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'customer-1',
+      email: 'customer@example.com',
+      fullName: 'Customer',
+      role: UserRole.CUSTOMER,
+    });
+    const customerToken = app.get(JwtTokenService).createAccessToken({
+      id: 'customer-1',
+      email: 'customer@example.com',
+      fullName: 'Customer',
+      role: UserRole.CUSTOMER,
+    });
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/operations/status')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .expect(403);
+
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'admin-1',
+      email: 'admin@example.com',
+      fullName: 'Admin',
+      role: UserRole.ADMIN,
+    });
+    const token = app.get(JwtTokenService).createAccessToken({
+      id: 'admin-1',
+      email: 'admin@example.com',
+      fullName: 'Admin',
+      role: UserRole.ADMIN,
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/operations/status')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          database: 'up',
+          redis: 'up',
+          mailOutbox: { pending: 0, failed: 0 },
+          payments: { reviewRequired: 0 },
+        });
       });
   });
 

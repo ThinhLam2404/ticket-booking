@@ -3,7 +3,9 @@ import { getRequestId, requestLogger } from './request-logger.middleware.js';
 
 describe('requestLogger', () => {
   it('keeps a valid request id and logs only safe request metadata', () => {
-    const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const output = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
     const finishHandlers: Array<() => void> = [];
     const request = {
       method: 'POST',
@@ -14,7 +16,9 @@ describe('requestLogger', () => {
     };
     const response = {
       setHeader: vi.fn(),
-      on: vi.fn((_event: string, handler: () => void) => finishHandlers.push(handler)),
+      on: vi.fn((_event: string, handler: () => void) =>
+        finishHandlers.push(handler),
+      ),
       statusCode: 401,
     };
     const next = vi.fn();
@@ -33,7 +37,9 @@ describe('requestLogger', () => {
   it('replaces malformed or oversized request ids', () => {
     const request = {
       header: (name: string) =>
-        name.toLowerCase() === 'x-request-id' ? `${'x'.repeat(129)}` : undefined,
+        name.toLowerCase() === 'x-request-id'
+          ? `${'x'.repeat(129)}`
+          : undefined,
     };
 
     const requestId = getRequestId(request as never);

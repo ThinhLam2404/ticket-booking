@@ -12,6 +12,15 @@ export function createOpenApiDocument(app: INestApplication) {
     .setDescription('API for booking movie tickets')
     .setVersion('1.0')
     .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'Metrics token',
+        description: 'Bearer token from METRICS_TOKEN',
+      },
+      'metrics',
+    )
     .build();
 
   return SwaggerModule.createDocument(app, swaggerConfig, {

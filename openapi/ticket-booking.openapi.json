@@ -4227,6 +4227,84 @@
           "tickets"
         ]
       }
+    },
+    "/api/v1/metrics": {
+      "get": {
+        "operationId": "Metrics_metrics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Prometheus exposition metrics",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid metrics token"
+          },
+          "503": {
+            "description": "Metrics endpoint is not configured"
+          }
+        },
+        "security": [
+          {
+            "metrics": []
+          }
+        ],
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
+    "/api/v1/admin/operations/status": {
+      "get": {
+        "operationId": "Operations_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsStatusDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "operations"
+        ]
+      }
     }
   },
   "info": {
@@ -4243,6 +4321,12 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "type": "http"
+      },
+      "metrics": {
+        "scheme": "bearer",
+        "bearerFormat": "Metrics token",
+        "type": "http",
+        "description": "Bearer token from METRICS_TOKEN"
       }
     },
     "schemas": {
@@ -7091,6 +7175,107 @@
           "createdAt",
           "booking",
           "bookingItem"
+        ]
+      },
+      "MailWorkerOperationsDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "starting",
+              "up",
+              "restarting",
+              "stopping"
+            ],
+            "example": "up"
+          },
+          "restartsLast5Minutes": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "status",
+          "restartsLast5Minutes"
+        ]
+      },
+      "MailOutboxOperationsDto": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "number",
+            "example": 2
+          },
+          "failed": {
+            "type": "number",
+            "example": 1
+          },
+          "oldestPendingSeconds": {
+            "type": "number",
+            "example": 120
+          }
+        },
+        "required": [
+          "pending",
+          "failed",
+          "oldestPendingSeconds"
+        ]
+      },
+      "PaymentOperationsDto": {
+        "type": "object",
+        "properties": {
+          "reviewRequired": {
+            "type": "number",
+            "example": 1
+          }
+        },
+        "required": [
+          "reviewRequired"
+        ]
+      },
+      "OperationsStatusDto": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "example": "up"
+          },
+          "redis": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "example": "up"
+          },
+          "mailWorker": {
+            "$ref": "#/components/schemas/MailWorkerOperationsDto"
+          },
+          "mailOutbox": {
+            "$ref": "#/components/schemas/MailOutboxOperationsDto"
+          },
+          "payments": {
+            "$ref": "#/components/schemas/PaymentOperationsDto"
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-10-02T08:00:00.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "database",
+          "redis",
+          "mailWorker",
+          "mailOutbox",
+          "payments",
+          "timestamp"
         ]
       }
     }

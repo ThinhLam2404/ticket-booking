@@ -69,6 +69,7 @@ Một ghế theo một suất chiếu chỉ được bán một lần. Hệ th�
 | Security       | `helmet`, Redis atomic counters        | Security headers, CORS allowlist, rate limiting   |
 | Movie source   | TMDB API v3                            | Tìm kiếm và nhập metadata phim cho Admin          |
 | Scheduler      | `@nestjs/schedule`                     | Expire booking và cleanup retention mỗi ngày     |
+| Metrics        | `@prometheus-io/client`                 | Prometheus metrics cho HTTP và domain operations |
 | Frontend      | React 19, Vite 8, TypeScript             | Customer UI và API client                         |
 | Frontend data  | Fetch API, sessionStorage                | HTTP request, token session và refresh            |
 | Unit/E2E test  | Vitest, Supertest                      | Kiểm thử backend                                  |
@@ -84,7 +85,7 @@ File: `be/docker-compose.yml`; root scripts gọi file này từ repository root
 | PostgreSQL | `5432` | DB `ticket_booking`, user/password local `ticket_booking` |
 | Redis | `6379` | Seat lock local |
 
-Application có thể chạy trực tiếp bằng Node/NestJS và Vite cho development, hoặc bằng Docker production-like stack. `be/docker-compose.yml` cung cấp PostgreSQL và Redis local cho lần đầu clone; có thể chuyển development sang Prisma Cloud bằng cách thay `DATABASE_URL` trong `be/.env`. `docker-compose.app.yml` chạy API, frontend và Redis, còn API kết nối PostgreSQL external qua `be/.env`. API dùng Helmet, CORS allowlist và giới hạn JSON/urlencoded body theo environment. Rate limit dùng Redis atomic counter cho auth, SePay webhook và admin mutation; test/integration vẫn có thể kiểm tra abuse vì guard không bypass theo `NODE_ENV`. Email dùng SMTP provider cấu hình qua biến môi trường. Mail gửi bất đồng bộ bằng Worker Thread đọc `MailOutbox`; request chỉ chờ transaction outbox commit, không chờ SMTP. Worker được đánh thức ngay sau commit bằng message `wake` và vẫn polling fallback theo chu kỳ.
+Application có thể chạy trực tiếp bằng Node/NestJS và Vite cho development, hoặc bằng Docker production-like stack. `be/docker-compose.yml` cung cấp PostgreSQL và Redis local cho lần đầu clone; có thể chuyển development sang Prisma Cloud bằng cách thay `DATABASE_URL` trong `be/.env`. `docker-compose.app.yml` chạy API, frontend và Redis, còn API kết nối PostgreSQL external qua `be/.env`. API dùng Helmet, CORS allowlist và giới hạn JSON/urlencoded body theo environment. Rate limit dùng Redis atomic counter cho auth, SePay webhook và admin mutation; test/integration vẫn có thể kiểm tra abuse vì guard không bypass theo `NODE_ENV`. Email dùng SMTP provider cấu hình qua biến môi trường. Mail gửi bất đồng bộ bằng Worker Thread đọc `MailOutbox`; request chỉ chờ transaction outbox commit, không chờ SMTP. Worker được đánh thức ngay sau commit bằng message `wake` và vẫn polling fallback theo chu kỳ. Observability module xuất Prometheus metrics có bearer token riêng, trạng thái vận hành cho Admin và Discord alert có cooldown/deduplication bằng Redis.
 
 ### 2.3. URL API
 
@@ -92,6 +93,7 @@ Application có thể chạy trực tiếp bằng Node/NestJS và Vite cho devel
 - API prefix: `/api/v1`
 - API root: `http://localhost:3000/api/v1`
 - Swagger UI: `http://localhost:3000/api/docs` khi Swagger được bật
+- Prometheus metrics: `http://localhost:3000/api/v1/metrics` với `Authorization: Bearer <METRICS_TOKEN>`
 
 Global prefix, CORS allowlist, Helmet, body limit, trusted proxy, validation pipe và Swagger gate được cấu hình tại `be/src/config/app.config.ts`. Frontend đọc API URL từ `fe/.env` qua biến `VITE_API_URL`. Khi không cấu hình `SWAGGER_ENABLED`, Swagger mặc định bật ở development/test và tắt ở production; `true` luôn bật, `false` luôn tắt.
 
@@ -161,6 +163,7 @@ be/src/
 │   ├── payments/
 │   ├── tickets/
 │   ├── health/
+│   ├── observability/
 │   └── redis/
 ├── app.module.ts
 └── main.ts
@@ -196,6 +199,7 @@ Root điều phối cả hai ứng dụng bằng `package.json`; dependency và 
 | `sepay`     | SePay checkout, webhook và đối soát giao dịch      |
 | `tickets`   | Ticket đã phát hành                                 |
 | `health`    | Liveness/readiness                                  |
+| `observability` | Prometheus metrics, operations status và Discord alert |
 | `redis`     | Redis client và lock operations                     |
 
 ### 3.2. Shared infrastructure
@@ -233,11 +237,13 @@ Customer UI hiện có:
 ├── README.md
 ├── docker-compose.app.yml
 ├── .github/workflows/ci.yml
+├── scripts/ops/
 ├── be/
 │   ├── Dockerfile
 │   ├── docker-entrypoint.sh
 │   ├── package.json
 │   ├── docker-compose.yml
+│   ├── docker-compose.ops.yml
 │   ├── prisma/
 │   └── src/
 └── fe/
@@ -271,6 +277,15 @@ MAIL_WORKER_ENABLED=true
 MAIL_WORKER_POLL_MS=10000
 MAIL_WORKER_STALE_LOCK_MS=300000
 MAIL_WORKER_SHUTDOWN_TIMEOUT_MS=15000
+METRICS_TOKEN=change-this-local-metrics-token
+OPS_ALERTS_ENABLED=false
+DISCORD_ALERT_WEBHOOK_URL=
+OPS_ALERT_COOLDOWN_SECONDS=900
+MAIL_OUTBOX_PENDING_ALERT_THRESHOLD=20
+MAIL_OUTBOX_FAILED_ALERT_THRESHOLD=1
+MAIL_OUTBOX_AGE_ALERT_SECONDS=900
+PAYMENT_REVIEW_ALERT_THRESHOLD=1
+MAIL_WORKER_RESTART_ALERT_THRESHOLD=3
 CORS_ORIGINS=http://localhost:5173
 SWAGGER_ENABLED=false
 TRUST_PROXY=false
@@ -307,6 +322,15 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `MAIL_WORKER_POLL_MS`    | Không    | Chu kỳ polling fallback khi outbox rỗng, default `10000`      |
 | `MAIL_WORKER_STALE_LOCK_MS` | Không | Thời gian reclaim lock PROCESSING, default `300000`           |
 | `MAIL_WORKER_SHUTDOWN_TIMEOUT_MS` | Không | Timeout graceful shutdown, default `15000`              |
+| `METRICS_TOKEN` | Production | Bearer token riêng cho `/api/v1/metrics`; production yêu cầu tối thiểu 32 ký tự, không dùng placeholder |
+| `OPS_ALERTS_ENABLED` | Không | Bật Discord operational alerts khi là `true`; default `false` |
+| `DISCORD_ALERT_WEBHOOK_URL` | Khi alerts bật | Discord HTTPS webhook; không được ghi vào log hoặc commit |
+| `OPS_ALERT_COOLDOWN_SECONDS` | Không | Cooldown cho mỗi alert/recovery key, default `900` giây |
+| `MAIL_OUTBOX_PENDING_ALERT_THRESHOLD` | Không | Ngưỡng số mail `PENDING`, default `20` |
+| `MAIL_OUTBOX_FAILED_ALERT_THRESHOLD` | Không | Ngưỡng số mail `FAILED`, default `1` |
+| `MAIL_OUTBOX_AGE_ALERT_SECONDS` | Không | Ngưỡng tuổi mail pending cũ nhất, default `900` giây |
+| `PAYMENT_REVIEW_ALERT_THRESHOLD` | Không | Ngưỡng transaction `REVIEW_REQUIRED`, default `1` |
+| `MAIL_WORKER_RESTART_ALERT_THRESHOLD` | Không | Ngưỡng restart trong cửa sổ 5 phút, default `3` |
 | `CORS_ORIGINS`            | Production | Comma-separated browser origins được phép gọi API       |
 | `SWAGGER_ENABLED`         | Không    | `true` bật Swagger, `false` tắt Swagger ở mọi môi trường |
 | `TRUST_PROXY`             | Không    | `false`, `true` hoặc số hop proxy để tính đúng client IP |
@@ -329,7 +353,7 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 
 - Không commit `.env` thật.
 - Không lưu plaintext password hoặc refresh token.
-- Production yêu cầu mỗi JWT secret dài tối thiểu 32 ký tự và không được dùng giá trị mẫu/placeholder trong `.env.example`.
+- Production yêu cầu mỗi JWT secret và `METRICS_TOKEN` dài tối thiểu 32 ký tự; không được dùng giá trị mẫu/placeholder trong `.env.example`.
 - Access và refresh secret phải khác nhau.
 - `TMDB_ACCESS_TOKEN` chỉ nằm ở backend `.env`; không truyền token sang frontend hoặc commit vào repository.
 - TMDB là nguồn dữ liệu ngoài. Chỉ phim đã được Admin nhập vào catalog nội bộ mới có thể publish, tạo showtime và booking.
@@ -1176,7 +1200,7 @@ sequenceDiagram
 #### `GET /api/v1/health/ready`
 
 - Auth: public.
-- Response `200` nếu PostgreSQL được cấu hình và Redis đều hoạt động.
+- Response `200` nếu PostgreSQL, Redis và Mail Worker (khi được bật) đều hoạt động.
 - Response `503` nếu một dependency down.
 
 ```json
@@ -1184,9 +1208,57 @@ sequenceDiagram
   "status": "ok",
   "checks": {
     "database": "up",
-    "redis": "up"
+    "redis": "up",
+    "mailWorker": "up"
   },
   "timestamp": "2026-09-07T10:00:00.000Z"
+}
+```
+
+#### `GET /api/v1/metrics`
+
+- Auth: bearer token riêng từ `METRICS_TOKEN`, không dùng Admin JWT.
+- Response: `200 text/plain` theo Prometheus exposition format; `401` nếu token sai và `503` nếu endpoint chưa được cấu hình.
+- Endpoint được hiển thị riêng trong Swagger dưới tag `metrics`, dùng security scheme `metrics` và không dùng Admin JWT.
+- HTTP labels dùng route template hoặc path đã chuẩn hóa, không dùng booking/user ID làm label để tránh cardinality cao.
+
+Ví dụ:
+
+```bash
+curl -H "Authorization: Bearer $METRICS_TOKEN" \
+  http://localhost:3000/api/v1/metrics
+```
+
+Metrics chính:
+
+- `cinebook_http_requests_total`, `cinebook_http_request_duration_seconds`, `cinebook_http_requests_in_flight`.
+- `cinebook_hold_conflicts_total`, `cinebook_bookings_expired_total`, `cinebook_payment_review_required_total`.
+- `cinebook_mail_worker_restarts_total`, `cinebook_mail_outbox_pending`, `cinebook_mail_outbox_failed`, `cinebook_mail_outbox_oldest_pending_seconds`, `cinebook_mail_outbox_data_up`.
+- `cinebook_dependency_up{dependency="database|redis|mail_worker"}` và các Node.js process metrics có prefix `cinebook_process_`. Khi database down, các outbox gauge giữ last-known value; dùng `cinebook_mail_outbox_data_up 0` để nhận biết dữ liệu đang stale.
+
+#### `GET /api/v1/admin/operations/status`
+
+- Auth: Bearer JWT (Role `ADMIN`).
+- Response `200` kể cả khi dependency down; field `database`/`redis` thể hiện trạng thái để dashboard vẫn hiển thị chẩn đoán.
+- Admin Dashboard gọi endpoint mỗi 60 giây và có loading/error/retry riêng, không làm hỏng các dashboard card khác.
+
+```json
+{
+  "database": "up",
+  "redis": "up",
+  "mailWorker": {
+    "status": "up",
+    "restartsLast5Minutes": 0
+  },
+  "mailOutbox": {
+    "pending": 0,
+    "failed": 0,
+    "oldestPendingSeconds": 0
+  },
+  "payments": {
+    "reviewRequired": 0
+  },
+  "timestamp": "2026-10-02T08:00:00.000Z"
 }
 ```
 
@@ -2274,6 +2346,19 @@ File: `be/src/modules/maintenance/maintenance.scheduler.ts`.
 - `releaseIfOwned()` release an toàn.
 - Disconnect tại module destroy.
 
+### 11.5. Operational monitor và structured domain logs
+
+`OperationalMonitorScheduler` chạy mỗi phút để cập nhật gauges và đánh giá alert cho:
+
+- PostgreSQL/Redis down.
+- Mail Worker restart nhiều lần trong cửa sổ 5 phút.
+- Mail outbox pending count, failed count hoặc oldest-pending age vượt ngưỡng.
+- SePay transaction `REVIEW_REQUIRED` vượt ngưỡng.
+
+Khi `OPS_ALERTS_ENABLED=true`, alert và recovery được gửi qua Discord webhook. Redis giữ cooldown/state theo alert key để nhiều replica không gửi trùng; process có fallback in-memory để vẫn báo Redis down. Các alert phụ thuộc dữ liệu database không bị tự động resolve khi database down. Sự cố còn active có thể được nhắc lại sau `OPS_ALERT_COOLDOWN_SECONDS`.
+
+Request middleware tạo/kiểm tra `X-Request-Id`, lưu request context bằng `AsyncLocalStorage`, trả request ID trong response và ghi JSON metadata (`method`, `path`, `statusCode`, `durationMs`). Domain events phát sinh trong HTTP request context như booking held/cancelled, payment intent/review và booking confirmed có thể dùng cùng request ID. Event từ mail worker và operational scheduler chạy ngoài HTTP request context nên hiện không có request ID liên kết. Log không ghi authorization, cookie, password, QR payload hoặc raw SePay webhook body.
+
 ## 12. Validation và error handling
 
 ### 12.1. Global ValidationPipe
@@ -2358,6 +2443,7 @@ npm run api:check
 npm test
 npm run test:e2e
 npm run test:integration
+npm run ops:backup-restore-drill
 npm run test:cov
 npm run typecheck
 npm run lint
@@ -2370,7 +2456,8 @@ npm run check:ci
 - `npm run api:check` kiểm tra generated artifacts có deterministic và up to date.
 - `npm run check` chạy lint, typecheck, build, unit test và E2E test cho backend/frontend.
 - `npm run test:integration` dùng PostgreSQL/Redis test riêng, deploy migrations và tự teardown containers.
-- `npm run check:ci` thêm API drift check và integration suite; verification gần nhất pass với backend unit `78/78`, frontend `10/10`, E2E `7/7`, integration `15/15`.
+- `npm run check:ci` thêm API drift check và integration suite; verification gần nhất pass với backend unit `91/91`, frontend `10/10`, E2E `9/9`, integration `15/15`.
+- `npm run ops:backup-restore-drill` kiểm tra archive/atomic restore/migration status trên PostgreSQL local cô lập; CI chạy lệnh này trong job riêng.
 - GitHub Actions tại `.github/workflows/ci.yml` chạy lại các quality gates và build cả backend/frontend Docker image trên máy sạch cho mỗi push vào `main` và mỗi pull request.
 - Provider smoke với SMTP/SePay thật không chạy trong development; cần sandbox/test provider ở staging để kiểm tra register → verify → checkout → webhook → ticket email.
 
@@ -2391,12 +2478,14 @@ Unit test:
 - JWT access/refresh create/verify.
 - JWT reject khác secret.
 - Booking expiry scheduler delegate.
+- Metrics route normalization/export, operations snapshot, alert cooldown/recovery và monitor không resolve alert giả khi database down.
 - Root controller.
 
 E2E test:
 
 - Root route dưới `/api/v1`.
 - Health liveness.
+- Metrics bearer-token protection và Admin operations-status authorization.
 - Auth payload validation.
 - OpenAPI response contracts cho pagination, seat map, SePay checkout/webhook và error schema.
 
@@ -2492,6 +2581,7 @@ Root `package.json` điều phối commands nhưng không gộp dependency: `be/
 | `npm run api:generate` | Export OpenAPI và sinh frontend types |
 | `npm run api:check` | Kiểm tra generated API artifacts deterministic |
 | `npm run test:integration` | Chạy integration test với PostgreSQL/Redis test riêng |
+| `npm run ops:backup-restore-drill` | Chạy backup/restore drill trên PostgreSQL Docker cô lập ở port `55433` |
 | `npm run infra:up` | Start PostgreSQL và Redis local |
 | `npm run infra:down` | Stop PostgreSQL và Redis local |
 | `npm run prisma:generate` | Generate Prisma Client |
@@ -2517,7 +2607,7 @@ Lệnh này build và chạy:
 - `redis`: lock/rate-limit store nội bộ trong container.
 - PostgreSQL không nằm trong production-like compose này; API kết nối database external có thể truy cập từ container, ví dụ Prisma Cloud.
 
-Mở `http://localhost:8080`; frontend gọi `/api/v1` qua Nginx proxy. API container chạy `prisma migrate deploy` trước khi start, nên migration phải được review và apply đúng database external. Trước `npm run docker:up`, cần có `be/.env` chứa `DATABASE_URL` mà container truy cập được, JWT secrets, `SEPAY_WEBHOOK_API_KEY` và các config bắt buộc. URL `localhost:5432` mặc định dành cho backend chạy trực tiếp trên host và không dùng được từ API container; production-like stack nên dùng Prisma Cloud hoặc một PostgreSQL external phù hợp. Compose mặc định tắt Mail Worker (`DOCKER_MAIL_WORKER_ENABLED=false`); muốn gửi email phải cấu hình SMTP và bật biến này có chủ đích. API chỉ nhận traffic từ frontend proxy trên network nội bộ; `TRUST_PROXY=1` dùng đúng client IP do Nginx chuyển tiếp. Dừng stack bằng:
+Mở `http://localhost:8080`; frontend gọi `/api/v1` qua Nginx proxy. API container chạy `prisma migrate deploy` trước khi start, nên migration phải được review và apply đúng database external. Trước `npm run docker:up`, cần có `be/.env` chứa `DATABASE_URL` mà container truy cập được, JWT secrets, `SEPAY_WEBHOOK_API_KEY`, `METRICS_TOKEN` tối thiểu 32 ký tự và các config bắt buộc. URL `localhost:5432` mặc định dành cho backend chạy trực tiếp trên host và không dùng được từ API container; production-like stack nên dùng Prisma Cloud hoặc một PostgreSQL external phù hợp. Compose mặc định tắt Mail Worker (`DOCKER_MAIL_WORKER_ENABLED=false`); muốn gửi email phải cấu hình SMTP và bật biến này có chủ đích. API chỉ nhận traffic từ frontend proxy trên network nội bộ; `TRUST_PROXY=1` dùng đúng client IP do Nginx chuyển tiếp. Dừng stack bằng:
 
 ```bash
 npm run docker:down
@@ -2543,11 +2633,44 @@ Workflow `.github/workflows/ci.yml` chạy trên GitHub Actions:
 6. Build kiểm tra source có build được.
 7. API check phát hiện OpenAPI/generated types drift.
 8. Unit/frontend/E2E test kiểm tra behavior.
-9. Deployment validation kiểm tra Compose và shell entrypoint syntax.
+9. Deployment validation kiểm tra app/ops Compose, shell scripts và Node drill syntax.
 10. Build backend và frontend Docker image để phát hiện lỗi containerization.
 11. Integration job dựng PostgreSQL/Redis cô lập bằng Docker và chạy migration + integration suite.
+12. Backup/restore job độc lập dựng PostgreSQL 17 ở port `55433`, backup source, restore atomic vào database rỗng rồi so sánh booking/payment/outbox checksum và migration status.
 
 Pull request bị đánh dấu failed nếu một bước failed. CI hiện chưa deploy app; đó là CD và sẽ làm sau khi có staging, secrets và approval.
+
+#### Backup, restore và migration recovery
+
+Hai script chỉ nhận URL riêng qua environment, không tự đọc `DATABASE_URL` của app:
+
+```bash
+BACKUP_DATABASE_URL='postgresql://user:password@host:5432/source' \
+  sh scripts/ops/backup-postgres.sh backups/cinebook.dump
+
+RESTORE_DATABASE_URL='postgresql://user:password@host:5432/clean_target' \
+CONFIRM_RESTORE_DATABASE='clean_target' \
+  sh scripts/ops/restore-postgres.sh backups/cinebook.dump
+```
+
+Quy tắc an toàn:
+
+- Cần PostgreSQL client tools `pg_dump`, `pg_restore`, `psql`; archive dùng custom format, không owner/privilege.
+- Backup ghi vào file tạm, validate archive rồi mới rename; không overwrite file đã tồn tại.
+- Archive chứa dữ liệu thật và được tạo với `umask 077`; không commit, không đặt trong web root, và phải mã hóa/đưa vào storage có access control nếu dùng ngoài local drill.
+- Script từ chối Prisma-only/pooled query parameters và host Prisma pooled đã biết; phải dùng direct libpq-compatible URL.
+- Restore yêu cầu tên database xác nhận khớp chính xác URL, target không có user object và dùng `--single-transaction --exit-on-error`; lỗi giữa chừng rollback toàn bộ transaction restore.
+- Không chạy restore vào development database đang dùng hoặc Prisma Cloud thật. Luôn tạo database rỗng riêng, restore, kiểm tra dữ liệu/migration rồi mới quyết định cutover ngoài script.
+
+Drill tự động:
+
+```bash
+npm run ops:backup-restore-drill
+```
+
+Drill dùng `be/docker-compose.ops.yml`, PostgreSQL local cô lập ở `127.0.0.1:55433`, deploy toàn bộ migration, tạo fixture có booking/payment/mail outbox, kiểm tra guard từ chối sai confirmation và target không rỗng, backup, restore rồi teardown cả container/volume. URL source/target hard-code local; script không đọc Prisma Cloud URL. CI chạy drill này trong job riêng.
+
+Migration rollback mặc định là **forward-fix**: dừng rollout, giữ backup trước migration, sửa migration bằng migration mới và chạy `prisma migrate deploy`. Chỉ chạy down SQL thủ công khi đã review rõ data-loss impact và đã thử trên bản restore cô lập. Không dùng `prisma migrate dev`, `db push`, chỉnh bảng trực tiếp hoặc đánh dấu migration resolved trên Prisma Cloud trong incident khi chưa có runbook cụ thể. Staging cutover/rollback drill vẫn là gate chưa hoàn thành vì Sprint 3 chưa chọn hosting target.
 
 ### 14.4. Runtime URL và cấu hình frontend
 
@@ -2647,8 +2770,9 @@ Không chạy `prisma migrate dev` trên Prisma Cloud/production; dùng `prisma 
 - OpenAPI JSON và frontend declarations được sinh từ backend contract qua root scripts.
 - Custom error format đã được thêm với `code`, `details`, `path`, `requestId` và `timestamp`.
 - Integration/concurrency suite đã có cho hold, idempotency, expiry và payment; Sprint 2 bổ sung migration backfill, refresh rotation/reuse, rate limit và retention cleanup coverage.
-- Dockerfile, local production-like Compose stack, structured request logging và GitHub Actions CI đã có; CD deploy staging/production, metrics/tracing và alerts chưa có.
-- Chưa có backup/restore script hoặc rollback drill cho production; cần thiết kế với direct database URL và kiểm chứng trên database cô lập trước khi vận hành thật.
+- Dockerfile, local production-like Compose stack, structured request/domain logs, Prometheus metrics, Discord alerts, Admin operations status và GitHub Actions CI đã có; distributed tracing và CD deploy staging/production chưa có.
+- Safe direct-URL backup/atomic restore scripts và isolated CI drill đã có; chưa chạy restore/cutover/rollback trên staging hoặc production vì chưa chọn hosting target.
+- Chưa có lịch backup production, off-site encrypted storage hoặc retention policy; các script hiện là primitive vận hành và CI drill, không phải backup service tự động.
 - `prisma:seed` cập nhật admin role/name nhưng không đổi password nếu admin đã tồn tại.
 
 ### 15.2. Roadmap đề xuất

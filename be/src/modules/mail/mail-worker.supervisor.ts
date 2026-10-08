@@ -1,6 +1,13 @@
-import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationShutdown,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Worker } from 'node:worker_threads';
+import { logOperationalEvent } from '../../common/logging/operational-logger.js';
+import { recordMailWorkerRestart } from '../observability/metrics.service.js';
 export type MailWorkerData = {
   databaseUrl: string;
   smtpHost: string;
@@ -18,17 +25,23 @@ type WorkerMessage =
   | { type: 'ready' }
   | { type: 'idle' }
   | { type: 'processing'; outboxId: string }
+  | { type: 'sent'; outboxId: string }
+  | { type: 'failed'; outboxId: string; message: string }
   | { type: 'error'; message: string }
   | { type: 'stopped' };
 
 @Injectable()
-export class MailWorkerSupervisor implements OnModuleInit, OnApplicationShutdown {
+export class MailWorkerSupervisor
+  implements OnModuleInit, OnApplicationShutdown
+{
   private readonly logger = new Logger(MailWorkerSupervisor.name);
   private worker?: Worker;
   private restartTimer?: NodeJS.Timeout;
   private stopping = false;
   private restartDelayMs = 1000;
-  private status: 'disabled' | 'starting' | 'up' | 'restarting' | 'stopping' = 'disabled';
+  private restartTimestamps: number[] = [];
+  private status: 'disabled' | 'starting' | 'up' | 'restarting' | 'stopping' =
+    'disabled';
 
   constructor(private readonly config: ConfigService) {}
 
@@ -41,12 +54,22 @@ export class MailWorkerSupervisor implements OnModuleInit, OnApplicationShutdown
   getStatus(): 'disabled' | 'starting' | 'up' | 'restarting' | 'stopping' {
     return this.status;
   }
+  //NOTE - đếm restart bao nhiêu lần trong 5 phút
+  getRecentRestartCount(windowMs = 5 * 60 * 1000): number {
+    const cutoff = Date.now() - windowMs;
+    this.restartTimestamps = this.restartTimestamps.filter(
+      (timestamp) => timestamp >= cutoff,
+    );
+    return this.restartTimestamps.length;
+  }
 
   wake(): void {
     try {
       this.worker?.postMessage({ type: 'wake' });
     } catch (error) {
-      this.logger.warn(`Could not wake mail worker: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(
+        `Could not wake mail worker: ${error instanceof Error ? error.message : String(error)}`,
+      );
       const worker = this.worker;
       this.worker = undefined;
       this.status = 'restarting';
@@ -66,9 +89,12 @@ export class MailWorkerSupervisor implements OnModuleInit, OnApplicationShutdown
     const worker = this.worker;
     this.worker = undefined;
     await new Promise<void>((resolve) => {
-      const timeout = setTimeout(() => {
-        void worker.terminate().finally(resolve);
-      }, this.numberConfig('MAIL_WORKER_SHUTDOWN_TIMEOUT_MS', 15000));
+      const timeout = setTimeout(
+        () => {
+          void worker.terminate().finally(resolve);
+        },
+        this.numberConfig('MAIL_WORKER_SHUTDOWN_TIMEOUT_MS', 15000),
+      );
       worker.once('exit', () => {
         clearTimeout(timeout);
         resolve();
@@ -95,8 +121,23 @@ export class MailWorkerSupervisor implements OnModuleInit, OnApplicationShutdown
         this.logger.log('Mail worker ready');
       } else if (message.type === 'processing') {
         this.logger.debug(`Mail worker processing ${message.outboxId}`);
+        logOperationalEvent('info', 'mail_outbox_processing', {
+          outboxId: message.outboxId,
+        });
       } else if (message.type === 'error') {
         this.logger.error(`Mail worker error: ${message.message}`);
+        logOperationalEvent('error', 'mail_outbox_failed', {
+          reason: message.message,
+        });
+      } else if (message.type === 'sent') {
+        logOperationalEvent('info', 'mail_outbox_sent', {
+          outboxId: message.outboxId,
+        });
+      } else if (message.type === 'failed') {
+        logOperationalEvent('error', 'mail_outbox_failed', {
+          outboxId: message.outboxId,
+          reason: message.message,
+        });
       }
     });
     worker.on('error', (error) => {
@@ -106,6 +147,12 @@ export class MailWorkerSupervisor implements OnModuleInit, OnApplicationShutdown
       if (this.worker === worker) this.worker = undefined;
       if (!this.stopping) {
         this.status = 'restarting';
+        this.restartTimestamps.push(Date.now());
+        this.getRecentRestartCount();
+        recordMailWorkerRestart();
+        logOperationalEvent('warn', 'mail_worker_restarting', {
+          exitCode: code,
+        });
         this.logger.warn(`Mail worker exited with code ${code}; restarting`);
         this.scheduleRestart();
       }
@@ -137,8 +184,12 @@ export class MailWorkerSupervisor implements OnModuleInit, OnApplicationShutdown
       smtpSecure: this.config.get<string>('SMTP_SECURE') === 'true',
       smtpUser: this.config.get<string>('SMTP_USER'),
       smtpPassword: this.config.get<string>('SMTP_PASSWORD'),
-      smtpFrom: this.config.get<string>('SMTP_FROM') ?? 'CineBook <no-reply@example.com>',
-      publicAppUrl: (this.config.get<string>('PUBLIC_APP_URL') ?? 'http://localhost:5173').replace(/\/$/, ''),
+      smtpFrom:
+        this.config.get<string>('SMTP_FROM') ??
+        'CineBook <no-reply@example.com>',
+      publicAppUrl: (
+        this.config.get<string>('PUBLIC_APP_URL') ?? 'http://localhost:5173'
+      ).replace(/\/$/, ''),
       pollMs: this.numberConfig('MAIL_WORKER_POLL_MS', 10000),
       staleLockMs: this.numberConfig('MAIL_WORKER_STALE_LOCK_MS', 300000),
     };
@@ -146,7 +197,8 @@ export class MailWorkerSupervisor implements OnModuleInit, OnApplicationShutdown
 
   private requiredConfig(key: string): string {
     const value = this.config.get<string>(key);
-    if (!value) throw new Error(`${key} is required when mail worker is enabled`);
+    if (!value)
+      throw new Error(`${key} is required when mail worker is enabled`);
     return value;
   }
 

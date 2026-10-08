@@ -75,7 +75,9 @@ jobs:
         run: |
           cp be/.env.example be/.env
           docker compose --env-file be/.env -f docker-compose.app.yml config -q
-          sh -n be/docker-entrypoint.sh
+          docker compose -f be/docker-compose.ops.yml config -q
+          sh -n be/docker-entrypoint.sh scripts/ops/backup-postgres.sh scripts/ops/restore-postgres.sh
+          node --check scripts/ops/run-backup-restore-drill.mjs
           rm be/.env
 
       - name: Build backend Docker image
@@ -122,3 +124,30 @@ jobs:
 
       - name: Run isolated integration suite
         run: npm run test:integration
+
+  backup-restore-drill:
+    name: PostgreSQL backup and restore drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            be/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci --prefix be
+
+      - name: Run isolated backup and restore drill
+        run: npm run ops:backup-restore-drill

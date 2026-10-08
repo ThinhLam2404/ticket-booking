@@ -29,12 +29,12 @@ CineBook là personal project với hai mục tiêu song song:
 
 Các giới hạn production chính:
 
-- Dockerfile, local Compose stack, structured request logging và GitHub Actions CI đã có; chưa có CD deployment production.
-- Metrics/tracing, alerts và staging environment chưa có.
+- Dockerfile, local Compose stack, structured request/domain logging, Prometheus metrics, Discord alerts và GitHub Actions CI đã có; chưa có CD deployment production.
+- Distributed tracing và staging environment chưa có.
 - Rate limiting Redis, CORS allowlist, Helmet/security headers và Swagger production gate đã được triển khai trong Sprint 2.
 - Chưa có refund/reconciliation flow hoàn chỉnh.
 - Booking/ticket/payment list chưa có pagination chuẩn hóa.
-- Chưa có backup/restore và rollback drill đã kiểm chứng cho production.
+- Backup/atomic restore scripts và isolated local/CI drill đã có; chưa kiểm chứng cutover/rollback trên staging hoặc production.
 - Provider-specific SePay signature/IP verification vẫn phụ thuộc provider capability.
 - Chưa có admin user management và audit log.
 
@@ -167,11 +167,14 @@ Mục tiêu: có thể build, deploy, theo dõi và khôi phục hệ thống m�
 - `requestLogger`: JSON request log gồm request ID, method, path, status và duration; không log body, token, cookie hoặc secret. Request ID từ client được giới hạn format/độ dài và dùng chung với error filter.
 - `docker-compose.app.yml`: cloud-backed production-like stack gồm API, frontend và Redis; API đọc PostgreSQL URL/secrets từ `be/.env`, chạy bằng `npm run docker:up` và dừng bằng `npm run docker:down`.
 - `dev:all`: development launcher khởi động PostgreSQL/Redis local rồi start backend/frontend; cấu hình mặc định khớp `be/.env.example`. Có thể chuyển sang Prisma Cloud bằng `DATABASE_URL`; migration được chạy riêng bằng `npm run prisma:deploy`.
+- `ObservabilityModule`: protected Prometheus endpoint, request/domain metrics, Admin operations status, dashboard status cards và monitor mỗi phút.
+- Discord alerts: database/Redis down, worker restart loop trong 5 phút, mail pending/failed/age và payment review; Redis cooldown/state cùng in-memory fallback khi Redis down.
+- Recovery scripts: direct URL backup, clean-target atomic restore và `npm run ops:backup-restore-drill` với PostgreSQL 17 cô lập; CI có job riêng.
 
 Các bước còn lại của Sprint 3:
 
-- Thêm metrics, alert và mail outbox/worker operational signals.
 - Tạo staging environment và CD deploy có approval; chưa cần domain cho phần local/CI này.
+- Chạy cutover/migration rollback drill trên staging sau khi chọn hosting target; local restore drill không thay thế staging rehearsal.
 
 Việc cần làm:
 
@@ -179,20 +182,21 @@ Việc cần làm:
 - [x] Viết CI pipeline chạy lint, typecheck, build, unit, frontend, E2E, integration và API drift check.
 - [ ] Thiết lập staging environment gần production với PostgreSQL/Redis/SMTP test provider.
 - [x] Thêm structured JSON logging với request ID cho request metadata; không log token, password, secret hoặc QR payload.
-- [ ] Thêm metrics tối thiểu: request latency/error rate, hold conflicts, booking expiry, payment review, outbox pending/failed/age và worker restart.
-- [x] Readiness hiện kiểm tra database, Redis và mail worker status; chưa có outbox age/backlog metric.
-- [ ] Thiết kế backup/restore và rollback migration runbook, sau đó kiểm chứng restore trên database cô lập.
-- [ ] Thêm alert cho payment `REVIEW_REQUIRED`, mail backlog, Redis/DB down và worker restart loop.
+- [x] Thêm metrics tối thiểu: request latency/error rate, hold conflicts, booking expiry, payment review, outbox pending/failed/age và worker restart.
+- [x] Readiness kiểm tra database, Redis và mail worker; operations status/metrics theo dõi thêm outbox age/backlog và payment review.
+- [x] Thiết kế safe backup/atomic restore, forward-fix rollback runbook và kiểm chứng restore trên database local cô lập.
+- [x] Thêm Discord alert cho payment `REVIEW_REQUIRED`, mail pending/failed/age, Redis/DB down và worker restart loop; có cooldown, deduplication và recovery.
 
 Verification Sprint 3 nền tảng:
 
 - Backend và frontend Docker image build pass; CI đã có bước build bắt buộc cho cả hai image.
 - Cloud-backed Compose smoke pass: API readiness `200`, frontend Nginx `200`, API proxy hoạt động; `redis`, `api` và `frontend` có healthcheck, API migration startup kết nối Prisma Cloud thành công. Compose bind frontend ở `127.0.0.1:8080`, trust đúng một Nginx proxy hop và mặc định tắt Mail Worker.
-- Verification gần nhất: backend unit `78/78`, frontend `10/10`, E2E `7/7`, integration `15/15`, API check pass.
+- Verification gần nhất: backend unit `91/91`, frontend `10/10`, E2E `9/9`, integration `15/15`, API check pass.
 - Prisma Cloud verification pass: `prisma migrate deploy` và `prisma migrate status`; database không còn migration pending.
-- Chưa deploy staging/production và chưa có metrics/alerts/CD approval; CI clean-runner có test environment cố định cho E2E/unit và integration dùng stack cô lập.
+- Isolated backup/restore drill pass: deploy đủ 15 migrations, backup custom archive, atomic restore vào database rỗng, booking/payment/outbox checksum `1:1:1:100000.00` và migration status up to date.
+- Chưa deploy staging/production, chưa có distributed tracing hoặc CD approval; CI clean-runner có integration stack và backup/restore stack cô lập.
 
-Trạng thái: Sprint 3 đang thực hiện; commit message đề xuất cho phần nền tảng: `build: add container and CI foundations`.
+Trạng thái: infrastructure/observability/recovery baseline của Sprint 3 đã hoàn thành; staging/CD và staging rollback rehearsal được chủ động deferred, nên chưa đánh dấu toàn bộ Sprint 3 hoàn thành. Commit message đề xuất: `build: add Docker runtime and CI foundations`.
 
 Kỹ năng đạt được: containerization, CI/CD, SRE fundamentals, logs/metrics/health checks và disaster recovery.
 
@@ -353,6 +357,7 @@ npm test
 npm run test:fe
 npm run test:e2e
 npm run test:integration
+npm run ops:backup-restore-drill
 npm run api:check
 npm run check:ci
 git diff --check

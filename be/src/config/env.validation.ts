@@ -6,6 +6,7 @@ import {
   IsString,
   IsUrl,
   Matches,
+  ValidateIf,
   validateSync,
 } from 'class-validator';
 
@@ -128,6 +129,46 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   MAIL_WORKER_SHUTDOWN_TIMEOUT_MS = '15000';
+
+  @IsOptional()
+  @IsString()
+  METRICS_TOKEN?: string;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  OPS_ALERTS_ENABLED = 'false';
+
+  @ValidateIf(
+    (environment: EnvironmentVariables) =>
+      environment.OPS_ALERTS_ENABLED === 'true',
+  )
+  @IsNotEmpty()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
+  DISCORD_ALERT_WEBHOOK_URL?: string;
+
+  @IsOptional()
+  @Matches(/^[1-9]\d*$/)
+  OPS_ALERT_COOLDOWN_SECONDS = '900';
+
+  @IsOptional()
+  @Matches(/^[1-9]\d*$/)
+  MAIL_OUTBOX_PENDING_ALERT_THRESHOLD = '20';
+
+  @IsOptional()
+  @Matches(/^[1-9]\d*$/)
+  MAIL_OUTBOX_FAILED_ALERT_THRESHOLD = '1';
+
+  @IsOptional()
+  @Matches(/^[1-9]\d*$/)
+  MAIL_OUTBOX_AGE_ALERT_SECONDS = '900';
+
+  @IsOptional()
+  @Matches(/^[1-9]\d*$/)
+  PAYMENT_REVIEW_ALERT_THRESHOLD = '1';
+
+  @IsOptional()
+  @Matches(/^[1-9]\d*$/)
+  MAIL_WORKER_RESTART_ALERT_THRESHOLD = '3';
 }
 
 export function validateEnvironment(config: Record<string, unknown>) {
@@ -166,19 +207,38 @@ export function validateEnvironment(config: Record<string, unknown>) {
       ),
     )
   ) {
-    throw new Error('JWT secrets must not use example or placeholder values in production');
+    throw new Error(
+      'JWT secrets must not use example or placeholder values in production',
+    );
   }
 
   if (validated.NODE_ENV === 'production') {
     const requiredProductionValues = [
       ['SEPAY_WEBHOOK_API_KEY', validated.SEPAY_WEBHOOK_API_KEY],
       ['CORS_ORIGINS', validated.CORS_ORIGINS],
+      ['METRICS_TOKEN', validated.METRICS_TOKEN],
     ] as const;
     const missing = requiredProductionValues
       .filter(([, value]) => !value?.trim())
       .map(([key]) => key);
     if (missing.length) {
-      throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
+      throw new Error(
+        `Missing required production environment variables: ${missing.join(', ')}`,
+      );
+    }
+    if ((validated.METRICS_TOKEN?.length ?? 0) < 32) {
+      throw new Error(
+        'METRICS_TOKEN must be at least 32 characters in production',
+      );
+    }
+    if (
+      /(?:change[-_ ]?me|example|replace[-_ ]?with|your[-_ ]|local[-_ ]|password)/i.test(
+        validated.METRICS_TOKEN ?? '',
+      )
+    ) {
+      throw new Error(
+        'METRICS_TOKEN must not use an example or placeholder value in production',
+      );
     }
   }
 
