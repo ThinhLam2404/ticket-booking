@@ -27,12 +27,12 @@ jobs:
       MAIL_WORKER_ENABLED: "false"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -49,6 +49,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci --prefix fe
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
 
       - name: Run lint
         run: npm run lint
@@ -104,10 +107,10 @@ jobs:
     needs: quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -122,6 +125,9 @@ jobs:
       - name: Install backend dependencies
         run: npm ci --prefix be
 
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
+
       - name: Run isolated integration suite
         run: npm run test:integration
 
@@ -132,10 +138,10 @@ jobs:
     needs: quality
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -148,6 +154,9 @@ jobs:
 
       - name: Install backend dependencies
         run: npm ci --prefix be
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
 
       - name: Run isolated backup and restore drill
         run: npm run ops:backup-restore-drill
