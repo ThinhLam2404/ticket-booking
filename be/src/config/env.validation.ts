@@ -20,7 +20,7 @@ class EnvironmentVariables {
   DATABASE_URL!: string;
 
   @IsNotEmpty()
-  @IsUrl({ protocols: ['redis'], require_tld: false })
+  @IsUrl({ protocols: ['redis', 'rediss'], require_tld: false })
   REDIS_URL!: string;
 
   @IsNotEmpty()
