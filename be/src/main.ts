@@ -8,12 +8,13 @@ async function bootstrap() {
   app.enableShutdownHooks();
   app.use(requestLogger);
   configureApp(app);
-  const configuredPort = process.env.PORT?.trim();
+  const configuredPort =
+    process.env.SERVER_PORT?.trim() ?? process.env.PORT?.trim();
   const parsedPort = configuredPort ? Number(configuredPort) : Number.NaN;
   const port =
     Number.isInteger(parsedPort) && parsedPort >= 0
       ? parsedPort
       : 3000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 }
 await bootstrap();

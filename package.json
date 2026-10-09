@@ -4,14 +4,19 @@
   "description": "Movie ticket booking system with NestJS backend and React frontend",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "install:all": "npm install --prefix be && npm install --prefix fe",
     "dev": "concurrently --kill-others-on-fail --names be,fe --prefix-colors blue,green \"npm run dev:be\" \"npm run dev:fe\"",
     "dev:all": "npm run infra:up && npm run dev",
     "dev:be": "npm --prefix be run start:dev",
     "dev:fe": "npm --prefix fe run dev",
-    "build": "npm run build:be && npm run build:fe",
+    "build": "npm run prisma:generate && npm run build:be && npm run build:fe",
     "build:be": "npm --prefix be run build",
+    "start:heroku": "npm run prisma:deploy && npm --prefix be run start:prod",
+    "heroku-postbuild": "npm install --prefix be --include=dev && npm --prefix be run prisma:generate && npm --prefix be run build",
     "build:fe": "npm --prefix fe run build",
     "lint": "npm run lint:be && npm run lint:fe",
     "lint:be": "npm --prefix be run lint",
