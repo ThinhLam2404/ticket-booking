@@ -2466,7 +2466,7 @@ npm run check:ci
 - `npm run test:integration` dùng PostgreSQL/Redis test riêng, deploy migrations và tự teardown containers.
 - `npm run check:ci` thêm API drift check và integration suite; verification gần nhất pass với backend unit `91/91`, frontend `10/10`, E2E `9/9`, integration `15/15`.
 - `npm run ops:backup-restore-drill` kiểm tra archive/atomic restore/migration status trên PostgreSQL local cô lập; CI chạy lệnh này trong job riêng.
-- GitHub Actions tại `.github/workflows/ci.yml` chạy lại các quality gates và build cả backend/frontend Docker image trên máy sạch cho mỗi push vào `main` và mỗi pull request. Workflow cài dependencies xong sẽ chạy `npm run prisma:generate` trước các bước lint/typecheck/test để bảo đảm Prisma Client khớp với `be/prisma/schema.prisma`.
+- GitHub Actions tại `.github/workflows/ci.yml` chạy lại các quality gates và build cả backend/frontend Docker image trên máy sạch cho mỗi push vào `main` và mỗi pull request. Workflow cài dependencies xong sẽ chạy `npm run prisma:generate` trước các bước lint/typecheck/test để bảo đảm Prisma Client khớp với `be/prisma/schema.prisma`. Các lockfile con (`be/package-lock.json`, `fe/package-lock.json`) phải được cập nhật bằng npm lockfile generation và kiểm tra bằng `npm ci --dry-run`; nếu không, runner sẽ dừng ngay ở bước cài dependency vì thiếu optional peer dependencies như `magicast` hoặc TypeScript phụ của `vite-tsconfig-paths`.
 - Provider smoke với SMTP/SePay thật không chạy trong development; cần sandbox/test provider ở staging để kiểm tra register → verify → checkout → webhook → ticket email.
 
 Generated API artifacts:
