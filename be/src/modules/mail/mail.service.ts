@@ -56,6 +56,25 @@ export class MailService {
     this.worker.wake();
   }
 
+  async queueRefundEmail(
+    bookingId: string,
+    recipient: string,
+    amount: string,
+    reason: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    await client.mailOutbox.upsert({
+      where: { dedupeKey: `REFUND_NOTIFICATION:${bookingId}` },
+      create: {
+        type: MailOutboxType.REFUND_NOTIFICATION,
+        recipient,
+        dedupeKey: `REFUND_NOTIFICATION:${bookingId}`,
+        payload: { bookingId, amount, reason },
+      },
+      update: {},
+    });
+  }
+
   hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
   }

@@ -89,20 +89,22 @@ enum MailOutboxStatus {
 enum MailOutboxType {
   EMAIL_VERIFICATION
   TICKETS_ISSUED
+  REFUND_NOTIFICATION
 }
 
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  passwordHash  String
-  fullName      String
-  role                   UserRole       @default(CUSTOMER)
-  emailVerifiedAt        DateTime?
-  bookings               Booking[]
-  refreshTokens          RefreshToken[]
+  id                      String                   @id @default(cuid())
+  email                   String                   @unique
+  passwordHash            String
+  fullName                String
+  role                    UserRole                 @default(CUSTOMER)
+  emailVerifiedAt         DateTime?
+  bookings                Booking[]
+  refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
-  createdAt              DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  refunds                 Refund[]
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
 }
 
 model Movie {
@@ -114,8 +116,8 @@ model Movie {
   backdropUrl String?
   trailerKey  String?
   releaseDate DateTime?
-  rating      Decimal? @db.Decimal(3, 1)
-  genres      String[] @default([])
+  rating      Decimal?    @db.Decimal(3, 1)
+  genres      String[]    @default([])
   ageRating   String?
   duration    Int
   status      MovieStatus @default(DRAFT)
@@ -164,21 +166,21 @@ model Seat {
 }
 
 model Showtime {
-  id               String    @id @default(cuid())
+  id               String         @id @default(cuid())
   startsAt         DateTime
   endsAt           DateTime
   movieId          String
-  movie            Movie     @relation(fields: [movieId], references: [id], onDelete: Restrict)
+  movie            Movie          @relation(fields: [movieId], references: [id], onDelete: Restrict)
   roomId           String
-  room             Room      @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  room             Room           @relation(fields: [roomId], references: [id], onDelete: Restrict)
   format           ShowtimeFormat @default(TWO_D_SUBTITLED)
-  basePrice        Decimal   @db.Decimal(10, 2)
-  vipMultiplier    Decimal   @db.Decimal(5, 2)
-  coupleMultiplier Decimal   @db.Decimal(5, 2)
+  basePrice        Decimal        @db.Decimal(10, 2)
+  vipMultiplier    Decimal        @db.Decimal(5, 2)
+  coupleMultiplier Decimal        @db.Decimal(5, 2)
   showtimeSeats    ShowtimeSeat[]
   bookings         Booking[]
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@index([movieId, startsAt])
   @@index([roomId, startsAt, endsAt])
@@ -204,17 +206,17 @@ model ShowtimeSeat {
 }
 
 model RefreshToken {
-  id               String    @id @default(cuid())
-  jti              String    @unique
-  tokenHash        String
-  familyId         String
-  expiresAt        DateTime
-  revokedAt        DateTime?
-  replacedByJti    String?
-  reuseDetectedAt  DateTime?
-  userId           String
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt        DateTime  @default(now())
+  id              String    @id @default(cuid())
+  jti             String    @unique
+  tokenHash       String
+  familyId        String
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  replacedByJti   String?
+  reuseDetectedAt DateTime?
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
 
   @@index([userId, revokedAt])
   @@index([familyId, revokedAt])
@@ -222,55 +224,56 @@ model RefreshToken {
 }
 
 model EmailVerificationToken {
-  id        String    @id @default(cuid())
-  tokenHash String    @unique
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
   consumedAt DateTime?
-  createdAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([userId, consumedAt])
   @@index([expiresAt])
 }
 
 model MailOutbox {
-  id           String           @id @default(cuid())
-  type         MailOutboxType
-  status       MailOutboxStatus @default(PENDING)
-  recipient    String
-  dedupeKey    String           @unique
-  payload      Json
-  attemptCount Int              @default(0)
-  nextAttemptAt DateTime        @default(now())
-  sentAt       DateTime?
-  lastError    String?
-  lockedAt     DateTime?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id            String           @id @default(cuid())
+  type          MailOutboxType
+  status        MailOutboxStatus @default(PENDING)
+  recipient     String
+  dedupeKey     String           @unique
+  payload       Json
+  attemptCount  Int              @default(0)
+  nextAttemptAt DateTime         @default(now())
+  sentAt        DateTime?
+  lastError     String?
+  lockedAt      DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   @@index([status, nextAttemptAt])
 }
 
 model Booking {
-  id             String         @id @default(cuid())
-  status         BookingStatus  @default(PENDING)
-  totalAmount    Decimal        @db.Decimal(10, 2)
+  id             String              @id @default(cuid())
+  status         BookingStatus       @default(PENDING)
+  totalAmount    Decimal             @db.Decimal(10, 2)
   expiresAt      DateTime
   holdToken      String
   idempotencyKey String?
   requestHash    String?
   userId         String
-  user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Restrict)
   showtimeId     String
-  showtime       Showtime       @relation(fields: [showtimeId], references: [id], onDelete: Restrict)
+  showtime       Showtime            @relation(fields: [showtimeId], references: [id], onDelete: Restrict)
   items          BookingItem[]
-  heldSeats      ShowtimeSeat[] @relation("BookingSeatHolds")
+  heldSeats      ShowtimeSeat[]      @relation("BookingSeatHolds")
   payment        Payment?
   sepayIntent    SepayPaymentIntent?
   tickets        Ticket[]
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  refunds        Refund[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   @@unique([userId, idempotencyKey])
   @@index([holdToken])
@@ -291,15 +294,16 @@ model BookingItem {
 }
 
 model Payment {
-  id             String        @id @default(cuid())
-  provider       String
-  reference      String?       @unique
-  status         PaymentStatus @default(PENDING)
-  amount         Decimal       @db.Decimal(10, 2)
-  bookingId      String        @unique
-  booking        Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id        String        @id @default(cuid())
+  provider  String
+  reference String?       @unique
+  status    PaymentStatus @default(PENDING)
+  amount    Decimal       @db.Decimal(10, 2)
+  bookingId String        @unique
+  booking   Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  refunds   Refund[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 model Ticket {
@@ -315,39 +319,62 @@ model Ticket {
 }
 
 model SepayPaymentIntent {
-  id             String            @id @default(cuid())
-  paymentCode    String            @unique
-  status         SepayIntentStatus @default(PENDING)
-  expectedAmount Decimal           @db.Decimal(10, 2)
+  id             String             @id @default(cuid())
+  paymentCode    String             @unique
+  status         SepayIntentStatus  @default(PENDING)
+  expectedAmount Decimal            @db.Decimal(10, 2)
   expiresAt      DateTime
-  bookingId      String            @unique
-  booking        Booking           @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  bookingId      String             @unique
+  booking        Booking            @relation(fields: [bookingId], references: [id], onDelete: Restrict)
   userId         String
   transactions   SepayTransaction[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   @@index([status, expiresAt])
   @@index([paymentCode])
 }
 
 model SepayTransaction {
-  id                   String                 @id @default(cuid())
-  sepayId              Int                    @unique
-  gateway              String
-  accountNumber        String
-  transferAmount       Decimal                @db.Decimal(10, 2)
-  content              String
-  referenceCode        String?
-  transferType         String
-  transactionDate      DateTime
-  status               SepayTransactionStatus @default(MATCHED)
-  adminNote            String?
-  paymentIntentId      String?
-  paymentIntent        SepayPaymentIntent?    @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
+  id              String                 @id @default(cuid())
+  sepayId         Int                    @unique
+  gateway         String
+  accountNumber   String
+  transferAmount  Decimal                @db.Decimal(10, 2)
+  content         String
+  referenceCode   String?
+  transferType    String
+  transactionDate DateTime
+  status          SepayTransactionStatus @default(MATCHED)
+  adminNote       String?
+  paymentIntentId String?
+  paymentIntent   SepayPaymentIntent?    @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+  refunds         Refund[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   @@index([paymentIntentId])
   @@index([status])
+}
+
+model Refund {
+  id             String            @id @default(cuid())
+  bookingId      String
+  booking        Booking           @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  paymentId      String
+  payment        Payment           @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  transactionId  String?
+  transaction    SepayTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  amount         Decimal           @db.Decimal(10, 2)
+  reason         String
+  adminNote      String?
+  adminId        String
+  admin          User              @relation(fields: [adminId], references: [id], onDelete: Restrict)
+  idempotencyKey String            @unique
+  createdAt      DateTime          @default(now())
+
+  @@index([bookingId])
+  @@index([paymentId])
+  @@index([adminId])
+  @@unique([bookingId])
 }

@@ -1,5 +1,11 @@
 # Movie Ticket Booking System and API
 
+## Sprint 4 — Đối soát thủ công và quản trị hoàn tiền
+
+- Admin xác nhận giao dịch SePay cần rà soát tại `POST /api/v1/payments/admin/sepay/transactions/:id/confirm`. Nếu có lệch số tiền, booking hết hạn hoặc booking không còn chờ thanh toán, hệ thống trả cảnh báo; admin gửi lại `force: true` sau khi kiểm tra.
+- Danh sách booking quản trị: `GET /api/v1/bookings/admin` với `search`, `status`, `page`, `limit`; chi tiết: `GET /api/v1/bookings/admin/:id`.
+- Refund booking: `POST /api/v1/payments/admin/bookings/:bookingId/refund`; flow cập nhật payment/booking/ticket, giải phóng ghế và queue email.
+
 Tài liệu dùng chung cho toàn bộ repository `ticket-booking`, mô tả frontend, backend, API contract, database, infrastructure, runtime flow và cách chạy hệ thống theo đúng source code hiện tại.
 
 ## Mục lục
@@ -1834,9 +1840,10 @@ Metrics chính:
 #### `POST /api/v1/showtimes/bulk`
 
 - Auth: Bearer JWT, role `ADMIN`.
-- Tạo toàn bộ slot trong một transaction Serializable.
-- Nếu có overlap hoặc lỗi khởi tạo seat, rollback toàn batch.
+- Tạo toàn bộ slot trong một transaction Serializable; batch gom việc tạo snapshot ghế vào một lệnh `createMany` để giảm thời gian giữ transaction và tránh lỗi timeout khi tạo nhiều suất.
+- Transaction có `maxWait` 10 giây và `timeout` 30 giây; nếu có overlap hoặc lỗi khởi tạo seat, rollback toàn batch.
 - Database exclusion constraint vẫn là lớp bảo vệ cuối cùng.
+- Frontend chờ invalidate query hoàn tất sau create/update/delete; cache chi tiết suất đã xóa được remove để không hiển thị lại dữ liệu cũ.
 - Role: `ADMIN`.
 - Success: `201`.
 - Body:
@@ -1894,7 +1901,8 @@ Rules:
 
 - Auth: Bearer JWT.
 - Role: `ADMIN`.
-- Success: `200` nếu chưa có booking.
+- Success: `200` nếu chưa có booking; việc xóa và kiểm tra booking chạy trong cùng transaction để tránh race condition và dữ liệu cũ trong cache admin.
+- Frontend đợi cache danh sách được refetch xong và xóa cache chi tiết sau update/delete, vì vậy dòng đã sửa/xóa không bị giữ lại bởi invalidate bất đồng bộ.
 - Nếu đã có booking: `409`.
 
 ### 8.11. Bookings API
@@ -2458,7 +2466,7 @@ npm run check:ci
 - `npm run test:integration` dùng PostgreSQL/Redis test riêng, deploy migrations và tự teardown containers.
 - `npm run check:ci` thêm API drift check và integration suite; verification gần nhất pass với backend unit `91/91`, frontend `10/10`, E2E `9/9`, integration `15/15`.
 - `npm run ops:backup-restore-drill` kiểm tra archive/atomic restore/migration status trên PostgreSQL local cô lập; CI chạy lệnh này trong job riêng.
-- GitHub Actions tại `.github/workflows/ci.yml` chạy lại các quality gates và build cả backend/frontend Docker image trên máy sạch cho mỗi push vào `main` và mỗi pull request.
+- GitHub Actions tại `.github/workflows/ci.yml` chạy lại các quality gates và build cả backend/frontend Docker image trên máy sạch cho mỗi push vào `main` và mỗi pull request. Workflow cài dependencies xong sẽ chạy `npm run prisma:generate` trước các bước lint/typecheck/test để bảo đảm Prisma Client khớp với `be/prisma/schema.prisma`.
 - Provider smoke với SMTP/SePay thật không chạy trong development; cần sandbox/test provider ở staging để kiểm tra register → verify → checkout → webhook → ticket email.
 
 Generated API artifacts:
@@ -2668,18 +2676,49 @@ Drill tự động:
 npm run ops:backup-restore-drill
 ```
 
-Drill dùng `be/docker-compose.ops.yml`, PostgreSQL local cô lập ở `127.0.0.1:55433`, deploy toàn bộ migration, tạo fixture có booking/payment/mail outbox, kiểm tra guard từ chối sai confirmation và target không rỗng, backup, restore rồi teardown cả container/volume. URL source/target hard-code local; script không đọc Prisma Cloud URL. CI chạy drill này trong job riêng.
+Drill dùng `be/docker-compose.ops.yml`, PostgreSQL local cô lập ở `127.0.0.1:55433`, deploy toàn bộ migration, tạo fixture có booking/payment/mail outbox, kiểm tra guard từ chối sai confirmation và target không rỗng, backup, restore rồi teardown cả container/volume. URL source/target hard-code local; script không đọc Prisma Cloud URL. Container PostgreSQL chạy bằng user không phải root, nên script tạo thư mục dump bind-mount với quyền tạm thời phù hợp; file archive vẫn giữ `umask 077`. CI chạy drill này trong job riêng.
 
 Migration rollback mặc định là **forward-fix**: dừng rollout, giữ backup trước migration, sửa migration bằng migration mới và chạy `prisma migrate deploy`. Chỉ chạy down SQL thủ công khi đã review rõ data-loss impact và đã thử trên bản restore cô lập. Không dùng `prisma migrate dev`, `db push`, chỉnh bảng trực tiếp hoặc đánh dấu migration resolved trên Prisma Cloud trong incident khi chưa có runbook cụ thể. Staging cutover/rollback drill vẫn là gate chưa hoàn thành vì Sprint 3 chưa chọn hosting target.
 
 ### 14.4. Runtime URL và cấu hình frontend
 
-Backend:
+Backend đọc `SERVER_PORT` trước `PORT` và bind trên `0.0.0.0` để tương thích với các platform hosting như Botkeep. Local development có thể tiếp tục dùng `PORT=3000`.
+
+Backend local:
 
 ```text
 API root: http://localhost:3000/api/v1
 Swagger:  http://localhost:3000/api/docs
 ```
+
+Production không dùng các URL `localhost`: đặt `DATABASE_URL` là connection string Prisma Cloud, `REDIS_URL` là connection string Redis managed (ví dụ Upstash `rediss://...`), `CORS_ORIGINS` là origin frontend public và `PUBLIC_APP_URL` là frontend URL public. Giữ các giá trị local chỉ trong `.env.example`; secret thật chỉ cấu hình trên platform.
+
+Botkeep deployment checklist:
+
+```text
+Working directory: be
+Build: npm run prisma:generate && npm run build
+Start: npm run start:prod
+Migration: npm run prisma:deploy (chạy một lần trước khi start hoặc bằng release step)
+Health: /api/v1/health/ready
+```
+
+Nếu Prisma Cloud cung cấp pooled và direct URL, dùng pooled URL cho runtime và direct URL cho migration theo hướng dẫn của provider; không chạy `prisma migrate dev` trên production.
+
+Frontend production:
+
+```env
+VITE_API_URL=https://<api-domain>/api/v1
+```
+
+Frontend phải được build lại sau khi đổi `VITE_API_URL`, vì Vite nhúng giá trị này vào bundle.
+
+Heroku deployment:
+
+- Heroku buildpack detects the root `package.json`; deploy the repository root, not `be/` alone.
+- Root `heroku-postbuild` generates Prisma Client and builds the backend. The committed `Procfile` runs migrations in a `release` phase and starts only the backend web process.
+- Set Heroku Config Vars for `DATABASE_URL`, `REDIS_URL`, production JWT secrets, `CORS_ORIGINS`, `PUBLIC_APP_URL`, `METRICS_TOKEN` and `SEPAY_WEBHOOK_API_KEY`. Never commit `.env`.
+- Heroku supplies `PORT`; the backend binds `0.0.0.0` and reads it through `main.ts`. Check `https://<app>.herokuapp.com/api/v1/health/ready` after release.
 
 Frontend Vite mặc định chạy tại URL được Vite chọn, thường là `http://localhost:5173`. API URL mặc định:
 

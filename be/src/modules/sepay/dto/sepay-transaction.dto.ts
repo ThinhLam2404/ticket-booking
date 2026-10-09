@@ -1,5 +1,28 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SepayTransactionStatus } from '@prisma/client';
+import { SepayTransactionStatus, BookingStatus } from '@prisma/client';
+
+export class AdminBookingSummaryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ enum: BookingStatus })
+  status!: BookingStatus;
+
+  @ApiProperty()
+  totalAmount!: string;
+
+  @ApiProperty()
+  userEmail!: string;
+
+  @ApiProperty()
+  movieTitle!: string;
+
+  @ApiProperty()
+  showtimeStartsAt!: string;
+
+  @ApiProperty({ type: [String] })
+  seatLabels!: string[];
+}
 
 export class SepayTransactionResponseDto {
   @ApiProperty()
@@ -37,6 +60,9 @@ export class SepayTransactionResponseDto {
 
   @ApiProperty({ nullable: true })
   paymentIntentId!: string | null;
+
+  @ApiProperty({ nullable: true, type: AdminBookingSummaryDto })
+  booking?: AdminBookingSummaryDto | null;
 
   @ApiProperty()
   createdAt!: string;

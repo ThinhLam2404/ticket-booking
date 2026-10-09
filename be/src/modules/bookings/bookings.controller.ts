@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Query,
   Headers,
   Param,
   Post,
@@ -23,6 +24,9 @@ import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
+import { AdminBookingsQueryDto } from './dto/admin-bookings.dto.js';
+import { RolesGuard } from '../../common/auth/roles.guard.js';
+import { Roles } from '../../common/auth/roles.decorator.js';
 import { BookingsService } from './bookings.service.js';
 
 @ApiTags('bookings')
@@ -46,6 +50,22 @@ export class BookingsController {
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     return this.bookingsService.hold(user.id, dto, idempotencyKey);
+  }
+
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiResponse({ status: 200 })
+  findAllAdmin(@Query() query: AdminBookingsQueryDto) {
+    return this.bookingsService.findAllAdmin(query);
+  }
+
+  @Get('admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiResponse({ status: 200 })
+  findOneAdmin(@Param('id') id: string) {
+    return this.bookingsService.findOneAdmin(id);
   }
 
   @Get()

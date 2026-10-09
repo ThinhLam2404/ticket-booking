@@ -393,6 +393,14 @@ export const api = {
   bookings(signal?: AbortSignal) {
     return request<Booking[]>('/bookings', { signal });
   },
+  adminBookings(params?: { search?: string; status?: string; page?: number; limit?: number }, signal?: AbortSignal) {
+    const query = new URLSearchParams();
+    Object.entries(params ?? {}).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
+    return request<{ data: Booking[]; meta: { page: number; limit: number; total: number; totalPages: number } }>(`/bookings/admin?${query}`, { signal });
+  },
+  adminBooking(id: string, signal?: AbortSignal) {
+    return request<Booking>(`/bookings/admin/${id}`, { signal });
+  },
   cancelBooking(id: string) {
     return request<Booking>(`/bookings/${id}/cancel`, { method: 'POST' });
   },
@@ -406,9 +414,21 @@ export const api = {
     const query = status ? `?status=${status}` : '';
     return request<SepayTransactionsResponse>(`/payments/admin/sepay/transactions${query}`, { signal });
   },
+  adminConfirmSepayTransaction(id: string, body: { force?: boolean; adminNote?: string }) {
+    return request<SepayTransaction>(`/payments/admin/sepay/transactions/${id}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
   adminUpdateSepayTransaction(id: string, body: UpdateSepayTransactionRequest) {
     return request<SepayTransaction>(`/payments/admin/sepay/transactions/${id}`, {
       method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  },
+  adminRefundBooking(bookingId: string, body: { reason: string; adminNote?: string }) {
+    return request(`/payments/admin/bookings/${bookingId}/refund`, {
+      method: 'POST',
       body: JSON.stringify(body),
     });
   },

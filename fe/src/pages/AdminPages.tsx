@@ -4,3 +4,5 @@ export { AdminMoviesPage } from "../features/admin/movies/AdminMoviesPage";
 export { AdminCinemasPage, AdminRoomsPage, AdminSeatsPage } from "../features/admin/cinemas/AdminCinemasPage";
 export { AdminShowtimesPage } from "../features/admin/showtimes/AdminShowtimesPage";
 export { AdminPaymentsPage } from "../features/admin/payments/AdminPaymentsPage";
+export { AdminBookingsPage } from "../features/admin/bookings/AdminBookingsPage";
+export { AdminBookingDetailPage } from "../features/admin/bookings/AdminBookingDetailPage";

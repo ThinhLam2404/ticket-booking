@@ -8,8 +8,10 @@ import { BookingPage, SeatsPage } from './pages/BookingPages';
 import { BookingsPage, TicketPage, TicketsPage } from './pages/AccountPages';
 import { CinemaPage, HomePage, MoviePage } from './pages/CatalogPages';
 import { VerifyEmailPage } from './pages/AuthPages';
-import { AdminCinemasPage, AdminDashboardPage, AdminLoginPage,   AdminMoviesPage,
+import { AdminCinemasPage, AdminDashboardPage, AdminLoginPage, AdminMoviesPage,
   AdminPaymentsPage,
+  AdminBookingsPage,
+  AdminBookingDetailPage,
   AdminRoomsPage, AdminSeatsPage, AdminShowtimesPage } from './pages/AdminPages';
 import './App.css';
 import './cobalt-editorial.css';
@@ -59,6 +61,8 @@ const router = createBrowserRouter([
           { path: 'admin/rooms/:roomId/seats', element: <AdminSeatsPage /> },
           { path: 'admin/showtimes', element: <AdminShowtimesPage /> },
           { path: 'admin/payments', element: <AdminPaymentsPage /> },
+          { path: 'admin/bookings', element: <AdminBookingsPage /> },
+          { path: 'admin/bookings/:id', element: <AdminBookingDetailPage /> },
         ],
       },
     ],

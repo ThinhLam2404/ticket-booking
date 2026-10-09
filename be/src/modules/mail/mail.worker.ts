@@ -10,6 +10,7 @@ import QRCode from 'qrcode';
 import type { MailWorkerData } from './mail-worker.supervisor.js';
 import { renderTicketEmail } from './templates/ticket-email.template.js';
 import { renderVerificationEmail } from './templates/verification-email.template.js';
+import { renderRefundEmail } from './templates/refund-email.template.js';
 
 const data = workerData as MailWorkerData;
 const prisma = new PrismaClient({
@@ -171,6 +172,12 @@ async function renderOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
       verificationUrl: `${data.publicAppUrl}/verify-email?token=${encodeURIComponent(payload.token)}`,
       expiresInHours: 24,
     });
+  }
+  if (outbox.type === MailOutboxType.REFUND_NOTIFICATION) {
+    const payload = outbox.payload as { bookingId: string; amount: string; reason: string };
+    const booking = await prisma.booking.findUnique({ where: { id: payload.bookingId }, include: { user: true } });
+    if (!booking) throw new Error('Refund booking not found');
+    return renderRefundEmail({ fullName: booking.user.fullName, bookingId: payload.bookingId, amount: payload.amount, reason: payload.reason });
   }
   const payload = outbox.payload as { bookingId: string };
   const booking = await prisma.booking.findUnique({

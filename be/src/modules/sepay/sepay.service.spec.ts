@@ -18,9 +18,16 @@ describe('SepayService', () => {
       releaseSeatLocks: vi.fn().mockResolvedValue(undefined),
     };
 
+    const redis = {
+      acquireLock: vi.fn().mockResolvedValue(true),
+      releaseLock: vi.fn().mockResolvedValue(true),
+    };
+
     const prisma = {
       booking: {
         findFirst: vi.fn(),
+        update: vi.fn(),
+        updateMany: vi.fn(),
       },
       showtimeSeat: {
         count: vi.fn(),
@@ -38,6 +45,16 @@ describe('SepayService', () => {
         updateMany: vi.fn(),
         findMany: vi.fn(),
       },
+      refund: {
+        findUnique: vi.fn(),
+        create: vi.fn(),
+      },
+      payment: {
+        update: vi.fn(),
+      },
+      ticket: {
+        updateMany: vi.fn(),
+      },
       $transaction: vi.fn(),
     };
 
@@ -45,10 +62,11 @@ describe('SepayService', () => {
       prisma as never,
       bookingsService as never,
       config as never,
-      { queueTicketEmail: vi.fn(), wakeWorker: vi.fn() } as never,
+      { queueTicketEmail: vi.fn(), queueRefundEmail: vi.fn(), wakeWorker: vi.fn() } as never,
+      redis as never,
     );
 
-    return { service, prisma, bookingsService, config };
+    return { service, prisma, bookingsService, config, redis };
   }
 
   describe('checkout', () => {
