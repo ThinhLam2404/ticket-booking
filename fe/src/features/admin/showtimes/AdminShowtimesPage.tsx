@@ -195,10 +195,29 @@ export function AdminShowtimesPage() {
   const cinemasQuery = useQuery({ queryKey: ["admin-cinemas"], queryFn: ({ signal }) => api.cinemas(undefined, signal) });
   const query = useQuery({ queryKey: ["admin-showtimes", movieId, cinemaId, status, specialOnly, includePast], queryFn: ({ signal }) => api.adminShowtimes({ movieId: movieId || undefined, cinemaId: cinemaId || undefined, status: status || undefined, specialOnly: specialOnly || undefined, includePast, pageSize: 100 }, signal) });
   const detailQuery = useQuery({ queryKey: ["admin-showtime", detailId], queryFn: ({ signal }) => api.adminShowtime(detailId, signal), enabled: Boolean(detailId) });
-  const saveMutation = useMutation({ mutationFn: ({ id, body }: { id?: string; body: CreateShowtimeRequest | UpdateShowtimeRequest }) => id ? api.updateShowtime(id, body as UpdateShowtimeRequest) : api.createShowtime(body as CreateShowtimeRequest), onSuccess: () => { const message = modal?.mode === "edit" ? "Đã cập nhật suất chiếu." : "Đã tạo suất chiếu."; void queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] }); setModal(null); setDetailId(""); setMutationError(""); setSuccessMessage(message); } });
-  const cinemaBulkMutation = useMutation({ mutationFn: (body: CinemaBulkShowtimeRequest) => api.createCinemaBulkShowtimes(body), onSuccess: (created) => { void queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] }); setCinemaBulkModal(false); setMutationError(""); setSuccessMessage(`Đã tạo ${created.length} suất chiếu đa phòng.`); } });
-  const bulkMutation = useMutation({ mutationFn: (body: BulkShowtimeRequest) => api.createBulkShowtimes(body), onSuccess: (created) => { void queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] }); setBulkModal(false); setMutationError(""); setSuccessMessage(`Đã tạo ${created.length} suất chiếu.`); } });
-  const deleteMutation = useMutation({ mutationFn: (id: string) => api.deleteShowtime(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] }); setConfirm(null); setSuccessMessage("Đã xóa suất chiếu."); } });
+  const saveMutation = useMutation({
+    mutationFn: ({ id, body }: { id?: string; body: CreateShowtimeRequest | UpdateShowtimeRequest }) => id ? api.updateShowtime(id, body as UpdateShowtimeRequest) : api.createShowtime(body as CreateShowtimeRequest),
+    onSuccess: async (saved, variables) => {
+      const message = variables.id ? "Đã cập nhật suất chiếu." : "Đã tạo suất chiếu.";
+      if (variables.id) queryClient.setQueryData(["admin-showtime", variables.id], saved);
+      await queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] });
+      setModal(null);
+      setDetailId("");
+      setMutationError("");
+      setSuccessMessage(message);
+    },
+  });
+  const cinemaBulkMutation = useMutation({ mutationFn: (body: CinemaBulkShowtimeRequest) => api.createCinemaBulkShowtimes(body), onSuccess: async (created) => { await queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] }); setCinemaBulkModal(false); setMutationError(""); setSuccessMessage(`Đã tạo ${created.length} suất chiếu đa phòng.`); } });
+  const bulkMutation = useMutation({ mutationFn: (body: BulkShowtimeRequest) => api.createBulkShowtimes(body), onSuccess: async (created) => { await queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] }); setBulkModal(false); setMutationError(""); setSuccessMessage(`Đã tạo ${created.length} suất chiếu.`); } });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.deleteShowtime(id),
+    onSuccess: async (_deleted, id) => {
+      queryClient.removeQueries({ queryKey: ["admin-showtime", id] });
+      await queryClient.invalidateQueries({ queryKey: ["admin-showtimes"] });
+      setConfirm(null);
+      setSuccessMessage("Đã xóa suất chiếu.");
+    },
+  });
   const showtimes = query.data?.data ?? [];
   const movies = moviesQuery.data?.data ?? [];
   const cinemas = cinemasQuery.data ?? [];

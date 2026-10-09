@@ -341,6 +341,11 @@ export class ShowtimesService {
           });
           if (!movie) throw new NotFoundException('Movie not found');
           const ids: string[] = [];
+          const showtimeSeatData: Array<{
+            showtimeId: string;
+            seatId: string;
+            price: string;
+          }> = [];
           for (const assignment of plan.assignments) {
             const room = await transaction.room.findUnique({
               where: { id: assignment.roomId },
@@ -377,8 +382,8 @@ export class ShowtimesService {
               },
             });
             ids.push(showtime.id);
-            await transaction.showtimeSeat.createMany({
-              data: context.room.seats.map((seat) => ({
+            showtimeSeatData.push(
+              ...context.room.seats.map((seat) => ({
                 showtimeId: showtime.id,
                 seatId: seat.id,
                 price: this.calculatePrice(
@@ -388,8 +393,9 @@ export class ShowtimesService {
                   pricing.coupleMultiplier,
                 ),
               })),
-            });
+            );
           }
+          await transaction.showtimeSeat.createMany({ data: showtimeSeatData });
 
           return transaction.showtime.findMany({
             where: { id: { in: ids } },
@@ -401,7 +407,11 @@ export class ShowtimesService {
             orderBy: { startsAt: 'asc' },
           });
         },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 10_000,
+          timeout: 30_000,
+        },
       );
       return toPublicResponse(created);
     } catch (error) {
@@ -714,6 +724,11 @@ export class ShowtimesService {
           }
 
           const showtimeIds: string[] = [];
+          const showtimeSeatData: Array<{
+            showtimeId: string;
+            seatId: string;
+            price: string;
+          }> = [];
           const format = dto.format ?? ShowtimeFormat.TWO_D_SUBTITLED;
           for (const slot of slots) {
             const pricing = this.resolvePricing(
@@ -746,8 +761,8 @@ export class ShowtimesService {
             });
 
             showtimeIds.push(showtime.id);
-            await transaction.showtimeSeat.createMany({
-              data: validRoom.seats.map((seat) => ({
+            showtimeSeatData.push(
+              ...validRoom.seats.map((seat) => ({
                 showtimeId: showtime.id,
                 seatId: seat.id,
                 price: this.calculatePrice(
@@ -757,8 +772,9 @@ export class ShowtimesService {
                   pricing.coupleMultiplier,
                 ),
               })),
-            });
+            );
           }
+          await transaction.showtimeSeat.createMany({ data: showtimeSeatData });
 
           return transaction.showtime.findMany({
             where: { id: { in: showtimeIds } },
@@ -770,7 +786,11 @@ export class ShowtimesService {
             orderBy: { startsAt: 'asc' },
           });
         },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 10_000,
+          timeout: 30_000,
+        },
       );
       return toPublicResponse(created);
     } catch (error) {
@@ -1156,23 +1176,37 @@ export class ShowtimesService {
   }
 
   async remove(id: string) {
-    const showtime = await this.prisma.showtime.findUnique({
-      where: { id },
-      include: { _count: { select: { bookings: true } } },
-    });
+    try {
+      const deleted = await this.prisma.$transaction(async (transaction) => {
+        const showtime = await transaction.showtime.findUnique({
+          where: { id },
+          include: { _count: { select: { bookings: true } } },
+        });
 
-    if (!showtime) {
-      throw new NotFoundException('Showtime not found');
+        if (!showtime) {
+          throw new NotFoundException('Showtime not found');
+        }
+
+        if (showtime._count.bookings > 0) {
+          throw new ConflictException(
+            'Showtime cannot be deleted after bookings exist',
+          );
+        }
+
+        return transaction.showtime.delete({ where: { id } });
+      });
+      return toPublicResponse(deleted);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new ConflictException(
+          'Showtime cannot be deleted after bookings exist',
+        );
+      }
+      throw error;
     }
-
-    if (showtime._count.bookings > 0) {
-      throw new ConflictException(
-        'Showtime cannot be deleted after bookings exist',
-      );
-    }
-
-    const deleted = await this.prisma.showtime.delete({ where: { id } });
-    return toPublicResponse(deleted);
   }
 
   private resolvePricing(
