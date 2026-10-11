@@ -1840,7 +1840,7 @@ Metrics chính:
 #### `POST /api/v1/showtimes/bulk`
 
 - Auth: Bearer JWT, role `ADMIN`.
-- Tạo toàn bộ slot trong một transaction Serializable; batch gom việc tạo snapshot ghế vào một lệnh `createMany` để giảm thời gian giữ transaction và tránh lỗi timeout khi tạo nhiều suất.
+- Tạo toàn bộ slot trong một transaction Serializable: `Showtime.createManyAndReturn` rồi gom snapshot ghế bằng `ShowtimeSeat.createMany`. Snapshot dùng ID và pricing của record trả về, không phụ thuộc thứ tự kết quả insert. Prisma có thể chia batch SQL theo giới hạn tham số.
 - Transaction có `maxWait` 10 giây và `timeout` 30 giây; nếu có overlap hoặc lỗi khởi tạo seat, rollback toàn batch.
 - Database exclusion constraint vẫn là lớp bảo vệ cuối cùng.
 - Frontend chờ invalidate query hoàn tất sau create/update/delete; cache chi tiết suất đã xóa được remove để không hiển thị lại dữ liệu cũ.
@@ -1896,6 +1896,15 @@ Rules:
 - Rebuild plan trong transaction `Serializable`, tạo showtime và snapshot `ShowtimeSeat` cho từng assignment.
 - Nếu capacity không đủ, trả `409 SHOWTIME_BULK_SHORTAGE` và rollback toàn bộ.
 - Preview và commit dùng cùng planner; nếu availability thay đổi giữa hai request, commit tính lại trên snapshot mới thay vì tin preview cũ.
+- Commit dùng lại room/seat context đã đọc trong planner, không query lại phòng cho từng assignment; giá vẫn được tính riêng theo phòng/ngày.
+
+#### Tối ưu và chẩn đoán thao tác suất chiếu
+
+- Update giá snapshot theo ba nhóm `STANDARD`, `VIP`, `COUPLE` bằng tối đa ba `updateMany`, không update từng ghế. Suất đã có booking vẫn không cho sửa.
+- Bulk một phòng, đa phòng và update retry toàn bộ transaction khi Prisma trả `P2034`, tối đa ba lần với backoff ngoài transaction. Hết lượt trả `409 SHOWTIME_CONCURRENT_CHANGE`; không coi mọi serialization conflict hoặc `P2004` là trùng lịch. Exclusion constraint thật được nhận diện qua tên `Showtime_room_time_exclusion` hoặc SQLSTATE `23P01`.
+- Lỗi API 5xx có log server `api_request_failed` với request ID, method, path, loại exception và Prisma code. Không log request body, raw error message/metadata hoặc secrets; response không lộ chi tiết DB. Dùng request ID đối chiếu `P2028` (transaction), `P2024` (pool), hoặc lỗi schema thay vì kết luận từ thông báo chung `Database operation failed`.
+- Chưa thêm index hoặc đổi pool mặc định khi chưa có query plan/đo tải. Dùng `EXPLAIN (ANALYZE, BUFFERS)` cho query đọc trên môi trường test có dữ liệu đại diện; tính cả pool API và mail worker trước khi cấu hình connection limit.
+- Verification: `npm test` kiểm tra mapping batch đảo thứ tự, retry và cập nhật nhóm giá; `npm run test:integration` dùng PostgreSQL/Redis cô lập để kiểm tra snapshot thật, rollback, update/delete và hai batch tranh cùng lịch. Không chạy integration trực tiếp trên DB development.
 
 #### `DELETE /api/v1/showtimes/:id`
 

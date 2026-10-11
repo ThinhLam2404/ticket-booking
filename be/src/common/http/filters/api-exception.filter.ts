@@ -8,7 +8,7 @@ import {
 import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { getRequestId } from '../../logging/request-logger.middleware.js';
-
+import { Logger } from '@nestjs/common';
 interface ErrorResponse {
   statusCode: number;
   code: string;
@@ -31,10 +31,12 @@ const messageCodes: Record<string, string> = {
   'Insufficient permissions': 'FORBIDDEN',
   'Cinema not found': 'CINEMA_NOT_FOUND',
   'Cinema already exists': 'CINEMA_ALREADY_EXISTS',
-  'Cinema cannot be deleted while it has active showtimes': 'CINEMA_HAS_SHOWTIMES',
+  'Cinema cannot be deleted while it has active showtimes':
+    'CINEMA_HAS_SHOWTIMES',
   'Room not found': 'ROOM_NOT_FOUND',
   'Room already exists in this cinema': 'ROOM_ALREADY_EXISTS',
-  'Room format cannot be changed while it has showtimes': 'ROOM_FORMAT_HAS_SHOWTIMES',
+  'Room format cannot be changed while it has showtimes':
+    'ROOM_FORMAT_HAS_SHOWTIMES',
   'Room cannot be deleted while it has showtimes': 'ROOM_HAS_SHOWTIMES',
   'Movie not found': 'MOVIE_NOT_FOUND',
   'Movie must be published before scheduling': 'MOVIE_NOT_PUBLISHED',
@@ -42,7 +44,8 @@ const messageCodes: Record<string, string> = {
   'Showtime not found': 'SHOWTIME_NOT_FOUND',
   'Showtime end must be after its start': 'SHOWTIME_INVALID_ORDER',
   'Showtime must start in the future': 'SHOWTIME_IN_PAST',
-  'Showtime start must include an explicit timezone offset': 'SHOWTIME_TIMEZONE_REQUIRED',
+  'Showtime start must include an explicit timezone offset':
+    'SHOWTIME_TIMEZONE_REQUIRED',
   'Showtime start is invalid': 'SHOWTIME_START_INVALID',
   'Room already has an overlapping showtime': 'SHOWTIME_OVERLAP',
   'Showtime starts outside venue operating hours': 'SHOWTIME_OUTSIDE_HOURS',
@@ -56,10 +59,13 @@ const messageCodes: Record<string, string> = {
   'Seat cannot be changed while the room has showtimes': 'SEAT_HAS_SHOWTIMES',
   'Seat cannot be deleted while it is used by a showtime': 'SEAT_HAS_SHOWTIMES',
   'Complete seat layouts must be managed in bulk': 'SEAT_LAYOUT_BULK_ONLY',
-  'Couple seats must be managed as a complete room layout': 'COUPLE_LAYOUT_REQUIRED',
+  'Couple seats must be managed as a complete room layout':
+    'COUPLE_LAYOUT_REQUIRED',
   'Duplicate seat coordinate in layout': 'SEAT_DUPLICATE_COORDINATE',
-  'Room layout cannot be replaced while it has showtimes': 'SEAT_LAYOUT_HAS_SHOWTIMES',
-  'Room layout cannot be replaced while it is used by a showtime': 'SEAT_LAYOUT_HAS_SHOWTIMES',
+  'Room layout cannot be replaced while it has showtimes':
+    'SEAT_LAYOUT_HAS_SHOWTIMES',
+  'Room layout cannot be replaced while it is used by a showtime':
+    'SEAT_LAYOUT_HAS_SHOWTIMES',
   'At least one seat is required': 'SEAT_REQUIRED',
   'One or more showtime seats were not found': 'SEAT_NOT_FOUND',
   'Couple seat must have a valid partner': 'COUPLE_PARTNER_INVALID',
@@ -86,12 +92,28 @@ const messageCodes: Record<string, string> = {
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ApiExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();
     const request = context.getRequest<Request>();
     const response = context.getResponse<Response>();
     const requestId = this.getRequestId(request);
     const error = this.resolveError(exception);
+
+    if (error.statusCode >= 500) {
+      this.logger.error({
+        event: 'api_request_failed',
+        requestId,
+        method: request.method,
+        path: request.path,
+        prismaCode:
+          exception instanceof Prisma.PrismaClientKnownRequestError
+            ? exception.code
+            : undefined,
+        exceptionType: exception instanceof Error ? exception.name : 'Unknown',
+      });
+    }
 
     response.setHeader('X-Request-Id', requestId);
     response.status(error.statusCode).json({
@@ -181,7 +203,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
     const record = response as Record<string, unknown>;
     const rawMessage = record.message;
-    const explicitCode = typeof record.code === 'string' ? record.code : undefined;
+    const explicitCode =
+      typeof record.code === 'string' ? record.code : undefined;
     if (Array.isArray(rawMessage)) {
       return {
         code: explicitCode ?? 'VALIDATION_FAILED',
@@ -195,7 +218,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
         ? rawMessage
         : 'Request could not be processed';
     return {
-      code: explicitCode ?? messageCodes[message] ?? this.codeForStatus(statusCode),
+      code:
+        explicitCode ?? messageCodes[message] ?? this.codeForStatus(statusCode),
       message,
       details: Array.isArray(record.details) ? record.details : [],
     };

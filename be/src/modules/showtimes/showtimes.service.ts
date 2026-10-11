@@ -251,8 +251,8 @@ export class ShowtimesService {
     let cursor = openAt;
     for (const slot of blocked) {
       const windowStart = cursor > openAt ? cursor : openAt;
-        const windowEnd =
-          slot.startsAt < schedulingEndAt ? slot.startsAt : schedulingEndAt;
+      const windowEnd =
+        slot.startsAt < schedulingEndAt ? slot.startsAt : schedulingEndAt;
       if (windowEnd.getTime() - windowStart.getTime() >= durationMs) {
         freeWindows.push({
           startsAt: windowStart,
@@ -326,9 +326,14 @@ export class ShowtimesService {
   //NOTE - tạo suất cho nhiều phòng trong 1 rạp
   async createCinemaBulk(dto: CinemaBulkShowtimeDto) {
     try {
-      const created = await this.prisma.$transaction(
+      const created = await this.schedulingTransaction(
         async (transaction) => {
-          const plan = await this.buildCinemaBulkPlan(transaction, dto);
+          const roomsById = new Map<string, ShowtimeContext['room']>();
+          const plan = await this.buildCinemaBulkPlan(
+            transaction,
+            dto,
+            roomsById,
+          );
           if (!plan.valid) {
             throw new ConflictException({
               code: 'SHOWTIME_BULK_SHORTAGE',
@@ -336,61 +341,38 @@ export class ShowtimesService {
             });
           }
 
-          const movie = await transaction.movie.findUnique({
-            where: { id: dto.movieId },
+          const inserted = await transaction.showtime.createManyAndReturn({
+            data: plan.assignments.map((assignment) => ({
+              movieId: dto.movieId,
+              roomId: assignment.roomId,
+              format: dto.format ?? ShowtimeFormat.TWO_D_SUBTITLED,
+              startsAt: new Date(assignment.startsAt),
+              endsAt: new Date(assignment.endsAt),
+              basePrice: this.toDecimalString(assignment.basePrice),
+              vipMultiplier: this.toDecimalString(assignment.vipMultiplier),
+              coupleMultiplier: this.toDecimalString(
+                assignment.coupleMultiplier,
+              ),
+            })),
           });
-          if (!movie) throw new NotFoundException('Movie not found');
-          const ids: string[] = [];
+          const ids = inserted.map((showtime) => showtime.id);
           const showtimeSeatData: Array<{
             showtimeId: string;
             seatId: string;
             price: string;
           }> = [];
-          for (const assignment of plan.assignments) {
-            const room = await transaction.room.findUnique({
-              where: { id: assignment.roomId },
-              include: { seats: true },
-            });
-            const context = this.getSchedulingContext(movie, room);
-            const startsAt = new Date(assignment.startsAt);
-            const format = dto.format ?? ShowtimeFormat.TWO_D_SUBTITLED;
-            const pricing = this.resolvePricing(
-              {
-                basePrice: dto.basePrice,
-                vipMultiplier: dto.vipMultiplier,
-                coupleMultiplier: dto.coupleMultiplier,
-              },
-              undefined,
-              {
-                roomFormat: context.room.format ?? RoomFormat.STANDARD,
-                showtimeFormat: format,
-                startsAt,
-              },
-            );
-            const showtime = await transaction.showtime.create({
-              data: {
-                movieId: dto.movieId,
-                roomId: assignment.roomId,
-                format,
-                startsAt,
-                endsAt: new Date(assignment.endsAt),
-                basePrice: this.toDecimalString(pricing.basePrice),
-                vipMultiplier: this.toDecimalString(pricing.vipMultiplier),
-                coupleMultiplier: this.toDecimalString(
-                  pricing.coupleMultiplier,
-                ),
-              },
-            });
-            ids.push(showtime.id);
+          for (const showtime of inserted) {
+            //NOTE - dau ! noi room chac chan ton tai
+            const room = roomsById.get(showtime.roomId)!;
             showtimeSeatData.push(
-              ...context.room.seats.map((seat) => ({
+              ...room.seats.map((seat) => ({
                 showtimeId: showtime.id,
                 seatId: seat.id,
                 price: this.calculatePrice(
-                  pricing.basePrice,
+                  showtime.basePrice.toNumber(),
                   seat.type,
-                  pricing.vipMultiplier,
-                  pricing.coupleMultiplier,
+                  showtime.vipMultiplier.toNumber(),
+                  showtime.coupleMultiplier.toNumber(),
                 ),
               })),
             );
@@ -442,6 +424,8 @@ export class ShowtimesService {
   private async buildCinemaBulkPlan(
     client: PrismaService | Prisma.TransactionClient,
     dto: CinemaBulkShowtimeDto,
+    //NOTE - optional vi ham nay dung cho ca preview va create; voi review thi ko can
+    roomsById?: Map<string, ShowtimeContext['room']>,
   ): Promise<CinemaBulkPreviewResponseDto> {
     const movie = await client.movie.findUnique({ where: { id: dto.movieId } });
     if (!movie) throw new NotFoundException('Movie not found');
@@ -455,6 +439,7 @@ export class ShowtimesService {
       dto.date,
       movie.duration,
       dto.turnaroundMinutes,
+      roomsById,
     );
     const roomIndexes = new Map(schedules.map((room) => [room.roomId, 0]));
     const selected: CinemaSlot[] = [];
@@ -475,9 +460,10 @@ export class ShowtimesService {
 
     const format = dto.format ?? ShowtimeFormat.TWO_D_SUBTITLED;
     const assignments = selected
-      .sort((left, right) =>
-        left.startsAt.getTime() - right.startsAt.getTime() ||
-        left.roomId.localeCompare(right.roomId),
+      .sort(
+        (left, right) =>
+          left.startsAt.getTime() - right.startsAt.getTime() ||
+          left.roomId.localeCompare(right.roomId),
       )
       .map((assignment) => {
         const pricing = getPricingQuote({
@@ -532,6 +518,7 @@ export class ShowtimesService {
     date: string,
     durationMinutes: number,
     turnaroundMinutes: number,
+    roomsById?: Map<string, ShowtimeContext['room']>,
   ): Promise<CinemaRoomSchedule[]> {
     const { openAt, closeAt } = dayBoundsVn(date);
     if (Number.isNaN(openAt.getTime()) || Number.isNaN(closeAt.getTime())) {
@@ -539,10 +526,16 @@ export class ShowtimesService {
     }
     const rooms = await client.room.findMany({
       where: { cinemaId },
-      include: { seats: true },
+      select: {
+        id: true,
+        name: true,
+        format: true,
+        seats: { select: { id: true, row: true, number: true, type: true } },
+      },
       orderBy: { id: 'asc' },
     });
     if (!rooms.length) throw new NotFoundException('Room not found');
+    for (const room of rooms) roomsById?.set(room.id, room);
 
     const durationMs = durationMinutes * 60 * 1000;
     const turnaroundMs = turnaroundMinutes * 60 * 1000;
@@ -608,7 +601,8 @@ export class ShowtimesService {
         const previous = slots.at(-1);
         if (
           !previous ||
-          previous.endsAt.getTime() + turnaroundMs <= candidate.startsAt.getTime()
+          previous.endsAt.getTime() + turnaroundMs <=
+            candidate.startsAt.getTime()
         ) {
           slots.push(candidate);
         }
@@ -689,7 +683,7 @@ export class ShowtimesService {
   //NOTE - tạo nhiều suất cho 1 phòng
   async createBulk(dto: BulkShowtimeDto) {
     try {
-      const created = await this.prisma.$transaction(
+      const created = await this.schedulingTransaction(
         async (transaction) => {
           const movie = await transaction.movie.findUnique({
             where: { id: dto.movieId },
@@ -723,14 +717,8 @@ export class ShowtimesService {
             );
           }
 
-          const showtimeIds: string[] = [];
-          const showtimeSeatData: Array<{
-            showtimeId: string;
-            seatId: string;
-            price: string;
-          }> = [];
           const format = dto.format ?? ShowtimeFormat.TWO_D_SUBTITLED;
-          for (const slot of slots) {
+          const data = slots.map((slot) => {
             const pricing = this.resolvePricing(
               {
                 basePrice: dto.basePrice,
@@ -744,36 +732,35 @@ export class ShowtimesService {
                 startsAt: slot.startsAt,
               },
             );
-
-            const showtime = await transaction.showtime.create({
-              data: {
-                movieId: dto.movieId,
-                roomId: dto.roomId,
-                format,
-                startsAt: slot.startsAt,
-                endsAt: slot.endsAt,
-                basePrice: this.toDecimalString(pricing.basePrice),
-                vipMultiplier: this.toDecimalString(pricing.vipMultiplier),
-                coupleMultiplier: this.toDecimalString(
-                  pricing.coupleMultiplier,
-                ),
-              },
-            });
-
-            showtimeIds.push(showtime.id);
-            showtimeSeatData.push(
-              ...validRoom.seats.map((seat) => ({
-                showtimeId: showtime.id,
-                seatId: seat.id,
-                price: this.calculatePrice(
-                  pricing.basePrice,
-                  seat.type,
-                  pricing.vipMultiplier,
-                  pricing.coupleMultiplier,
-                ),
-              })),
-            );
-          }
+            //NOTE - dựng dữ liệu truoc sau do moi insert vao de toi uu
+            return {
+              movieId: dto.movieId,
+              roomId: dto.roomId,
+              format,
+              startsAt: slot.startsAt,
+              endsAt: slot.endsAt,
+              basePrice: this.toDecimalString(pricing.basePrice),
+              vipMultiplier: this.toDecimalString(pricing.vipMultiplier),
+              coupleMultiplier: this.toDecimalString(pricing.coupleMultiplier),
+            };
+          });
+          const inserted = await transaction.showtime.createManyAndReturn({
+            data,
+          });
+          const showtimeIds = inserted.map((showtime) => showtime.id);
+          //NOTE - dung flatmap de bien 2x10 ghe thanh array 20 gia tri
+          const showtimeSeatData = inserted.flatMap((showtime) =>
+            validRoom.seats.map((seat) => ({
+              showtimeId: showtime.id,
+              seatId: seat.id,
+              price: this.calculatePrice(
+                showtime.basePrice.toNumber(),
+                seat.type,
+                showtime.vipMultiplier.toNumber(),
+                showtime.coupleMultiplier.toNumber(),
+              ),
+            })),
+          );
           await transaction.showtimeSeat.createMany({ data: showtimeSeatData });
 
           return transaction.showtime.findMany({
@@ -892,7 +879,7 @@ export class ShowtimesService {
 
   async update(id: string, dto: UpdateShowtimeDto) {
     try {
-      return await this.prisma.$transaction(
+      return await this.schedulingTransaction(
         async (transaction) => {
           const current = await transaction.showtime.findUnique({
             where: { id },
@@ -1033,21 +1020,29 @@ export class ShowtimesService {
             });
             //NOTE - nếu chỉ đổi giá
           } else if (pricing) {
-            await Promise.all(
-              current.showtimeSeats.map((showtimeSeat) =>
-                transaction.showtimeSeat.update({
-                  where: { id: showtimeSeat.id },
-                  data: {
-                    price: this.calculatePrice(
-                      pricing.basePrice,
-                      showtimeSeat.seat.type,
-                      pricing.vipMultiplier,
-                      pricing.coupleMultiplier,
-                    ),
-                  },
-                }),
-              ),
-            );
+            //NOTE - gom theo loai ghe
+            //NOTE - thay vi loop update tung seat thi gom theo tung loai update => giam so lan update db xuong
+            for (const type of [
+              SeatType.STANDARD,
+              SeatType.VIP,
+              SeatType.COUPLE,
+            ]) {
+              const ids = current.showtimeSeats
+                .filter((item) => item.seat.type === type)
+                .map((item) => item.id);
+              if (!ids.length) continue;
+              await transaction.showtimeSeat.updateMany({
+                where: { showtimeId: id, id: { in: ids } },
+                data: {
+                  price: this.calculatePrice(
+                    pricing.basePrice,
+                    type,
+                    pricing.vipMultiplier,
+                    pricing.coupleMultiplier,
+                  ),
+                },
+              });
+            }
           }
 
           const result = await transaction.showtime.findUniqueOrThrow({
@@ -1159,20 +1154,53 @@ export class ShowtimesService {
     return slots;
   }
 
+  private async schedulingTransaction<T>(
+    operation: (transaction: Prisma.TransactionClient) => Promise<T>,
+    options: {
+      isolationLevel: Prisma.TransactionIsolationLevel;
+      maxWait?: number;
+      timeout?: number;
+    },
+  ): Promise<T> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(operation, options);
+      } catch (error) {
+        if (
+          !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+          error.code !== 'P2034'
+        ) {
+          throw error;
+        }
+        if (attempt === 2) {
+          throw new ConflictException({
+            code: 'SHOWTIME_CONCURRENT_CHANGE',
+            message: 'Lịch chiếu đang được thay đổi. Vui lòng thử lại.',
+          });
+        }
+        // Backoff happens outside the rolled-back transaction/connection.
+        await new Promise<void>((resolve) =>
+          setTimeout(
+            resolve,
+            50 * 2 ** attempt + Math.floor(Math.random() * 50),
+          ),
+        );
+      }
+    }
+    throw new Error('Unreachable scheduling retry state');
+  }
+
   private isShowtimeOverlapError(error: unknown) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return error.code === 'P2004' || error.code === 'P2034';
-    }
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      ((error as { code?: unknown }).code === 'P2004' ||
-        (error as { code?: unknown }).code === 'P2034')
-    ) {
-      return true;
-    }
-    return error instanceof Error && error.message.includes('23P01');
+    if (!(error instanceof Error)) return false;
+    const evidence =
+      error.message +
+      (error instanceof Prisma.PrismaClientKnownRequestError
+        ? JSON.stringify(error.meta ?? {})
+        : '');
+    return (
+      evidence.includes('Showtime_room_time_exclusion') ||
+      evidence.includes('23P01')
+    );
   }
 
   async remove(id: string) {

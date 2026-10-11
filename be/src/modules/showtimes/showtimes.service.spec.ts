@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { RoomFormat, ShowtimeFormat, ShowtimeSeatStatus } from '@prisma/client';
+import { Prisma, RoomFormat, ShowtimeFormat, ShowtimeSeatStatus } from '@prisma/client';
 import { getPolicyBasePrice, getPricingDayType } from './showtime-policy.js';
 import { ShowtimesService } from './showtimes.service.js';
 
@@ -135,6 +135,100 @@ function validRoomSeats() {
     ),
   ];
 }
+
+describe('Showtime bulk persistence and transaction retries', () => {
+  function fixture() {
+    const seats = validRoomSeats();
+    const transaction = {
+      movie: { findUnique: vi.fn().mockResolvedValue({ id: 'movie-1', duration: 120, status: 'PUBLISHED' }) },
+      room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1', format: RoomFormat.STANDARD, seats }) },
+      showtime: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        createManyAndReturn: vi.fn(async ({ data }) => data.map((item: Record<string, unknown>, index: number) => ({
+          ...item, id: `showtime-${index}`,
+          basePrice: new Prisma.Decimal(item.basePrice as string),
+          vipMultiplier: new Prisma.Decimal(item.vipMultiplier as string),
+          coupleMultiplier: new Prisma.Decimal(item.coupleMultiplier as string),
+        })).reverse()),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      showtimeSeat: { createMany: vi.fn().mockResolvedValue({ count: 20 }) },
+    };
+    const prisma = { $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(transaction)) };
+    const service = new ShowtimesService(prisma as never, {} as never);
+    const dto = { movieId: 'movie-1', roomId: 'room-1', firstStartsAt: futureVnStartsAt('10:00:00').toISOString(), count: 2, turnaroundMinutes: 20 };
+    return { service, prisma, transaction, dto, seats };
+  }
+
+  it('inserts once per entity and maps snapshots even if returned rows are reversed', async () => {
+    const { service, transaction, dto, seats } = fixture();
+    await service.createBulk(dto);
+    expect(transaction.showtime.createManyAndReturn).toHaveBeenCalledTimes(1);
+    expect(transaction.showtimeSeat.createMany).toHaveBeenCalledTimes(1);
+    const snapshots = transaction.showtimeSeat.createMany.mock.calls[0]![0].data;
+    expect(snapshots).toHaveLength(2 * seats.length);
+    for (const id of ['showtime-0', 'showtime-1']) {
+      expect(snapshots.filter((seat: { showtimeId: string }) => seat.showtimeId === id)).toHaveLength(seats.length);
+    }
+    expect(snapshots).toContainEqual(expect.objectContaining({ seatId: 'E-1', price: expect.any(String) }));
+  });
+
+  it('retries the entire transaction only for P2034', async () => {
+    const { service, prisma, transaction, dto } = fixture();
+    prisma.$transaction.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError('conflict', { code: 'P2034', clientVersion: '6.19.3' }));
+    await service.createBulk(dto);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(transaction.movie.findUnique).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses planner room context for cinema bulk without per-assignment lookups', async () => {
+    const { service, transaction, seats } = fixture();
+    const roomFindMany = vi.fn().mockResolvedValue([
+      { id: 'room-1', name: 'Standard', format: RoomFormat.STANDARD, seats },
+      { id: 'room-2', name: 'IMAX', format: RoomFormat.IMAX, seats },
+    ]);
+    Object.assign(transaction.room, { findMany: roomFindMany });
+    const date = vnDatePart(new Date(Date.now() + 7 * 86400000));
+    await service.createCinemaBulk({ movieId: 'movie-1', cinemaId: 'cinema-1', date, count: 4, turnaroundMinutes: 20 });
+    expect(roomFindMany).toHaveBeenCalledTimes(1);
+    expect(transaction.room.findUnique).not.toHaveBeenCalled();
+    expect(transaction.movie.findUnique).toHaveBeenCalledTimes(1);
+    expect(transaction.showtime.createManyAndReturn).toHaveBeenCalledTimes(1);
+    const snapshots = transaction.showtimeSeat.createMany.mock.calls[0]![0].data;
+    expect(snapshots).toHaveLength(4 * seats.length);
+    const inserted = await transaction.showtime.createManyAndReturn.mock.results[0]!.value;
+    for (const showtime of inserted) {
+      expect(snapshots).toContainEqual({
+        showtimeId: showtime.id, seatId: 'A-1', price: showtime.basePrice.toFixed(2),
+      });
+    }
+  });
+
+  it('returns a distinct concurrency code after three failed attempts', async () => {
+    const { service, prisma, dto } = fixture();
+    prisma.$transaction.mockRejectedValue(new Prisma.PrismaClientKnownRequestError('conflict', { code: 'P2034', clientVersion: '6.19.3' }));
+    await expect(service.createBulk(dto)).rejects.toMatchObject({ response: { code: 'SHOWTIME_CONCURRENT_CHANGE' } });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retry timeouts or misclassify arbitrary constraints as overlaps', async () => {
+    for (const code of ['P2028', 'P2004']) {
+      const { service, prisma, dto } = fixture();
+      const error = new Prisma.PrismaClientKnownRequestError('unrelated failure', { code, clientVersion: '6.19.3' });
+      prisma.$transaction.mockRejectedValue(error);
+      await expect(service.createBulk(dto)).rejects.toBe(error);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('propagates seat insertion failure without querying a success response', async () => {
+    const { service, transaction, dto } = fixture();
+    const error = new Error('seat insertion failed');
+    transaction.showtimeSeat.createMany.mockRejectedValue(error);
+    await expect(service.createBulk(dto)).rejects.toBe(error);
+    expect(transaction.showtime.findMany).not.toHaveBeenCalled();
+  });
+});
 
 describe('ShowtimesService scheduling', () => {
   it('requires an explicit timezone on the start time', async () => {
@@ -298,7 +392,7 @@ describe('ShowtimesService admin updates', () => {
           },
           movie: { findUnique: vi.fn().mockResolvedValue({ status: 'PUBLISHED' }) },
           room: { findUnique: vi.fn().mockResolvedValue({ seats: [] }) },
-          showtimeSeat: { update: showtimeSeatUpdate },
+          showtimeSeat: { update: showtimeSeatUpdate, updateMany: showtimeSeatUpdate },
         }),
       ),
     };
@@ -346,7 +440,7 @@ describe('ShowtimesService admin updates', () => {
           },
           movie: { findUnique: vi.fn().mockResolvedValue({ status: 'PUBLISHED' }) },
           room: { findUnique: vi.fn().mockResolvedValue({ seats: [] }) },
-          showtimeSeat: { update: showtimeSeatUpdate },
+          showtimeSeat: { updateMany: showtimeSeatUpdate },
         }),
       ),
     };
@@ -355,15 +449,15 @@ describe('ShowtimesService admin updates', () => {
     await service.update('showtime-1', { coupleMultiplier: 1.3 });
 
     expect(showtimeSeatUpdate).toHaveBeenNthCalledWith(1, {
-      where: { id: 'standard' },
+      where: { showtimeId: 'showtime-1', id: { in: ['standard'] } },
       data: { price: '100000.00' },
     });
     expect(showtimeSeatUpdate).toHaveBeenNthCalledWith(2, {
-      where: { id: 'vip' },
+      where: { showtimeId: 'showtime-1', id: { in: ['vip'] } },
       data: { price: '110000.00' },
     });
     expect(showtimeSeatUpdate).toHaveBeenNthCalledWith(3, {
-      where: { id: 'couple' },
+      where: { showtimeId: 'showtime-1', id: { in: ['couple'] } },
       data: { price: '143000.00' },
     });
   });
