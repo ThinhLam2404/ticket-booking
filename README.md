@@ -2326,22 +2326,22 @@ File: `be/src/modules/bookings/booking-expiry.scheduler.ts`.
 
 - Cron: mỗi phút.
 - Gọi `BookingsService.expireBookings()`.
-- Tìm booking `PENDING` hết hạn.
+- Tìm booking `PENDING` hết hạn theo batch tối đa 50 bản ghi, ưu tiên booking hết hạn lâu hơn.
 - Chuyển booking thành `EXPIRED`.
 - Chuyển payment pending thành `FAILED` nếu còn dữ liệu legacy.
 - Chuyển SePay intent pending thành `EXPIRED`.
 - Release seat và Redis lock.
+- Scheduler xử lý tuần tự trong từng batch để tránh tạo quá nhiều transaction/query đồng thời.
 
 ### 11.2. Request-driven expiry
 
-Một số request có thể gọi expiry cho booking mục tiêu trước khi đọc/thao tác:
+Một số request vẫn có thể gọi expiry cho booking mục tiêu trước khi thao tác nghiệp vụ:
 
-- Lấy booking detail.
 - Cancel.
 - Checkout SePay.
-- Đọc showtime/seat map: `ShowtimesService` ủy quyền cleanup cho `BookingsService` theo showtime.
+- Các flow thao tác trực tiếp trên booking cần xác nhận trạng thái mới nhất.
 
-`ShowtimesService` không tự đổi `ShowtimeSeat` nữa; expiry trung tâm đồng bộ booking, payment, DB seat và Redis lock. Scheduler vẫn là cơ chế chính để cleanup toàn hệ thống.
+Đường đọc showtime/seat map không chạy cleanup booking nữa. `ShowtimesService` chỉ đọc showtime và ghế; `BookingExpiryScheduler` là cơ chế chính để cleanup toàn hệ thống. Việc tách này tránh để polling seat map tạo transaction cleanup trong mỗi request đọc.
 
 ### 11.3. Retention cleanup scheduler
 

@@ -14,7 +14,6 @@ import {
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
-import { BookingsService } from '../bookings/bookings.service.js';
 import { validateSeatLayout } from '../seats/seat-layout.js';
 import { CreateShowtimeDto } from './dto/create-showtime.dto.js';
 import {
@@ -79,10 +78,7 @@ type CinemaRoomSchedule = {
 
 @Injectable()
 export class ShowtimesService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly bookingsService: BookingsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: ListShowtimesDto) {
     return this.findShowtimes(query, {
@@ -176,8 +172,6 @@ export class ShowtimesService {
   }
 
   async findOne(id: string) {
-    //NOTE - xử lí expire cho seat, booking, payment
-    await this.bookingsService.expireBookingsForShowtime(id);
     const showtime = await this.prisma.showtime.findUnique({
       where: { id },
       include: {

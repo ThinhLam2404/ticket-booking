@@ -25,6 +25,7 @@ import {
 } from '../observability/metrics.service.js';
 
 const IDEMPOTENCY_KEY_MAX_LENGTH = 100;
+const BOOKING_EXPIRY_BATCH_SIZE = 50;
 
 @Injectable()
 export class BookingsService {
@@ -432,29 +433,25 @@ export class BookingsService {
   }
 
   async expireBookings() {
-    const expiredBookings = await this.prisma.booking.findMany({
-      where: { status: BookingStatus.PENDING, expiresAt: { lte: new Date() } },
-      include: { items: true },
-    });
+    let expiredCount = 0;
 
-    for (const booking of expiredBookings) {
-      await this.expireBooking(booking.id);
+    while (true) {
+      const expiredBookings = await this.prisma.booking.findMany({
+        where: { status: BookingStatus.PENDING, expiresAt: { lte: new Date() } },
+        select: { id: true },
+        orderBy: { expiresAt: 'asc' },
+        take: BOOKING_EXPIRY_BATCH_SIZE,
+      });
+      if (!expiredBookings.length) break;
+
+      for (const booking of expiredBookings) {
+        await this.expireBooking(booking.id);
+        expiredCount += 1;
+      }
+      if (expiredBookings.length < BOOKING_EXPIRY_BATCH_SIZE) break;
     }
-  }
 
-  async expireBookingsForShowtime(showtimeId: string) {
-    const expiredBookings = await this.prisma.booking.findMany({
-      where: {
-        showtimeId,
-        status: BookingStatus.PENDING,
-        expiresAt: { lte: new Date() },
-      },
-      select: { id: true },
-    });
-
-    for (const booking of expiredBookings) {
-      await this.expireBooking(booking.id);
-    }
+    return { processed: expiredCount };
   }
 
   async expireBookingById(id: string) {

@@ -120,6 +120,26 @@ describe('BookingsService Couple seat handling', () => {
     expect(redis.setIfAbsent).not.toHaveBeenCalled();
   });
 
+  it('expires bookings in bounded batches', async () => {
+    const bookingIds = Array.from({ length: 51 }, (_, index) => `booking-${index + 1}`);
+    const expireBooking = vi.fn().mockResolvedValue(undefined);
+    const findMany = vi
+      .fn()
+      .mockResolvedValueOnce(bookingIds.slice(0, 50).map((id) => ({ id })))
+      .mockResolvedValueOnce(bookingIds.slice(50).map((id) => ({ id })))
+      .mockResolvedValueOnce([]);
+    const prisma = {
+      booking: { findMany },
+    };
+    const service = new BookingsService(prisma as never, {} as never);
+    (service as unknown as { expireBooking: typeof expireBooking }).expireBooking = expireBooking;
+
+    await expect(service.expireBookings()).resolves.toEqual({ processed: 51 });
+    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({ take: 50 }));
+    expect(expireBooking).toHaveBeenCalledTimes(51);
+  });
+
   it('returns an idempotent booking even when the showtime is no longer bookable', async () => {
     const existingBooking = {
       id: 'booking-1',

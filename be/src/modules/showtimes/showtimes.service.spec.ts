@@ -36,7 +36,7 @@ describe('Showtime pricing policy', () => {
   });
 
   it('returns explicit quote overrides without changing the policy matrix', async () => {
-    const service = new ShowtimesService({} as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService({} as never);
 
     await expect(service.quotePricing({
       roomFormat: RoomFormat.STANDARD,
@@ -55,9 +55,8 @@ describe('Showtime pricing policy', () => {
   });
 });
 
-describe('ShowtimesService expiry lifecycle', () => {
-  it('delegates expired booking cleanup before reading a showtime', async () => {
-    const expireBookingsForShowtime = vi.fn().mockResolvedValue(undefined);
+describe('ShowtimesService read path', () => {
+  it('reads a showtime without triggering booking expiry cleanup', async () => {
     const showtime = {
       id: 'showtime-1',
       startsAt: new Date(Date.now() + 60 * 60 * 1000),
@@ -69,14 +68,12 @@ describe('ShowtimesService expiry lifecycle', () => {
     const prisma = {
       showtime: { findUnique: vi.fn().mockResolvedValue(showtime) },
     };
-    const service = new ShowtimesService(
-      prisma as never,
-      { expireBookingsForShowtime } as never,
-    );
+    const service = new ShowtimesService(prisma as never);
 
-    await service.findOne('showtime-1');
-
-    expect(expireBookingsForShowtime).toHaveBeenCalledWith('showtime-1');
+    await expect(service.findOne('showtime-1')).resolves.toMatchObject({
+      id: 'showtime-1',
+    });
+    expect(prisma.showtime.findUnique).toHaveBeenCalledOnce();
   });
 });
 
@@ -88,7 +85,7 @@ describe('ShowtimesService province filtering', () => {
       $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
       showtime: { findMany: showtimeFindMany, count: showtimeCount },
     };
-    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService(prisma as never);
 
     await expect(service.findAll({ page: 1, pageSize: 20, provinceCode: 48 })).resolves.toMatchObject({
       data: [],
@@ -155,7 +152,7 @@ describe('Showtime bulk persistence and transaction retries', () => {
       showtimeSeat: { createMany: vi.fn().mockResolvedValue({ count: 20 }) },
     };
     const prisma = { $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(transaction)) };
-    const service = new ShowtimesService(prisma as never, {} as never);
+    const service = new ShowtimesService(prisma as never);
     const dto = { movieId: 'movie-1', roomId: 'room-1', firstStartsAt: futureVnStartsAt('10:00:00').toISOString(), count: 2, turnaroundMinutes: 20 };
     return { service, prisma, transaction, dto, seats };
   }
@@ -232,7 +229,7 @@ describe('Showtime bulk persistence and transaction retries', () => {
 
 describe('ShowtimesService scheduling', () => {
   it('requires an explicit timezone on the start time', async () => {
-    const service = new ShowtimesService({} as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService({} as never);
 
     await expect(service.create({
       movieId: 'movie-1',
@@ -257,7 +254,7 @@ describe('ShowtimesService scheduling', () => {
         showtimeSeat: { createMany: vi.fn().mockResolvedValue({ count: seats.length }) },
       })),
     };
-    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService(prisma as never);
     const startsAt = futureVnStartsAt('10:00:00');
 
     await service.create({
@@ -290,7 +287,7 @@ describe('ShowtimesService scheduling', () => {
         showtimeSeat: { createMany: vi.fn().mockResolvedValue({ count: seats.length }) },
       })),
     };
-    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService(prisma as never);
     const startsAt = futureVnStartsAt('10:00:00');
 
     await service.create({
@@ -316,7 +313,7 @@ describe('ShowtimesService scheduling', () => {
       room: { findUnique: vi.fn().mockResolvedValue({ id: 'room-1', seats }) },
       showtime: { findMany: vi.fn().mockResolvedValue([]) },
     };
-    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService(prisma as never);
     const firstStartsAt = futureVnStartsAt('10:00:00');
 
     const result = await service.previewBulk({
@@ -347,7 +344,7 @@ describe('ShowtimesService admin updates', () => {
       },
       showtime: { findFirst: vi.fn().mockResolvedValue(null), create: showtimeCreate },
     };
-    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService(prisma as never);
 
     await expect(
       service.create({
@@ -396,7 +393,7 @@ describe('ShowtimesService admin updates', () => {
         }),
       ),
     };
-    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService(prisma as never);
 
     await expect(
       service.update('showtime-1', {
@@ -444,7 +441,7 @@ describe('ShowtimesService admin updates', () => {
         }),
       ),
     };
-    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService(prisma as never);
 
     await service.update('showtime-1', { coupleMultiplier: 1.3 });
 
@@ -487,7 +484,7 @@ describe('ShowtimesService admin updates', () => {
         callback({ showtime: { findUnique: showtimeFindUnique } }),
       ),
     };
-    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService(prisma as never);
 
     await expect(
       service.update('showtime-1', {
@@ -501,10 +498,7 @@ describe('ShowtimesService admin updates', () => {
 
 describe('ShowtimesService operating hours', () => {
   function createService(prisma: Record<string, unknown>) {
-    return new ShowtimesService(
-      prisma as never,
-      { expireBookingsForShowtime: vi.fn() } as never,
-    );
+    return new ShowtimesService(prisma as never);
   }
 
   it('rejects a showtime starting outside 08:00-23:00 VN', async () => {
@@ -624,7 +618,7 @@ describe('ShowtimesService cinema scheduling', () => {
       room: { findMany: vi.fn().mockResolvedValue(rooms) },
       showtime: { findMany: vi.fn().mockResolvedValue([]) },
     };
-    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService(prisma as never);
 
     const result = await service.previewCinemaBulk({
       movieId: 'movie-1',
@@ -664,7 +658,7 @@ describe('ShowtimesService cinema scheduling', () => {
       room: { findMany: vi.fn().mockResolvedValue(rooms) },
       showtime: { findMany: vi.fn().mockResolvedValue([]) },
     };
-    const service = new ShowtimesService(prisma as never, { expireBookingsForShowtime: vi.fn() } as never);
+    const service = new ShowtimesService(prisma as never);
 
     const result = await service.findCinemaFreeSlots('cinema-1', {
       date: '2099-10-05',
@@ -702,7 +696,6 @@ describe('ShowtimesService free slots', () => {
     };
     const service = new ShowtimesService(
       prisma as never,
-      { expireBookingsForShowtime: vi.fn() } as never,
     );
 
     const result = await service.findFreeSlots('room-1', {
@@ -733,7 +726,6 @@ describe('ShowtimesService free slots', () => {
     };
     const service = new ShowtimesService(
       prisma as never,
-      { expireBookingsForShowtime: vi.fn() } as never,
     );
 
     const result = await service.findFreeSlots('room-1', {
@@ -752,7 +744,6 @@ describe('ShowtimesService free slots', () => {
     };
     const service = new ShowtimesService(
       prisma as never,
-      { expireBookingsForShowtime: vi.fn() } as never,
     );
 
     await expect(service.findFreeSlots('missing', {
