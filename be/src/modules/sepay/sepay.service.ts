@@ -153,66 +153,88 @@ export class SepayService {
       return { success: true };
     }
 
-    const existing = await this.prisma.sepayTransaction.findUnique({
+    let existing = await this.prisma.sepayTransaction.findUnique({
       where: { sepayId: dto.id },
     });
-    if (existing) {
+    //NOTE - neu status = matched thi cho di tiep vi co the chua hoan tat confirm booking
+    if (
+      existing?.status === SepayTransactionStatus.CONFIRMED ||
+      existing?.status === SepayTransactionStatus.REVIEW_REQUIRED
+    ) {
       return { success: true };
     }
 
     const content = dto.content?.trim() ?? '';
     const paymentCode = this.extractPaymentCode(content);
-
     let intent = paymentCode
       ? await this.prisma.sepayPaymentIntent.findUnique({
           where: { paymentCode },
           include: { booking: { include: { items: true, user: true } } },
         })
       : null;
-
     const amount = new Prisma.Decimal(dto.transferAmount);
-
-    const matched =
-      intent &&
-      intent.status === SepayIntentStatus.PENDING &&
-      intent.expectedAmount.equals(amount) &&
-      intent.expiresAt > new Date();
-
-    const txStatus: SepayTransactionStatus = matched
-      ? SepayTransactionStatus.MATCHED
-      : SepayTransactionStatus.REVIEW_REQUIRED;
-
-    try {
-      await this.prisma.sepayTransaction.create({
-        data: {
-          sepayId: dto.id,
-          gateway: dto.gateway,
-          accountNumber: dto.accountNumber,
-          transferAmount: amount,
-          content: dto.content ?? '',
-          referenceCode: dto.referenceCode ?? null,
-          transferType: dto.transferType,
-          transactionDate: new Date(dto.transactionDate),
-          status: txStatus,
-          paymentIntentId: intent?.id ?? null,
-        },
-      });
-    } catch (error) {
-      if (isUniqueConstraintError(error)) {
+    //NOTE - neu chua co sepay transaction
+    if (!existing) {
+      const matched =
+        intent &&
+        intent.status === SepayIntentStatus.PENDING &&
+        intent.expectedAmount.equals(amount) &&
+        intent.expiresAt > new Date();
+      const txStatus: SepayTransactionStatus = matched
+        ? SepayTransactionStatus.MATCHED
+        : SepayTransactionStatus.REVIEW_REQUIRED;
+      try {
+        await this.prisma.sepayTransaction.create({
+          data: {
+            sepayId: dto.id,
+            gateway: dto.gateway,
+            accountNumber: dto.accountNumber,
+            transferAmount: amount,
+            content: dto.content ?? '',
+            referenceCode: dto.referenceCode ?? null,
+            transferType: dto.transferType,
+            transactionDate: new Date(dto.transactionDate),
+            status: txStatus,
+            paymentIntentId: intent?.id ?? null,
+          },
+        });
+      } catch (error) {
+        //NOTE - Nếu lỗi không phải duplicate thì vẫn throw lỗi thật.
+        if (!isUniqueConstraintError(error)) throw error;
+        const concurrent = await this.prisma.sepayTransaction.findUnique({
+          where: { sepayId: dto.id },
+        });
+        //NOTE - Nếu transaction là MATCHED, request hiện tại có thể tiếp tục confirm.
+        if (!concurrent || concurrent.status !== SepayTransactionStatus.MATCHED)
+          return { success: true };
+        existing = concurrent;
+      }
+      if (!matched) {
+        recordPaymentReviewRequired();
+        logOperationalEvent('warn', 'payment_review_required', {
+          sepayTransactionId: String(dto.id),
+          paymentIntentId: intent?.id,
+        });
+        this.logger.warn(
+          `SePay transaction ${dto.id} status=${txStatus} intentId=${intent?.id ?? 'none'}`,
+        );
         return { success: true };
       }
-      throw error;
     }
 
-    if (!matched || !intent) {
-      recordPaymentReviewRequired();
-      logOperationalEvent('warn', 'payment_review_required', {
-        sepayTransactionId: String(dto.id),
-        paymentIntentId: intent?.id,
+    if (!intent && existing?.paymentIntentId) {
+      intent = await this.prisma.sepayPaymentIntent.findUnique({
+        where: { id: existing.paymentIntentId },
+        include: { booking: { include: { items: true, user: true } } },
       });
-      this.logger.warn(
-        `SePay transaction ${dto.id} status=${txStatus} intentId=${intent?.id ?? 'none'}`,
-      );
+    }
+    //NOTE -  Nếu transaction là MATCHED nhưng không còn intent
+    if (!intent) {
+      await this.prisma.sepayTransaction.updateMany({
+        where: { sepayId: dto.id, status: SepayTransactionStatus.MATCHED },
+        data: { status: SepayTransactionStatus.REVIEW_REQUIRED },
+      });
+      recordPaymentReviewRequired();
       return { success: true };
     }
 
@@ -233,7 +255,9 @@ export class SepayService {
               include: {
                 user: true,
                 showtime: { include: { movie: true } },
-                items: { include: { showtimeSeat: { include: { seat: true } } } },
+                items: {
+                  include: { showtimeSeat: { include: { seat: true } } },
+                },
               },
             },
           },
@@ -252,7 +276,10 @@ export class SepayService {
           userEmail: booking.user?.email ?? '',
           movieTitle: booking.showtime?.movie?.title ?? '',
           showtimeStartsAt: booking.showtime?.startsAt.toISOString() ?? '',
-          seatLabels: booking.items.map((item) => `${item.showtimeSeat?.seat?.row ?? ''}${item.showtimeSeat?.seat?.number ?? ''}`),
+          seatLabels: booking.items.map(
+            (item) =>
+              `${item.showtimeSeat?.seat?.row ?? ''}${item.showtimeSeat?.seat?.number ?? ''}`,
+          ),
         },
       };
     });
@@ -265,37 +292,64 @@ export class SepayService {
   ) {
     const transaction = await this.prisma.sepayTransaction.findUnique({
       where: { id },
-      include: { paymentIntent: { include: { booking: { include: { items: true } } } } },
+      include: {
+        paymentIntent: { include: { booking: { include: { items: true } } } },
+      },
     });
     if (!transaction) throw new NotFoundException('Transaction not found');
     if (transaction.status !== SepayTransactionStatus.REVIEW_REQUIRED) {
-      throw new ConflictException('Only transactions requiring review can be confirmed');
+      throw new ConflictException(
+        'Only transactions requiring review can be confirmed',
+      );
     }
 
     const warnings: string[] = [];
     const booking = transaction.paymentIntent?.booking;
     if (!booking) warnings.push('BOOKING_NOT_FOUND');
     else {
-      if (!booking.totalAmount.equals(transaction.transferAmount)) warnings.push('AMOUNT_MISMATCH');
+      if (!booking.totalAmount.equals(transaction.transferAmount))
+        warnings.push('AMOUNT_MISMATCH');
       if (booking.expiresAt <= new Date()) warnings.push('BOOKING_EXPIRED');
-      if (booking.status !== BookingStatus.PENDING) warnings.push('BOOKING_NOT_PENDING');
+      if (booking.status !== BookingStatus.PENDING)
+        warnings.push('BOOKING_NOT_PENDING');
     }
     if (warnings.length && !dto.force) {
-      throw new ConflictException({ message: 'Manual confirmation requires force', code: 'CONFIRMATION_WARNINGS', warnings: warnings.join(',') });
+      throw new ConflictException({
+        message: 'Manual confirmation requires force',
+        code: 'CONFIRMATION_WARNINGS',
+        warnings: warnings.join(','),
+      });
     }
 
-    if (!booking) throw new ConflictException('Transaction is not linked to a booking');
+    if (!booking)
+      throw new ConflictException('Transaction is not linked to a booking');
     const intent = await this.prisma.sepayPaymentIntent.findUnique({
       where: { id: transaction.paymentIntentId ?? '' },
       include: { booking: { include: { user: true } } },
     });
     if (!intent) throw new ConflictException('Payment intent not found');
-    await this.confirmBooking(booking, intent, transaction.sepayId);
+    const confirmed = await this.confirmBooking(
+      booking,
+      intent,
+      transaction.sepayId,
+    );
+    if (!confirmed) {
+      throw new ConflictException(
+        'Booking could not be confirmed; transaction remains under review',
+      );
+    }
     const updated = await this.prisma.sepayTransaction.update({
       where: { id },
-      data: { status: SepayTransactionStatus.CONFIRMED, adminNote: dto.adminNote ?? null },
+      data: {
+        status: SepayTransactionStatus.CONFIRMED,
+        adminNote: dto.adminNote ?? null,
+      },
     });
-    logOperationalEvent('info', 'payment_manually_confirmed', { transactionId: id, adminId, warnings: warnings.join(',') });
+    logOperationalEvent('info', 'payment_manually_confirmed', {
+      transactionId: id,
+      adminId,
+      warnings: warnings.join(','),
+    });
     return updated;
   }
 
@@ -303,73 +357,162 @@ export class SepayService {
     id: string,
     dto: { status: SepayTransactionStatus; adminNote?: string },
   ) {
-    const existing = await this.prisma.sepayTransaction.findUnique({ where: { id } });
+    const existing = await this.prisma.sepayTransaction.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Transaction not found');
-    if (dto.status === SepayTransactionStatus.REFUNDED) {
-      throw new ConflictException('Use the refund endpoint to refund a booking');
+    if (
+      dto.status === SepayTransactionStatus.REFUNDED ||
+      dto.status === SepayTransactionStatus.CONFIRMED
+    ) {
+      throw new ConflictException(
+        'Use the corresponding payment workflow to confirm or refund a transaction',
+      );
     }
     return this.prisma.sepayTransaction.update({
       where: { id },
-      data: { status: dto.status, ...(dto.adminNote !== undefined && { adminNote: dto.adminNote }) },
+      data: {
+        status: dto.status,
+        ...(dto.adminNote !== undefined && { adminNote: dto.adminNote }),
+      },
     });
   }
-
-  async refundBooking(adminId: string, bookingId: string, dto: { reason: string; adminNote?: string }) {
+  async refundBooking(
+    adminId: string,
+    bookingId: string,
+    dto: { reason: string; adminNote?: string },
+  ) {
     const lockKey = `booking:refund:${bookingId}`;
     const lockValue = randomUUID();
     const lockAcquired = await this.redis.acquireLock(lockKey, lockValue, 30);
     if (!lockAcquired) {
-      throw new ConflictException('Another refund is in progress for this booking');
+      throw new ConflictException(
+        'Another refund is in progress for this booking',
+      );
     }
 
     try {
-      const booking = await this.prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: { payment: true, user: true, items: true, tickets: true, sepayIntent: { include: { transactions: true } } },
+      const idempotencyKey = `booking:${bookingId}`;
+      const existing = await this.prisma.refund.findUnique({
+        where: { idempotencyKey },
       });
-      if (!booking) throw new NotFoundException('Booking not found');
-      if (!booking.payment || booking.payment.status !== PaymentStatus.SUCCEEDED) {
-        throw new ConflictException('Only a successful payment can be refunded');
-      }
-      if (booking.tickets.some((ticket) => ticket.status === TicketStatus.USED)) {
-        throw new ConflictException('A used ticket cannot be refunded');
-      }
-      const existing = await this.prisma.refund.findUnique({ where: { idempotencyKey: `booking:${bookingId}` } });
       if (existing) return existing;
 
+      const booking = await this.prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: {
+          payment: true,
+          user: true,
+          items: true,
+          tickets: true,
+          sepayIntent: { include: { transactions: true } },
+        },
+      });
+      if (!booking) throw new NotFoundException('Booking not found');
+      if (
+        !booking.payment ||
+        booking.payment.status !== PaymentStatus.SUCCEEDED
+      ) {
+        throw new ConflictException(
+          'Only a successful payment can be refunded',
+        );
+      }
+      if (
+        booking.tickets.some((ticket) => ticket.status === TicketStatus.USED)
+      ) {
+        throw new ConflictException('A used ticket cannot be refunded');
+      }
+
       const refund = await this.prisma.$transaction(async (tx) => {
+        const current = await tx.booking.findUnique({
+          where: { id: bookingId },
+          include: {
+            payment: true,
+            user: true,
+            items: true,
+            tickets: true,
+            sepayIntent: { include: { transactions: true } },
+          },
+        });
+        if (!current) throw new NotFoundException('Booking not found');
+        const alreadyRefunded = await tx.refund.findUnique({
+          where: { idempotencyKey },
+        });
+        if (alreadyRefunded) return alreadyRefunded;
+        if (
+          !current.payment ||
+          current.payment.status !== PaymentStatus.SUCCEEDED
+        ) {
+          throw new ConflictException(
+            'Only a successful payment can be refunded',
+          );
+        }
+        if (
+          current.tickets.some((ticket) => ticket.status === TicketStatus.USED)
+        ) {
+          throw new ConflictException('A used ticket cannot be refunded');
+        }
         const created = await tx.refund.create({
           data: {
             bookingId,
-            paymentId: booking.payment!.id,
-            transactionId: booking.sepayIntent?.transactions.find((tx) => tx.status === SepayTransactionStatus.CONFIRMED)?.id ?? null,
-            amount: booking.payment!.amount,
+            paymentId: current.payment.id,
+            transactionId:
+              current.sepayIntent?.transactions.find(
+                (item) => item.status === SepayTransactionStatus.CONFIRMED,
+              )?.id ?? null,
+            amount: current.payment.amount,
             reason: dto.reason,
             adminNote: dto.adminNote,
             adminId,
-            idempotencyKey: `booking:${bookingId}`,
+            idempotencyKey,
           },
         });
-        await tx.payment.update({ where: { id: booking.payment!.id }, data: { status: PaymentStatus.REFUNDED } });
-        await tx.booking.update({ where: { id: bookingId }, data: { status: BookingStatus.CANCELLED } });
-        await tx.ticket.updateMany({ where: { bookingId, status: TicketStatus.ACTIVE }, data: { status: TicketStatus.CANCELLED } });
+        const paymentUpdated = await tx.payment.updateMany({
+          where: { id: current.payment.id, status: PaymentStatus.SUCCEEDED },
+          data: { status: PaymentStatus.REFUNDED },
+        });
+        if (paymentUpdated.count !== 1)
+          throw new ConflictException('Payment is no longer refundable');
+        await tx.booking.updateMany({
+          where: { id: bookingId, status: BookingStatus.CONFIRMED },
+          data: { status: BookingStatus.CANCELLED },
+        });
+        await tx.ticket.updateMany({
+          where: { bookingId, status: TicketStatus.ACTIVE },
+          data: { status: TicketStatus.CANCELLED },
+        });
         await tx.showtimeSeat.updateMany({
-          where: { heldByBookingId: bookingId, status: ShowtimeSeatStatus.SOLD },
-          data: { status: ShowtimeSeatStatus.AVAILABLE, heldByBookingId: null, heldUntil: null },
+          where: {
+            id: { in: current.items.map((item) => item.showtimeSeatId) },
+            status: ShowtimeSeatStatus.SOLD,
+          },
+          data: {
+            status: ShowtimeSeatStatus.AVAILABLE,
+            heldByBookingId: null,
+            heldUntil: null,
+          },
         });
         if (created.transactionId) {
-          await tx.sepayTransaction.update({ where: { id: created.transactionId }, data: { status: SepayTransactionStatus.REFUNDED } });
+          await tx.sepayTransaction.update({
+            where: { id: created.transactionId },
+            data: { status: SepayTransactionStatus.REFUNDED },
+          });
         }
         await this.mailService.queueRefundEmail(
           bookingId,
-          booking.user.email,
-          booking.payment!.amount.toString(),
+          current.user.email,
+          current.payment.amount.toString(),
           dto.reason,
           tx,
         );
         return created;
       });
-      logOperationalEvent('info', 'booking_refunded', { bookingId, refundId: refund.id, adminId, amount: refund.amount.toString() });
+      logOperationalEvent('info', 'booking_refunded', {
+        bookingId,
+        refundId: refund.id,
+        adminId,
+        amount: refund.amount.toString(),
+      });
       return refund;
     } finally {
       await this.redis.releaseLock(lockKey, lockValue);
@@ -391,9 +534,10 @@ export class SepayService {
       booking: { user: { email: string } };
     },
     sepayId: number,
-  ) {
+  ): Promise<boolean> {
+    let confirmed: unknown = null;
     try {
-      const confirmed = await this.prisma.$transaction(async (tx) => {
+      confirmed = await this.prisma.$transaction(async (tx) => {
         const current = await tx.booking.findFirst({
           where: {
             id: booking.id,
@@ -522,6 +666,7 @@ export class SepayService {
       this.logger.error(`Error confirming booking ${booking.id}`, err);
       throw err;
     }
+    return confirmed !== null;
   }
 
   private buildCheckoutResponse(intent: {

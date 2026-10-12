@@ -33,25 +33,68 @@ export class BookingsService {
     private readonly redis: RedisService,
   ) {}
 
-  async findAllAdmin(query: { search?: string; status?: BookingStatus; page?: number; limit?: number }) {
+  async findAllAdmin(query: {
+    search?: string;
+    status?: BookingStatus;
+    page?: number;
+    limit?: number;
+  }) {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 20, 100);
     const search = query.search?.trim();
     const where: Prisma.BookingWhereInput = {
       ...(query.status ? { status: query.status } : {}),
-      ...(search ? { OR: [{ id: { contains: search, mode: 'insensitive' } }, { user: { email: { contains: search, mode: 'insensitive' } } }] } : {}),
+      ...(search
+        ? {
+            OR: [
+              { id: { contains: search, mode: 'insensitive' } },
+              { user: { email: { contains: search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
     };
     const [data, total] = await this.prisma.$transaction([
-      this.prisma.booking.findMany({ where, include: { user: true, showtime: { include: { movie: true, room: { include: { cinema: true } } } }, items: { include: { showtimeSeat: { include: { seat: true } } } }, payment: true, refunds: true }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+      this.prisma.booking.findMany({
+        where,
+        include: {
+          user: true,
+          showtime: {
+            include: { movie: true, room: { include: { cinema: true } } },
+          },
+          items: { include: { showtimeSeat: { include: { seat: true } } } },
+          payment: true,
+          refunds: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
       this.prisma.booking.count({ where }),
     ]);
-    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data: toPublicResponse(data),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async findOneAdmin(id: string) {
-    const booking = await this.prisma.booking.findUnique({ where: { id }, include: { user: true, showtime: { include: { movie: true, room: { include: { cinema: true } } } }, items: { include: { showtimeSeat: { include: { seat: true } } } }, payment: true, tickets: true, refunds: true, sepayIntent: { include: { transactions: true } } } });
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        showtime: {
+          include: { movie: true, room: { include: { cinema: true } } },
+        },
+        items: { include: { showtimeSeat: { include: { seat: true } } } },
+        payment: true,
+        tickets: true,
+        refunds: true,
+        sepayIntent: { include: { transactions: true } },
+      },
+    });
     if (!booking) throw new NotFoundException('Booking not found');
-    return booking;
+    //NOTE - chuan hoa ko tra ve cac field nhu hashPassword, token,..
+    return toPublicResponse(booking);
   }
 
   async hold(userId: string, dto: CreateBookingDto, idempotencyKey?: string) {

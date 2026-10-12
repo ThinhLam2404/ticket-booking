@@ -43,7 +43,7 @@ MVP hiện tại hỗ trợ:
 - Giữ ghế tạm thời bằng Redis.
 - Tạo booking và tính tiền ở server.
 - Checkout tạo payment intent SePay và mã QR chuyển khoản.
-- Nhận webhook SePay, đối soát giao dịch và phát hành ticket sau thanh toán thành công.
+- Nhận webhook SePay, đối soát giao dịch và phát hành ticket sau thanh toán thành công; transaction `MATCHED` chưa hoàn tất có thể được xử lý lại khi webhook retry.
 - Hủy hoặc expire booking và giải phóng ghế.
 - Swagger UI để thử API.
 
@@ -2053,7 +2053,7 @@ Response:
 
 - Auth: Bearer JWT (Role `ADMIN`).
 - Success: `200`.
-- Cập nhật trạng thái giao dịch (ví dụ: chuyển sang `REFUNDED` sau khi hoàn tiền thủ công) kèm `adminNote`.
+- Cập nhật trạng thái giao dịch (ví dụ: chuyển sang `REFUNDED` sau khi hoàn tiền thủ công) kèm `adminNote`; transaction `CONFIRMED` hoặc `REVIEW_REQUIRED` không được xử lý lại như giao dịch mới.
 
 #### Payment record sau webhook
 
