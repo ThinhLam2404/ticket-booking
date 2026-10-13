@@ -3,6 +3,15 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 //NOTE - File này lưu requestId hiện tại trong toàn bộ vòng đời xử lý bất đồng bộ của một request.
 export type RequestContext = {
   requestId: string;
+  dbQueryCount?: number;
+  dbQueryDurationMs?: number;
+  dbSlowQueryCount?: number;
+};
+
+export type DbQueryMetrics = {
+  queryCount: number;
+  dbQueryDurationMs: number;
+  slowQueryCount: number;
 };
 
 const requestContextStorage = new AsyncLocalStorage<RequestContext>();
@@ -15,4 +24,25 @@ export function runWithRequestContext<T>(
 
 export function getCurrentRequestId(): string | undefined {
   return requestContextStorage.getStore()?.requestId;
+}
+
+export function recordDbQuery(durationMs: number, slow: boolean): void {
+  const context = requestContextStorage.getStore();
+  if (!context) return;
+
+  context.dbQueryCount = (context.dbQueryCount ?? 0) + 1;
+  context.dbQueryDurationMs = (context.dbQueryDurationMs ?? 0) + durationMs;
+  if (slow) {
+    context.dbSlowQueryCount = (context.dbSlowQueryCount ?? 0) + 1;
+  }
+}
+
+export function getCurrentDbQueryMetrics(): DbQueryMetrics {
+  const context = requestContextStorage.getStore();
+  return {
+    queryCount: context?.dbQueryCount ?? 0,
+    dbQueryDurationMs:
+      Math.round((context?.dbQueryDurationMs ?? 0) * 100) / 100,
+    slowQueryCount: context?.dbSlowQueryCount ?? 0,
+  };
 }

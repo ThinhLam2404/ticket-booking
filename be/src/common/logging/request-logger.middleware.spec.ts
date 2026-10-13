@@ -29,6 +29,8 @@ describe('requestLogger', () => {
     expect(response.setHeader).toHaveBeenCalledWith('X-Request-Id', 'req_test');
     expect(next).toHaveBeenCalledOnce();
     expect(output.mock.calls[0]?.[0]).toContain('"event":"http_request"');
+    expect(output.mock.calls[0]?.[0]).toContain('"queryCount":0');
+    expect(output.mock.calls[0]?.[0]).toContain('"dbQueryDurationMs":');
     expect(output.mock.calls[0]?.[0]).not.toContain('secret');
     expect(output.mock.calls[0]?.[0]).not.toContain('authorization');
     output.mockRestore();

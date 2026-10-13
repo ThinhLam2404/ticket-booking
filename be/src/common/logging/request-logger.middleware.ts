@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
-import { runWithRequestContext } from './request-context.js';
+import {
+  getCurrentDbQueryMetrics,
+  runWithRequestContext,
+} from './request-context.js';
 import {
   beginHttpRequest,
   recordHttpRequest,
@@ -31,6 +34,7 @@ export function requestLogger(
     response.on('finish', () => {
       const durationMs =
         Math.round((performance.now() - startedAt) * 100) / 100;
+      const dbQueryMetrics = getCurrentDbQueryMetrics();
       completeInFlight();
       recordHttpRequest(
         request.method,
@@ -50,6 +54,7 @@ export function requestLogger(
           path: request.path,
           statusCode: response.statusCode,
           durationMs,
+          ...dbQueryMetrics,
         })}\n`,
       );
     });

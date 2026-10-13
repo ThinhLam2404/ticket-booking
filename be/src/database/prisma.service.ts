@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
+import { recordDbQuery } from '../common/logging/request-context.js';
 
 const DEFAULT_SLOW_QUERY_MS = 250;
 
@@ -24,7 +25,9 @@ export class PrismaService
 
     if (queryLoggingEnabled) {
       this.$on('query' as never, (event: Prisma.QueryEvent) => {
-        if (event.duration < slowQueryThresholdMs()) return;
+        const slow = event.duration >= slowQueryThresholdMs();
+        recordDbQuery(event.duration, slow);
+        if (!slow) return;
         process.stdout.write(
           `${JSON.stringify({
             timestamp: new Date().toISOString(),
