@@ -4,6 +4,7 @@ import { Cron } from '@nestjs/schedule';
 import { DiscordAlertService } from './discord-alert.service.js';
 import { MetricsService } from './metrics.service.js';
 import { OperationsService } from './operations.service.js';
+import { logOperationalEvent } from '../../common/logging/operational-logger.js';
 
 @Injectable()
 export class OperationalMonitorScheduler {
@@ -16,6 +17,7 @@ export class OperationalMonitorScheduler {
 
   @Cron('*/1 * * * *')
   async monitor(): Promise<void> {
+    const startedAt = performance.now();
     const status = await this.operations.getStatus();
     this.metrics.updateOperationalMetrics({
       databaseUp: status.database === 'up',
@@ -28,7 +30,15 @@ export class OperationalMonitorScheduler {
       mailOutboxOldestPendingSeconds: status.mailOutbox.oldestPendingSeconds,
     });
 
-    if (!this.alerts.isEnabled()) return;
+    if (!this.alerts.isEnabled()) {
+      logOperationalEvent('info', 'scheduler_run', {
+        name: 'operational_monitor',
+        durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+        database: status.database,
+        redis: status.redis,
+      });
+      return;
+    }
 
     const pendingThreshold = this.numberConfig(
       'MAIL_OUTBOX_PENDING_ALERT_THRESHOLD',
@@ -116,6 +126,13 @@ export class OperationalMonitorScheduler {
     }
 
     await Promise.all(alertUpdates);
+    logOperationalEvent('info', 'scheduler_run', {
+      name: 'operational_monitor',
+      durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+      database: status.database,
+      redis: status.redis,
+      mailWorker: status.mailWorker.status,
+    });
   }
 
   private numberConfig(key: string, fallback: number): number {

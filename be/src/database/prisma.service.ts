@@ -4,6 +4,15 @@ import { recordDbQuery } from '../common/logging/request-context.js';
 
 const DEFAULT_SLOW_QUERY_MS = 250;
 
+export function queryFingerprint(query: string): string {
+  const normalized = query
+    .replace(/\s+/g, ' ')
+    .replace(/'(?:''|[^'])*'/g, '?')
+    .replace(/\b\d+(?:\.\d+)?\b/g, '?')
+    .trim();
+  return normalized.slice(0, 240);
+}
+
 function slowQueryThresholdMs(): number {
   const configured = Number(process.env.DB_SLOW_QUERY_MS);
   return Number.isFinite(configured) && configured >= 0
@@ -35,6 +44,7 @@ export class PrismaService
             event: 'db_query_slow',
             durationMs: event.duration,
             target: event.target,
+            fingerprint: queryFingerprint(event.query),
           })}\n`,
         );
       });
