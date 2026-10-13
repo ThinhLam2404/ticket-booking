@@ -50,10 +50,9 @@ export class TmdbClient {
 
   async listMovies(search: string | undefined, page: number) {
     const params = new URLSearchParams({
-      include_adult: 'false',
+      include_adult: 'true',
       language: 'vi-VN',
       page: String(page),
-      region: 'VN',
     });
     const path = search?.trim() ? '/search/movie' : '/movie/now_playing';
     if (search?.trim()) params.set('query', search.trim());
@@ -114,7 +113,9 @@ export class TmdbClient {
         ),
       );
       if (officialTrailer) return officialTrailer;
-      const trailer = pick(localized.filter((video) => video.type === 'Trailer'));
+      const trailer = pick(
+        localized.filter((video) => video.type === 'Trailer'),
+      );
       if (trailer) return trailer;
       return pick(localized.filter((video) => video.type === 'Teaser'));
     };
