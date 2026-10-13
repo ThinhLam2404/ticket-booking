@@ -75,6 +75,32 @@ describe('ShowtimesService read path', () => {
     });
     expect(prisma.showtime.findUnique).toHaveBeenCalledOnce();
   });
+
+  it('uses a seat-focused query for the seat map', async () => {
+    const prisma = {
+      showtime: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'showtime-1',
+          startsAt: new Date(Date.now() + 60 * 60 * 1000),
+          endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+          movie: { status: 'PUBLISHED' },
+          showtimeSeats: [],
+        }),
+      },
+    };
+    const service = new ShowtimesService(prisma as never);
+
+    await expect(service.findSeats('showtime-1')).resolves.toMatchObject({
+      showtimeId: 'showtime-1',
+      seats: [],
+    });
+    expect(prisma.showtime.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({
+        movie: { select: { status: true } },
+        showtimeSeats: expect.any(Object),
+      }),
+    }));
+  });
 });
 
 describe('ShowtimesService province filtering', () => {
@@ -99,6 +125,14 @@ describe('ShowtimesService province filtering', () => {
     expect(showtimeCount).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         room: { cinema: { provinceCode: 48 } },
+      }),
+    }));
+    expect(showtimeFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({
+        movie: expect.objectContaining({ select: expect.objectContaining({ title: true }) }),
+        room: expect.objectContaining({ select: expect.objectContaining({
+          cinema: expect.objectContaining({ select: expect.objectContaining({ name: true }) }),
+        }) }),
       }),
     }));
   });

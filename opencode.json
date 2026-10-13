@@ -47,6 +47,11 @@
         "STITCH_API_KEY": "{file:.stitch-key}"
       },
       "enabled": true
+    },
+    "prisma": {
+      "type": "remote",
+      "url": "https://mcp.prisma.io/mcp",
+      "enabled": true
     }
   }
 }

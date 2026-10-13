@@ -24,3 +24,6 @@ coverage/
 
 # Playwright MCP runtime snapshots
 /.playwright-mcp/
+
+# OpenCode local runtime dependencies
+.opencode/node_modules/

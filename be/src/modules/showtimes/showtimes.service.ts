@@ -147,11 +147,51 @@ export class ShowtimesService {
     }
 
     const [data, total] = await this.prisma.$transaction([
+      //NOTE - chi lay cac cot can thiet
       this.prisma.showtime.findMany({
         where,
-        include: {
-          movie: true,
-          room: { include: { cinema: true } },
+        select: {
+          id: true,
+          startsAt: true,
+          endsAt: true,
+          movieId: true,
+          roomId: true,
+          format: true,
+          basePrice: true,
+          vipMultiplier: true,
+          coupleMultiplier: true,
+          createdAt: true,
+          updatedAt: true,
+          movie: {
+            select: {
+              id: true,
+              title: true,
+              posterUrl: true,
+              rating: true,
+              genres: true,
+              ageRating: true,
+              duration: true,
+              status: true,
+            },
+          },
+          room: {
+            select: {
+              id: true,
+              name: true,
+              cinemaId: true,
+              format: true,
+              cinema: {
+                select: {
+                  id: true,
+                  name: true,
+                  address: true,
+                  provinceCode: true,
+                  createdAt: true,
+                  updatedAt: true,
+                },
+              },
+            },
+          },
         },
         orderBy: { startsAt: 'asc' },
         skip: (query.page - 1) * query.pageSize,
@@ -174,11 +214,73 @@ export class ShowtimesService {
   async findOne(id: string) {
     const showtime = await this.prisma.showtime.findUnique({
       where: { id },
-      include: {
-        movie: true,
-        room: { include: { cinema: true } },
+      select: {
+        id: true,
+        startsAt: true,
+        endsAt: true,
+        movieId: true,
+        roomId: true,
+        format: true,
+        basePrice: true,
+        vipMultiplier: true,
+        coupleMultiplier: true,
+        createdAt: true,
+        updatedAt: true,
+        movie: {
+          select: {
+            id: true,
+            tmdbId: true,
+            title: true,
+            description: true,
+            posterUrl: true,
+            backdropUrl: true,
+            trailerKey: true,
+            releaseDate: true,
+            rating: true,
+            genres: true,
+            ageRating: true,
+            duration: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        room: {
+          select: {
+            id: true,
+            name: true,
+            cinemaId: true,
+            format: true,
+            cinema: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+                provinceCode: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+          },
+        },
         showtimeSeats: {
-          include: { seat: true },
+          select: {
+            id: true,
+            price: true,
+            status: true,
+            heldUntil: true,
+            showtimeId: true,
+            seatId: true,
+            seat: {
+              select: {
+                id: true,
+                row: true,
+                number: true,
+                type: true,
+                roomId: true,
+              },
+            },
+          },
           orderBy: [{ seat: { row: 'asc' } }, { seat: { number: 'asc' } }],
         },
       },
@@ -192,7 +294,40 @@ export class ShowtimesService {
   }
 
   async findSeats(id: string) {
-    const showtime = await this.findOne(id);
+    const showtime = await this.prisma.showtime.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        startsAt: true,
+        endsAt: true,
+        movie: { select: { status: true } },
+        showtimeSeats: {
+          select: {
+            id: true,
+            price: true,
+            status: true,
+            heldUntil: true,
+            showtimeId: true,
+            seatId: true,
+            seat: {
+              select: {
+                id: true,
+                row: true,
+                number: true,
+                type: true,
+                roomId: true,
+              },
+            },
+          },
+          orderBy: [{ seat: { row: 'asc' } }, { seat: { number: 'asc' } }],
+        },
+      },
+    });
+
+    if (!showtime || showtime.movie.status !== MovieStatus.PUBLISHED) {
+      throw new NotFoundException('Showtime not found');
+    }
+
     return toPublicResponse({
       showtimeId: showtime.id,
       startsAt: showtime.startsAt,

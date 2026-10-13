@@ -107,6 +107,14 @@ class EnvironmentVariables {
   REQUEST_BODY_LIMIT = '256kb';
 
   @IsOptional()
+  @IsIn(['true', 'false'])
+  DB_QUERY_LOGGING = 'false';
+
+  @IsOptional()
+  @Matches(/^\d+(\.\d+)?$/)
+  DB_SLOW_QUERY_MS = '250';
+
+  @IsOptional()
   @IsString()
   REFRESH_TOKEN_RETENTION_DAYS = '30';
 
