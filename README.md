@@ -282,6 +282,7 @@ PUBLIC_APP_URL=https://cinebook.example.com
 MAIL_WORKER_ENABLED=true
 MAIL_WORKER_POLL_MS=10000
 MAIL_WORKER_STALE_LOCK_MS=300000
+MAIL_WORKER_MAX_ATTEMPTS=5
 MAIL_WORKER_SHUTDOWN_TIMEOUT_MS=15000
 METRICS_TOKEN=change-this-local-metrics-token
 OPS_ALERTS_ENABLED=false
@@ -327,6 +328,7 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `MAIL_WORKER_ENABLED`    | Không    | Bật Worker Thread gửi mail; test/OpenAPI nên để `false`       |
 | `MAIL_WORKER_POLL_MS`    | Không    | Chu kỳ polling fallback khi outbox rỗng, default `10000`      |
 | `MAIL_WORKER_STALE_LOCK_MS` | Không | Thời gian reclaim lock PROCESSING, default `300000`           |
+| `MAIL_WORKER_MAX_ATTEMPTS` | Không | Số lần retry tối đa cho mỗi mail lỗi, default `5`; mail hết retry không còn báo backlog |
 | `MAIL_WORKER_SHUTDOWN_TIMEOUT_MS` | Không | Timeout graceful shutdown, default `15000`              |
 | `METRICS_TOKEN` | Production | Bearer token riêng cho `/api/v1/metrics`; production yêu cầu tối thiểu 32 ký tự, không dùng placeholder |
 | `OPS_ALERTS_ENABLED` | Không | Bật Discord operational alerts khi là `true`; default `false` |

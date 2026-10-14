@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { MailOutboxStatus, SepayTransactionStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service.js';
 import { MailWorkerSupervisor } from '../mail/mail-worker.supervisor.js';
@@ -28,6 +29,7 @@ export class OperationsService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly mailWorker: MailWorkerSupervisor,
+    private readonly config: ConfigService,
   ) {}
 
   async getStatus(): Promise<OperationsStatus> {
@@ -44,6 +46,8 @@ export class OperationsService {
     let failed = 0;
     let oldestPendingSeconds = 0;
     let reviewRequired = 0;
+    //NOTE - gửi retry mail tối đa 5 lần
+    const maxMailAttempts = this.numberConfig('MAIL_WORKER_MAX_ATTEMPTS', 5);
 
     if (database === 'up') {
       try {
@@ -53,7 +57,10 @@ export class OperationsService {
               where: { status: MailOutboxStatus.PENDING },
             }),
             this.prisma.mailOutbox.count({
-              where: { status: MailOutboxStatus.FAILED },
+              where: {
+                status: MailOutboxStatus.FAILED,
+                attemptCount: { lt: maxMailAttempts },
+              },
             }),
             this.prisma.mailOutbox.findFirst({
               where: { status: MailOutboxStatus.PENDING },
@@ -96,6 +103,11 @@ export class OperationsService {
     } catch {
       return 'down';
     }
+  }
+
+  private numberConfig(key: string, fallback: number): number {
+    const value = Number(this.config.get<string>(key));
+    return Number.isFinite(value) && value > 0 ? value : fallback;
   }
 
   private async redisStatus(): Promise<'down' | 'up'> {

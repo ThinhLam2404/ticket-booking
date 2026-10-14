@@ -22,6 +22,7 @@ describe('OperationsService', () => {
       prisma as never,
       redis as never,
       worker as never,
+      { get: vi.fn() } as never,
     );
 
     const status = await service.getStatus();
@@ -52,6 +53,7 @@ describe('OperationsService', () => {
       prisma as never,
       redis as never,
       worker as never,
+      { get: vi.fn() } as never,
     );
 
     const status = await service.getStatus();
@@ -84,6 +86,7 @@ describe('OperationsService', () => {
       prisma as never,
       redis as never,
       worker as never,
+      { get: vi.fn() } as never,
     );
 
     await expect(service.getStatus()).resolves.toMatchObject({

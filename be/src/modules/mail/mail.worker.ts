@@ -99,7 +99,12 @@ async function claimNext() {
   const readyWhere: Prisma.MailOutboxWhereInput = {
     OR: [
       {
-        status: { in: [MailOutboxStatus.PENDING, MailOutboxStatus.FAILED] },
+        status: MailOutboxStatus.PENDING,
+        nextAttemptAt: { lte: now },
+      },
+      {
+        status: MailOutboxStatus.FAILED,
+        attemptCount: { lt: data.maxAttempts },
         nextAttemptAt: { lte: now },
       },
       { status: MailOutboxStatus.PROCESSING, lockedAt: { lt: staleLockAt } },

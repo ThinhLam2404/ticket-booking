@@ -19,6 +19,7 @@ export type MailWorkerData = {
   publicAppUrl: string;
   pollMs: number;
   staleLockMs: number;
+  maxAttempts: number;
 };
 
 type WorkerMessage =
@@ -192,6 +193,7 @@ export class MailWorkerSupervisor
       ).replace(/\/$/, ''),
       pollMs: this.numberConfig('MAIL_WORKER_POLL_MS', 10000),
       staleLockMs: this.numberConfig('MAIL_WORKER_STALE_LOCK_MS', 300000),
+      maxAttempts: this.numberConfig('MAIL_WORKER_MAX_ATTEMPTS', 5),
     };
   }
 

@@ -136,6 +136,10 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  MAIL_WORKER_MAX_ATTEMPTS = '5';
+
+  @IsOptional()
+  @IsString()
   MAIL_WORKER_SHUTDOWN_TIMEOUT_MS = '15000';
 
   @IsOptional()
