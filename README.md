@@ -2326,7 +2326,7 @@ Migration thêm:
 
 File: `be/src/modules/bookings/booking-expiry.scheduler.ts`.
 
-- Cron: mỗi phút.
+- Cron: giây 30 của mỗi phút (`30 * * * * *`), lệch khỏi operational monitor ở đầu phút để giảm tranh chấp connection.
 - Gọi `BookingsService.expireBookings()`.
 - Tìm booking `PENDING` hết hạn theo batch tối đa 50 bản ghi, ưu tiên booking hết hạn lâu hơn.
 - Chuyển booking thành `EXPIRED`.
@@ -2367,7 +2367,7 @@ File: `be/src/modules/maintenance/maintenance.scheduler.ts`.
 
 ### 11.5. Operational monitor và structured domain logs
 
-`OperationalMonitorScheduler` chạy mỗi phút để cập nhật gauges và đánh giá alert cho:
+`OperationalMonitorScheduler` chạy ở đầu mỗi phút để cập nhật gauges và đánh giá alert cho. Các truy vấn MailOutbox pending/failed được gom vào một `groupBy` read-only; booking expiry chạy ở giây 30 để tránh chồng thời điểm với monitor:
 
 - PostgreSQL/Redis down.
 - Mail Worker restart nhiều lần trong cửa sổ 5 phút.

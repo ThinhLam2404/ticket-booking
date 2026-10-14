@@ -6,7 +6,10 @@ describe('OperationsService', () => {
     const prisma = {
       $queryRaw: vi.fn().mockResolvedValue([{ ok: 1 }]),
       mailOutbox: {
-        count: vi.fn().mockResolvedValueOnce(4).mockResolvedValueOnce(2),
+        groupBy: vi.fn().mockResolvedValue([
+          { status: 'PENDING', _count: { _all: 4 } },
+          { status: 'FAILED', _count: { _all: 2 } },
+        ]),
         findFirst: vi
           .fn()
           .mockResolvedValue({ createdAt: new Date(Date.now() - 120_000) }),
@@ -41,7 +44,10 @@ describe('OperationsService', () => {
   it('degrades safely when database and Redis are unavailable', async () => {
     const prisma = {
       $queryRaw: vi.fn().mockRejectedValue(new Error('db down')),
-      mailOutbox: { count: vi.fn(), findFirst: vi.fn() },
+      mailOutbox: {
+        groupBy: vi.fn(),
+        findFirst: vi.fn(),
+      },
       sepayTransaction: { count: vi.fn() },
     };
     const redis = { ping: vi.fn().mockRejectedValue(new Error('redis down')) };
@@ -65,14 +71,14 @@ describe('OperationsService', () => {
       mailOutbox: { pending: 0, failed: 0 },
       payments: { reviewRequired: 0 },
     });
-    expect(prisma.mailOutbox.count).not.toHaveBeenCalled();
+    expect(prisma.mailOutbox.groupBy).not.toHaveBeenCalled();
   });
 
   it('marks the database down when an operational query fails', async () => {
     const prisma = {
       $queryRaw: vi.fn().mockResolvedValue([{ ok: 1 }]),
       mailOutbox: {
-        count: vi.fn().mockRejectedValue(new Error('query failed')),
+        groupBy: vi.fn().mockRejectedValue(new Error('query failed')),
         findFirst: vi.fn().mockResolvedValue(null),
       },
       sepayTransaction: { count: vi.fn().mockResolvedValue(0) },

@@ -26,6 +26,7 @@ function createPrismaMock() {
     },
     mailOutbox: {
       count: vi.fn().mockResolvedValue(0),
+      groupBy: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),
     },
     sepayTransaction: { count: vi.fn().mockResolvedValue(0) },

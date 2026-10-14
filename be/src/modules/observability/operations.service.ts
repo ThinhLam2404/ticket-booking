@@ -51,16 +51,20 @@ export class OperationsService {
 
     if (database === 'up') {
       try {
-        const [pendingCount, failedCount, oldestPending, reviewCount] =
+        const [outboxCounts, oldestPending, reviewCount] =
           await Promise.all([
-            this.prisma.mailOutbox.count({
-              where: { status: MailOutboxStatus.PENDING },
-            }),
-            this.prisma.mailOutbox.count({
+            this.prisma.mailOutbox.groupBy({
+              by: ['status'],
               where: {
-                status: MailOutboxStatus.FAILED,
-                attemptCount: { lt: maxMailAttempts },
+                OR: [
+                  { status: MailOutboxStatus.PENDING },
+                  {
+                    status: MailOutboxStatus.FAILED,
+                    attemptCount: { lt: maxMailAttempts },
+                  },
+                ],
               },
+              _count: { _all: true },
             }),
             this.prisma.mailOutbox.findFirst({
               where: { status: MailOutboxStatus.PENDING },
@@ -71,8 +75,12 @@ export class OperationsService {
               where: { status: SepayTransactionStatus.REVIEW_REQUIRED },
             }),
           ]);
-        pending = pendingCount;
-        failed = failedCount;
+        pending = outboxCounts.find(
+          (entry) => entry.status === MailOutboxStatus.PENDING,
+        )?._count._all ?? 0;
+        failed = outboxCounts.find(
+          (entry) => entry.status === MailOutboxStatus.FAILED,
+        )?._count._all ?? 0;
         reviewRequired = reviewCount;
         //NOTE - tính pending lâu nhất
         if (oldestPending) {
