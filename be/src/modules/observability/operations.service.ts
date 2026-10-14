@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MailOutboxStatus, SepayTransactionStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service.js';
 import { MailWorkerSupervisor } from '../mail/mail-worker.supervisor.js';
 import { RedisService } from '../redis/redis.service.js';
@@ -33,66 +32,32 @@ export class OperationsService {
   ) {}
 
   async getStatus(): Promise<OperationsStatus> {
-    const [initialDatabaseStatus, redis] = await Promise.all([
-      this.databaseStatus(),
+    //NOTE - một query aggregate vừa kiểm tra DB vừa lấy toàn bộ số liệu vận hành
+    const maxMailAttempts = this.numberConfig('MAIL_WORKER_MAX_ATTEMPTS', 5);
+    const [databaseSummary, redis] = await Promise.all([
+      this.databaseSummary(maxMailAttempts),
       this.redisStatus(),
     ]);
-    let database = initialDatabaseStatus;
+    const database = databaseSummary ? 'up' : 'down';
     const mailWorker = {
       status: this.mailWorker.getStatus(),
       restartsLast5Minutes: this.mailWorker.getRecentRestartCount(),
     };
-    let pending = 0;
-    let failed = 0;
-    let oldestPendingSeconds = 0;
-    let reviewRequired = 0;
-    //NOTE - gửi retry mail tối đa 5 lần
-    const maxMailAttempts = this.numberConfig('MAIL_WORKER_MAX_ATTEMPTS', 5);
-
-    if (database === 'up') {
-      try {
-        const [outboxCounts, oldestPending, reviewCount] =
-          await Promise.all([
-            this.prisma.mailOutbox.groupBy({
-              by: ['status'],
-              where: {
-                OR: [
-                  { status: MailOutboxStatus.PENDING },
-                  {
-                    status: MailOutboxStatus.FAILED,
-                    attemptCount: { lt: maxMailAttempts },
-                  },
-                ],
-              },
-              _count: { _all: true },
-            }),
-            this.prisma.mailOutbox.findFirst({
-              where: { status: MailOutboxStatus.PENDING },
-              orderBy: { createdAt: 'asc' },
-              select: { createdAt: true },
-            }),
-            this.prisma.sepayTransaction.count({
-              where: { status: SepayTransactionStatus.REVIEW_REQUIRED },
-            }),
-          ]);
-        pending = outboxCounts.find(
-          (entry) => entry.status === MailOutboxStatus.PENDING,
-        )?._count._all ?? 0;
-        failed = outboxCounts.find(
-          (entry) => entry.status === MailOutboxStatus.FAILED,
-        )?._count._all ?? 0;
-        reviewRequired = reviewCount;
-        //NOTE - tính pending lâu nhất
-        if (oldestPending) {
-          oldestPendingSeconds = Math.max(
-            0,
-            Math.floor((Date.now() - oldestPending.createdAt.getTime()) / 1000),
-          );
-        }
-      } catch {
-        database = 'down';
-      }
-    }
+    const pending = databaseSummary
+      ? Number(databaseSummary.pending ?? 0)
+      : 0;
+    const failed = databaseSummary ? Number(databaseSummary.failed ?? 0) : 0;
+    const reviewRequired = databaseSummary
+      ? Number(databaseSummary.reviewRequired ?? 0)
+      : 0;
+    const oldestPendingSeconds = databaseSummary?.oldestPending
+      ? Math.max(
+          0,
+          Math.floor(
+            (Date.now() - databaseSummary.oldestPending.getTime()) / 1000,
+          ),
+        )
+      : 0;
 
     return {
       database,
@@ -104,12 +69,39 @@ export class OperationsService {
     };
   }
 
-  private async databaseStatus(): Promise<'down' | 'up'> {
+  private async databaseSummary(maxMailAttempts: number): Promise<{
+    pending: number;
+    failed: number;
+    reviewRequired: number;
+    oldestPending: Date | null;
+  } | null> {
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
-      return 'up';
+      const rows = await this.prisma.$queryRaw<
+        Array<{
+          pending: bigint | number;
+          failed: bigint | number;
+          reviewRequired: bigint | number;
+          oldestPending: Date | null;
+        }>
+      >`
+        SELECT
+          (SELECT COUNT(*) FROM "MailOutbox" WHERE "status" = 'PENDING') AS "pending",
+          (SELECT COUNT(*) FROM "MailOutbox"
+            WHERE "status" = 'FAILED' AND "attemptCount" < ${maxMailAttempts}) AS "failed",
+          (SELECT COUNT(*) FROM "SepayTransaction" WHERE "status" = 'REVIEW_REQUIRED') AS "reviewRequired",
+          (SELECT MIN("createdAt") FROM "MailOutbox" WHERE "status" = 'PENDING') AS "oldestPending"
+      `;
+      const row = rows[0];
+      return row
+        ? {
+            pending: Number(row.pending),
+            failed: Number(row.failed),
+            reviewRequired: Number(row.reviewRequired),
+            oldestPending: row.oldestPending,
+          }
+        : null;
     } catch {
-      return 'down';
+      return null;
     }
   }
 

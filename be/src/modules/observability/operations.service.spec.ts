@@ -4,17 +4,14 @@ import { OperationsService } from './operations.service.js';
 describe('OperationsService', () => {
   it('returns dependency, outbox and payment review status', async () => {
     const prisma = {
-      $queryRaw: vi.fn().mockResolvedValue([{ ok: 1 }]),
-      mailOutbox: {
-        groupBy: vi.fn().mockResolvedValue([
-          { status: 'PENDING', _count: { _all: 4 } },
-          { status: 'FAILED', _count: { _all: 2 } },
-        ]),
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ createdAt: new Date(Date.now() - 120_000) }),
-      },
-      sepayTransaction: { count: vi.fn().mockResolvedValue(3) },
+      $queryRaw: vi.fn().mockResolvedValue([{
+        pending: 4,
+        failed: 2,
+        reviewRequired: 3,
+        oldestPending: new Date(Date.now() - 120_000),
+      }]),
+      mailOutbox: {},
+      sepayTransaction: {},
     };
     const redis = { ping: vi.fn().mockResolvedValue('PONG') };
     const worker = {
@@ -44,11 +41,8 @@ describe('OperationsService', () => {
   it('degrades safely when database and Redis are unavailable', async () => {
     const prisma = {
       $queryRaw: vi.fn().mockRejectedValue(new Error('db down')),
-      mailOutbox: {
-        groupBy: vi.fn(),
-        findFirst: vi.fn(),
-      },
-      sepayTransaction: { count: vi.fn() },
+      mailOutbox: {},
+      sepayTransaction: {},
     };
     const redis = { ping: vi.fn().mockRejectedValue(new Error('redis down')) };
     const worker = {
@@ -71,17 +65,14 @@ describe('OperationsService', () => {
       mailOutbox: { pending: 0, failed: 0 },
       payments: { reviewRequired: 0 },
     });
-    expect(prisma.mailOutbox.groupBy).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).toHaveBeenCalledOnce();
   });
 
   it('marks the database down when an operational query fails', async () => {
     const prisma = {
-      $queryRaw: vi.fn().mockResolvedValue([{ ok: 1 }]),
-      mailOutbox: {
-        groupBy: vi.fn().mockRejectedValue(new Error('query failed')),
-        findFirst: vi.fn().mockResolvedValue(null),
-      },
-      sepayTransaction: { count: vi.fn().mockResolvedValue(0) },
+      $queryRaw: vi.fn().mockRejectedValue(new Error('query failed')),
+      mailOutbox: {},
+      sepayTransaction: {},
     };
     const redis = { ping: vi.fn().mockResolvedValue('PONG') };
     const worker = {

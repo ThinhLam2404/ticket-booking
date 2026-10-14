@@ -2367,7 +2367,7 @@ File: `be/src/modules/maintenance/maintenance.scheduler.ts`.
 
 ### 11.5. Operational monitor và structured domain logs
 
-`OperationalMonitorScheduler` chạy ở đầu mỗi phút để cập nhật gauges và đánh giá alert cho. Các truy vấn MailOutbox pending/failed được gom vào một `groupBy` read-only; booking expiry chạy ở giây 30 để tránh chồng thời điểm với monitor:
+`OperationalMonitorScheduler` chạy ở đầu mỗi phút để cập nhật gauges và đánh giá alert cho. Các số liệu database của monitor được lấy bằng một truy vấn aggregate read-only (pending/failed MailOutbox, oldest pending và giao dịch SePay cần review); booking expiry chạy ở giây 30 để tránh chồng thời điểm với monitor:
 
 - PostgreSQL/Redis down.
 - Mail Worker restart nhiều lần trong cửa sổ 5 phút.
