@@ -13,7 +13,12 @@ function createPrismaMock() {
   const prisma = {
     $connect: vi.fn().mockResolvedValue(undefined),
     $disconnect: vi.fn().mockResolvedValue(undefined),
-    $queryRaw: vi.fn().mockResolvedValue([{ '?column?': 1 }]),
+    $queryRaw: vi.fn().mockResolvedValue([{
+      pending: 0,
+      failed: 0,
+      reviewRequired: 0,
+      oldestPending: null,
+    }]),
     $transaction: vi.fn(async (operations: unknown) =>
       Array.isArray(operations)
         ? Promise.all(operations)

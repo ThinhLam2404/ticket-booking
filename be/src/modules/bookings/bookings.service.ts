@@ -223,7 +223,8 @@ export class BookingsService {
       }
 
       const expiresAt = new Date(Date.now() + holdTtl * 1000);
-      const booking = await this.prisma.$transaction(async (transaction) => {
+      const bookingId = await this.prisma.$transaction(
+        async (transaction) => {
         const now = new Date();
         //NOTE - update trạng thái ghế held -> available nếu đã hết hạn
         await transaction.showtimeSeat.updateMany({
@@ -296,12 +297,15 @@ export class BookingsService {
           );
         }
 
-        return transaction.booking.findUniqueOrThrow({
-          where: { id: createdBooking.id },
-          include: this.bookingInclude,
-        });
-      });
+        return createdBooking.id;
+      },
+      { maxWait: 15_000, timeout: 15_000 },
+    );
 
+      const booking = await this.prisma.booking.findUniqueOrThrow({
+        where: { id: bookingId },
+        include: this.bookingInclude,
+      });
       logOperationalEvent('info', 'booking_held', {
         bookingId: booking.id,
         showtimeId: booking.showtimeId,

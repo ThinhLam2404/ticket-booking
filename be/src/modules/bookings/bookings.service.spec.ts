@@ -18,6 +18,13 @@ describe('BookingsService Couple seat handling', () => {
         }),
       },
       showtimeSeat: { findMany: showtimeSeatFindMany },
+      booking: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: 'booking-1',
+          totalAmount: new Prisma.Decimal(264000),
+          items: [],
+        }),
+      },
       $transaction: vi.fn(async (callback: (transaction: unknown) => unknown) =>
         callback({
           showtimeSeat: {
