@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
+import { assertCursorDirection, buildCursorMeta, cursorWhere, decodeCursor } from '../../common/http/cursor-pagination.js';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { RedisService } from '../redis/redis.service.js';
@@ -34,48 +35,35 @@ export class BookingsService {
     private readonly redis: RedisService,
   ) {}
 
-  async findAllAdmin(query: {
-    search?: string;
-    status?: BookingStatus;
-    page?: number;
-    limit?: number;
-  }) {
-    const page = query.page ?? 1;
-    const limit = Math.min(query.limit ?? 20, 100);
+  async findAllAdmin(query: { search?: string; status?: BookingStatus; after?: string; before?: string; limit?: number; from?: string; to?: string }) {
+    const limit = query.limit ?? 20;
+    assertCursorDirection(query.after, query.before);
+    const direction = query.before ? 'before' : 'after';
+    const cursor = query.before ?? query.after;
+    const scope = `admin-bookings:${query.status ?? ''}:${query.search?.trim() ?? ''}:${query.from ?? ''}:${query.to ?? ''}`;
+    const payload = cursor ? decodeCursor(cursor, scope, direction) : undefined;
     const search = query.search?.trim();
     const where: Prisma.BookingWhereInput = {
       ...(query.status ? { status: query.status } : {}),
-      ...(search
+      ...(query.from || query.to
         ? {
-            OR: [
-              { id: { contains: search, mode: 'insensitive' } },
-              { user: { email: { contains: search, mode: 'insensitive' } } },
-            ],
+            createdAt: {
+              ...(query.from ? { gte: new Date(query.from) } : {}),
+              ...(query.to ? { lt: new Date(query.to) } : {}),
+            },
           }
         : {}),
+      ...(search ? { OR: [{ id: { contains: search, mode: 'insensitive' } }, { user: { email: { contains: search, mode: 'insensitive' } } }] } : {}),
+      ...(payload ? cursorWhere(payload, 'createdAt') : {}),
     };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.booking.findMany({
-        where,
-        include: {
-          user: true,
-          showtime: {
-            include: { movie: true, room: { include: { cinema: true } } },
-          },
-          items: { include: { showtimeSeat: { include: { seat: true } } } },
-          payment: true,
-          refunds: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.booking.count({ where }),
-    ]);
-    return {
-      data: toPublicResponse(data),
-      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    const data = await this.prisma.booking.findMany({
+      where,
+      include: { user: true, showtime: { include: { movie: true, room: { include: { cinema: true } } } }, items: { include: { showtimeSeat: { include: { seat: true } } } }, payment: true, refunds: true },
+      orderBy: direction === 'before' ? [{ createdAt: 'asc' }, { id: 'asc' }] : [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+    });
+    const result = buildCursorMeta(data, limit, scope, direction, (row) => row.createdAt, Boolean(cursor));
+    return { ...result, data: result.data.map((booking) => toPublicResponse(booking)) };
   }
 
   async findOneAdmin(id: string) {
@@ -331,13 +319,36 @@ export class BookingsService {
     }
   }
 
-  async findMine(userId: string) {
+  async findMine(userId: string, query: { status?: BookingStatus; search?: string; after?: string; before?: string; limit?: number; from?: string; to?: string } = {}) {
+    const limit = query.limit ?? 20;
+    assertCursorDirection(query.after, query.before);
+    const direction = query.before ? 'before' : 'after';
+    const cursor = query.before ?? query.after;
+    const search = query.search?.trim();
+    const scope = `bookings:${userId}:${query.status ?? ''}:${search ?? ''}:${query.from ?? ''}:${query.to ?? ''}`;
+    const payload = cursor ? decodeCursor(cursor, scope, direction) : undefined;
+    const where: Prisma.BookingWhereInput = {
+      userId,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.from || query.to
+        ? {
+            createdAt: {
+              ...(query.from ? { gte: new Date(query.from) } : {}),
+              ...(query.to ? { lt: new Date(query.to) } : {}),
+            },
+          }
+        : {}),
+      ...(search ? { OR: [{ id: { contains: search, mode: 'insensitive' } }, { showtime: { movie: { title: { contains: search, mode: 'insensitive' } } } }, { showtime: { room: { cinema: { name: { contains: search, mode: 'insensitive' } } } } }] } : {}),
+      ...(payload ? cursorWhere(payload, 'createdAt') : {}),
+    };
     const bookings = await this.prisma.booking.findMany({
-      where: { userId },
+      where,
       include: this.bookingInclude,
-      orderBy: { createdAt: 'desc' },
+      orderBy: direction === 'before' ? [{ createdAt: 'asc' }, { id: 'asc' }] : [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
     });
-    return bookings.map((booking) => toPublicResponse(booking));
+    const result = buildCursorMeta(bookings, limit, scope, direction, (row) => row.createdAt, Boolean(cursor));
+    return { ...result, data: result.data.map((booking) => toPublicResponse(booking)) };
   }
 
   async findOne(userId: string, id: string) {

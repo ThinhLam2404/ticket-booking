@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { SepayTransactionStatus } from '@prisma/client';
+import { ListTransactionsDto } from './dto/list-transactions.dto.js';
 import { ApiErrorResponses } from '../../common/http/swagger.decorators.js';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
@@ -25,6 +26,7 @@ import type { AuthUser } from '../../common/auth/auth-user.js';
 import { SepayCheckoutResponseDto } from './dto/sepay-checkout.dto.js';
 import {
   SepayTransactionResponseDto,
+  CursorPaginatedTransactionsResponseDto,
   UpdateTransactionStatusDto,
 } from './dto/sepay-transaction.dto.js';
 import { SepayWebhookDto } from './dto/sepay-webhook.dto.js';
@@ -62,11 +64,11 @@ export class SepayController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiResponse({ status: 200, type: SepayTransactionResponseDto, isArray: true })
+  @ApiResponse({ status: 200, type: CursorPaginatedTransactionsResponseDto })
   @ApiQuery({ name: 'status', required: false, enum: SepayTransactionStatus })
-  @ApiErrorResponses(401, 403)
-  findTransactions(@Query('status') status?: SepayTransactionStatus) {
-    return this.sepayService.findTransactions(status ? { status } : undefined);
+  @ApiErrorResponses(400, 401, 403)
+  findTransactions(@Query() query: ListTransactionsDto) {
+    return this.sepayService.findTransactions(query);
   }
 
   @Post('admin/bookings/:bookingId/refund')

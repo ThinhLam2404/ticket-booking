@@ -2025,6 +2025,20 @@ export interface components {
              */
             updatedAt: string;
         };
+        CursorPaginationMetaDto: {
+            /** @example 20 */
+            limit: number;
+            /** @example true */
+            hasNextPage: boolean;
+            /** @example false */
+            hasPreviousPage: boolean;
+            nextCursor: Record<string, never> | null;
+            previousCursor: Record<string, never> | null;
+        };
+        CursorPaginatedBookingsResponseDto: {
+            data: components["schemas"]["BookingResponseDto"][];
+            meta: components["schemas"]["CursorPaginationMetaDto"];
+        };
         SepayCheckoutResponseDto: {
             intentId: string;
             paymentCode: string;
@@ -2076,6 +2090,10 @@ export interface components {
             paymentIntentId: Record<string, never> | null;
             booking: components["schemas"]["AdminBookingSummaryDto"] | null;
             createdAt: string;
+        };
+        CursorPaginatedTransactionsResponseDto: {
+            data: components["schemas"]["SepayTransactionResponseDto"][];
+            meta: components["schemas"]["CursorPaginationMetaDto"];
         };
         RefundBookingDto: {
             /** @example Khách yêu cầu hoàn tiền do thay đổi lịch. */
@@ -2169,6 +2187,10 @@ export interface components {
             createdAt: string;
             booking: components["schemas"]["TicketBookingResponseDto"];
             bookingItem: components["schemas"]["TicketBookingItemResponseDto"];
+        };
+        CursorPaginatedTicketsResponseDto: {
+            data: components["schemas"]["TicketResponseDto"][];
+            meta: components["schemas"]["CursorPaginationMetaDto"];
         };
         MailWorkerOperationsDto: {
             /**
@@ -4648,10 +4670,15 @@ export interface operations {
     Bookings_findAllAdmin: {
         parameters: {
             query?: {
+                /** @description Opaque cursor returned by the previous page. */
+                after?: string;
+                /** @description Opaque cursor returned by the next page when moving backwards. */
+                before?: string;
+                limit?: components["schemas"]["Object"];
+                from?: string;
+                to?: string;
                 search?: string;
                 status?: "PENDING" | "CONFIRMED" | "CANCELLED" | "EXPIRED";
-                page?: components["schemas"]["Object"];
-                limit?: components["schemas"]["Object"];
             };
             header?: never;
             path?: never;
@@ -4663,7 +4690,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CursorPaginatedBookingsResponseDto"];
+                };
             };
         };
     };
@@ -4688,7 +4717,17 @@ export interface operations {
     };
     Bookings_findMine: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Opaque cursor returned by the previous page. */
+                after?: string;
+                /** @description Opaque cursor returned by the next page when moving backwards. */
+                before?: string;
+                limit?: components["schemas"]["Object"];
+                from?: string;
+                to?: string;
+                status?: "PENDING" | "CONFIRMED" | "CANCELLED" | "EXPIRED";
+                search?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4700,7 +4739,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BookingResponseDto"][];
+                    "application/json": components["schemas"]["CursorPaginatedBookingsResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
                 };
             };
             401: {
@@ -4864,6 +4911,13 @@ export interface operations {
     Sepay_findTransactions: {
         parameters: {
             query?: {
+                /** @description Opaque cursor returned by the previous page. */
+                after?: string;
+                /** @description Opaque cursor returned by the next page when moving backwards. */
+                before?: string;
+                limit?: components["schemas"]["Object"];
+                from?: string;
+                to?: string;
                 status?: "MATCHED" | "CONFIRMED" | "REVIEW_REQUIRED" | "REFUNDED";
             };
             header?: never;
@@ -4877,7 +4931,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SepayTransactionResponseDto"][];
+                    "application/json": components["schemas"]["CursorPaginatedTransactionsResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
                 };
             };
             401: {
@@ -5063,7 +5125,17 @@ export interface operations {
     };
     Tickets_findMine: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Opaque cursor returned by the previous page. */
+                after?: string;
+                /** @description Opaque cursor returned by the next page when moving backwards. */
+                before?: string;
+                limit?: components["schemas"]["Object"];
+                from?: string;
+                to?: string;
+                status?: "ACTIVE" | "USED" | "CANCELLED";
+                search?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5075,7 +5147,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TicketResponseDto"][];
+                    "application/json": components["schemas"]["CursorPaginatedTicketsResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
                 };
             };
             401: {

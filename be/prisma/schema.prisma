@@ -277,7 +277,8 @@ model Booking {
 
   @@unique([userId, idempotencyKey])
   @@index([holdToken])
-  @@index([userId, createdAt])
+  @@index([userId, createdAt, id])
+  @@index([status, createdAt, id])
   @@index([status, expiresAt])
 }
 
@@ -316,6 +317,8 @@ model Ticket {
   bookingItem   BookingItem  @relation(fields: [bookingItemId], references: [id], onDelete: Restrict)
   createdAt     DateTime     @default(now())
   usedAt        DateTime?
+
+  @@index([bookingId, createdAt, id])
 }
 
 model SepayPaymentIntent {
@@ -354,7 +357,7 @@ model SepayTransaction {
   updatedAt       DateTime               @updatedAt
 
   @@index([paymentIntentId])
-  @@index([status])
+  @@index([status, transactionDate, id])
 }
 
 model Refund {

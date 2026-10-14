@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { SepayTransactionStatus, BookingStatus } from '@prisma/client';
+import { CursorPaginationMetaDto } from '../../../common/http/dto/cursor-response.dto.js';
 
 export class AdminBookingSummaryDto {
   @ApiProperty()
@@ -66,6 +67,14 @@ export class SepayTransactionResponseDto {
 
   @ApiProperty()
   createdAt!: string;
+}
+
+export class CursorPaginatedTransactionsResponseDto {
+  @ApiProperty({ type: [SepayTransactionResponseDto] })
+  data!: SepayTransactionResponseDto[];
+
+  @ApiProperty({ type: CursorPaginationMetaDto })
+  meta!: CursorPaginationMetaDto;
 }
 
 export class UpdateTransactionStatusDto {

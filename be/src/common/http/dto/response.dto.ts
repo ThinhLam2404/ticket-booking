@@ -11,6 +11,7 @@ import {
   TicketStatus,
   UserRole,
 } from '@prisma/client';
+import { CursorPaginationMetaDto } from './cursor-response.dto.js';
 
 export class PaginationMetaDto {
   @ApiProperty({ example: 1 })
@@ -98,13 +99,21 @@ export class MovieResponseDto {
   })
   trailerKey?: string | null;
 
-  @ApiPropertyOptional({ type: String, example: '2024-02-27T00:00:00.000Z', format: 'date-time', nullable: true })
+  @ApiPropertyOptional({
+    type: String,
+    example: '2024-02-27T00:00:00.000Z',
+    format: 'date-time',
+    nullable: true,
+  })
   releaseDate?: string | null;
 
   @ApiPropertyOptional({ type: Number, example: 8.7, nullable: true })
   rating?: number | null;
 
-  @ApiProperty({ type: [String], example: ['Hành động', 'Khoa học viễn tưởng'] })
+  @ApiProperty({
+    type: [String],
+    example: ['Hành động', 'Khoa học viễn tưởng'],
+  })
   genres!: string[];
 
   @ApiPropertyOptional({ type: String, example: 'T13', nullable: true })
@@ -142,7 +151,10 @@ export class MovieShowtimeResponseDto {
   @ApiProperty({ example: 'clx-room-id' })
   roomId!: string;
 
-  @ApiProperty({ enum: ShowtimeFormat, example: ShowtimeFormat.TWO_D_SUBTITLED })
+  @ApiProperty({
+    enum: ShowtimeFormat,
+    example: ShowtimeFormat.TWO_D_SUBTITLED,
+  })
   format!: ShowtimeFormat;
 
   @ApiProperty({ type: String, example: '100000.00' })
@@ -319,7 +331,10 @@ export class ShowtimeResponseDto {
   @ApiProperty({ example: 'clx-room-id' })
   roomId!: string;
 
-  @ApiProperty({ enum: ShowtimeFormat, example: ShowtimeFormat.TWO_D_SUBTITLED })
+  @ApiProperty({
+    enum: ShowtimeFormat,
+    example: ShowtimeFormat.TWO_D_SUBTITLED,
+  })
   format!: ShowtimeFormat;
 
   @ApiProperty({ type: String, example: '100000.00' })
@@ -544,6 +559,21 @@ export class BookingResponseDto {
   updatedAt!: string;
 }
 
+export class CursorPaginatedBookingsResponseDto {
+  @ApiProperty({ type: [BookingResponseDto] })
+  data!: BookingResponseDto[];
+
+  @ApiProperty({ type: CursorPaginationMetaDto })
+  meta!: CursorPaginationMetaDto;
+}
+
+export class CursorPaginatedTicketsResponseDto {
+  @ApiProperty({ type: [TicketResponseDto] })
+  data!: TicketResponseDto[];
+
+  @ApiProperty({ type: CursorPaginationMetaDto })
+  meta!: CursorPaginationMetaDto;
+}
 
 export class HealthResponseDto {
   @ApiProperty({ enum: ['ok', 'degraded'], example: 'ok' })

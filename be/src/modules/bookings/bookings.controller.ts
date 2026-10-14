@@ -19,12 +19,14 @@ import {
 } from '../../common/http/swagger.decorators.js';
 import {
   BookingResponseDto,
+  CursorPaginatedBookingsResponseDto,
 } from '../../common/http/dto/response.dto.js';
+import { ListBookingsDto } from './dto/list-bookings.dto.js';
+import { AdminBookingsQueryDto } from './dto/admin-bookings.dto.js';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
-import { AdminBookingsQueryDto } from './dto/admin-bookings.dto.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { BookingsService } from './bookings.service.js';
@@ -55,7 +57,7 @@ export class BookingsController {
   @Get('admin')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 200, type: CursorPaginatedBookingsResponseDto })
   findAllAdmin(@Query() query: AdminBookingsQueryDto) {
     return this.bookingsService.findAllAdmin(query);
   }
@@ -69,10 +71,10 @@ export class BookingsController {
   }
 
   @Get()
-  @ApiResponse({ status: 200, type: BookingResponseDto, isArray: true })
-  @ApiErrorResponses(401)
-  findMine(@CurrentUser() user: AuthUser) {
-    return this.bookingsService.findMine(user.id);
+  @ApiResponse({ status: 200, type: CursorPaginatedBookingsResponseDto })
+  @ApiErrorResponses(400, 401)
+  findMine(@CurrentUser() user: AuthUser, @Query() query: ListBookingsDto) {
+    return this.bookingsService.findMine(user.id, query);
   }
 
   @Get(':id')

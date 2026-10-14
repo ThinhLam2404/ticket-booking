@@ -558,19 +558,24 @@ describe('Booking flow integration', () => {
       .get('/api/v1/tickets')
       .set('Authorization', `Bearer ${fixture.customerA.token}`)
       .expect(200);
-    expect(tickets.body).toHaveLength(2);
+    expect(tickets.body.data).toHaveLength(2);
     expect(
-      tickets.body.every(
+      tickets.body.data.every(
         (ticket: { bookingId: string }) => ticket.bookingId === held.body.id,
       ),
     ).toBe(true);
     expect(
       new Set(
-        tickets.body.map(
+        tickets.body.data.map(
           (ticket: { bookingItem?: { id?: string } }) => ticket.bookingItem?.id,
         ),
       ).size,
     ).toBe(2);
+    expect(tickets.body.meta).toMatchObject({
+      limit: 20,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    });
     expect(
       await adminPrisma.booking.findUnique({ where: { id: held.body.id } }),
     ).toMatchObject({ status: BookingStatus.CONFIRMED });

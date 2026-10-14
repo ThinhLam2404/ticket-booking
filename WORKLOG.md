@@ -234,23 +234,31 @@ Definition of done:
 
 Mục tiêu: tránh các endpoint danh sách tải toàn bộ dữ liệu khi production bắt đầu có nhiều user/booking.
 
-Việc cần làm:
+Đã hoàn thành:
 
-- Chuẩn hóa response `{ data, meta }` với `page`, `pageSize`, `total`, `totalPages`.
-- Áp dụng cho customer bookings/tickets và admin payments trước; sau đó cinemas/rooms/showtimes nếu cần.
-- Chuẩn hóa filter/search/sort/date range ở backend thay vì lọc toàn bộ ở frontend.
-- Đồng bộ query state vào URL để reload/chia sẻ được.
-- Rà index và query plan bằng dữ liệu lớn; chỉ thêm cache khi benchmark chứng minh cần.
-- Giữ giới hạn page size và validate sort field để tránh query abuse.
-- Bổ sung load test cho catalogue, booking list, ticket list và payment list.
+- Áp dụng cursor/keyset pagination cho customer bookings/tickets, admin bookings và admin SePay transactions.
+- Response cursor chuẩn hóa thành `{ data, meta }` với `limit`, `hasNextPage`, `hasPreviousPage`, `nextCursor`, `previousCursor`; movies/showtimes vẫn giữ contract offset.
+- Cursor versioned, opaque, HMAC-signed và ràng buộc endpoint/filter/user scope; reject cursor tampered, sai filter hoặc sai hướng.
+- Filter/search được thực thi backend trước pagination; customer ownership luôn nằm trong query authorization.
+- Query dùng stable ordering `createdAt DESC, id DESC` cho booking/ticket và `transactionDate DESC, id DESC` cho SePay, với `take: limit + 1` và không count mỗi trang.
+- URL state được đồng bộ cho customer bookings/tickets, admin bookings và admin payments; thay filter/search/cursor reset đúng trạng thái.
+- Thêm composite indexes phục vụ ownership/status và keyset access; index SePay dùng `transactionDate` đúng với sort contract.
+- Cập nhật OpenAPI, generated frontend types, README và integration contract cho response mới.
+- Bổ sung unit coverage cho cursor ký HMAC, tampering/scope/direction, duplicate timestamp và backward metadata.
+
+Còn lại sau Sprint 5:
+
+- Chưa có benchmark dataset production-size và kết quả `EXPLAIN (ANALYZE, BUFFERS)` được commit; indexes hiện tại cần được xác nhận lại trên staging dữ liệu đại diện.
+- Chưa chuyển movies/showtimes/cinemas/rooms sang cursor vì vẫn giữ offset contract theo quyết định phạm vi Sprint 5.
 
 Kỹ năng đạt được: database indexing, query planning, API pagination design và performance measurement.
 
 Definition of done:
 
-- Không còn list nghiệp vụ production nào tải không giới hạn.
-- Query có filter/sort được kiểm chứng bằng EXPLAIN hoặc benchmark.
-- Frontend giữ loading/empty/error/pagination state đúng trên mobile.
+- Không còn bốn list nghiệp vụ mục tiêu tải không giới hạn.
+- Query có filter/sort, cursor integrity và ownership được kiểm chứng bằng unit/integration tests.
+- Migration `20261015090000_sprint5_cursor_indexes` bổ sung composite indexes cho keyset access; cần chạy `npm run prisma:deploy` ở môi trường có database trước khi release.
+- Frontend giữ loading/empty/error/pagination state đúng trên mobile và URL reload được.
 
 ### Sprint 6 — Automated critical journeys và quality gate
 

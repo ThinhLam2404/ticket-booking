@@ -27,6 +27,7 @@ import { MailService } from '../mail/mail.service.js';
 import { logOperationalEvent } from '../../common/logging/operational-logger.js';
 import { recordPaymentReviewRequired } from '../observability/metrics.service.js';
 import { RedisService } from '../redis/redis.service.js';
+import { assertCursorDirection, buildCursorMeta, cursorWhere, decodeCursor } from '../../common/http/cursor-pagination.js';
 
 const PAYMENT_CODE_PREFIX = 'CB';
 const PAYMENT_CODE_LENGTH = 8;
@@ -242,12 +243,29 @@ export class SepayService {
     return { success: true };
   }
 
-  async findTransactions(query?: { status?: SepayTransactionStatus }) {
-    const where = query?.status ? { status: query.status } : {};
+  async findTransactions(query?: { status?: SepayTransactionStatus; after?: string; before?: string; limit?: number; from?: string; to?: string }) {
+    const limit = query?.limit ?? 20;
+    assertCursorDirection(query?.after, query?.before);
+    const direction = query?.before ? 'before' : 'after';
+    const cursor = query?.before ?? query?.after;
+    const scope = `sepay-transactions:${query?.status ?? ''}:${query?.from ?? ''}:${query?.to ?? ''}`;
+    const payload = cursor ? decodeCursor(cursor, scope, direction) : undefined;
+    const where = {
+      ...(query?.status ? { status: query.status } : {}),
+      ...(query?.from || query?.to
+        ? {
+            transactionDate: {
+              ...(query?.from ? { gte: new Date(query.from) } : {}),
+              ...(query?.to ? { lt: new Date(query.to) } : {}),
+            },
+          }
+        : {}),
+      ...(payload ? cursorWhere(payload, 'transactionDate') : {}),
+    };
     const transactions = await this.prisma.sepayTransaction.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
-      take: 100,
+      orderBy: direction === 'before' ? [{ transactionDate: 'asc' }, { id: 'asc' }] : [{ transactionDate: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
       include: {
         paymentIntent: {
           include: {
@@ -264,7 +282,7 @@ export class SepayService {
         },
       },
     });
-    return transactions.map((tx) => {
+    const mapped = transactions.map((tx) => {
       const booking = tx.paymentIntent?.booking;
       if (!booking) return { ...tx, booking: null };
       return {
@@ -276,13 +294,13 @@ export class SepayService {
           userEmail: booking.user?.email ?? '',
           movieTitle: booking.showtime?.movie?.title ?? '',
           showtimeStartsAt: booking.showtime?.startsAt.toISOString() ?? '',
-          seatLabels: booking.items.map(
-            (item) =>
-              `${item.showtimeSeat?.seat?.row ?? ''}${item.showtimeSeat?.seat?.number ?? ''}`,
-          ),
+          seatLabels: booking.items.map((item) => `${item.showtimeSeat?.seat?.row ?? ''}${item.showtimeSeat?.seat?.number ?? ''}`),
         },
       };
     });
+    const result = buildCursorMeta(transactions, limit, scope, direction, (row) => row.transactionDate, Boolean(cursor));
+    const mappedById = new Map(mapped.map((item) => [item.id, item]));
+    return { ...result, data: result.data.map((item) => mappedById.get(item.id) ?? item) };
   }
 
   async manualConfirmTransaction(

@@ -475,6 +475,9 @@ textarea { min-height: 110px; line-height: 1.55; resize: vertical; }
 
 .quick-actions { display: grid; gap: 10px; padding: 20px; }
 .quick-actions .full-width { width: 100%; }
+.cursor-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 24px 0; color: var(--muted); font-size: .75rem; }
+.cursor-pagination button { min-width: 92px; }
+@media (max-width: 720px) { .cursor-pagination { justify-content: space-between; gap: 8px; } .cursor-pagination span { font-size: .65rem; text-align: center; } }
 .admin-shell .tmdb-poster { width: 54px; height: 76px; display: grid; place-items: center; border-radius: 7px; background-color: var(--surface-high); background-position: center; background-size: cover; color: var(--accent-soft); font-weight: 800; }
 .admin-shell .tmdb-result-copy { min-width: 0; }
 .admin-shell .tmdb-result-copy strong, .admin-shell .tmdb-result-copy small, .admin-shell .tmdb-result-copy p { display: block; overflow: hidden; text-overflow: ellipsis; }

@@ -5,12 +5,14 @@ import type {
   EmailVerificationResponse,
   EmailVerificationResendResponse,
   Booking,
+  CursorBookingsResponse,
+  CursorTicketsResponse,
+  CursorSepayTransactionsResponse,
   Cinema,
   HoldRequest,
   LoginRequest,
   SepayCheckoutResponse,
   SepayTransaction,
-  SepayTransactionsResponse,
   UpdateSepayTransactionRequest,
   MovieDetails,
   MoviesResponse,
@@ -390,13 +392,15 @@ export const api = {
   checkout(bookingId: string) {
     return request<SepayCheckoutResponse>(`/payments/bookings/${bookingId}/checkout`, { method: 'POST' });
   },
-  bookings(signal?: AbortSignal) {
-    return request<Booking[]>('/bookings', { signal });
-  },
-  adminBookings(params?: { search?: string; status?: string; page?: number; limit?: number }, signal?: AbortSignal) {
+  bookings(params: { status?: string; search?: string; after?: string; before?: string; limit?: number; from?: string; to?: string } = {}, signal?: AbortSignal) {
     const query = new URLSearchParams();
-    Object.entries(params ?? {}).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
-    return request<{ data: Booking[]; meta: { page: number; limit: number; total: number; totalPages: number } }>(`/bookings/admin?${query}`, { signal });
+    Object.entries(params).forEach(([key, value]) => { if (value) query.set(key, String(value)); });
+    return request<CursorBookingsResponse>(`/bookings?${query.toString()}`, { signal });
+  },
+  adminBookings(params: { search?: string; status?: string; after?: string; before?: string; limit?: number; from?: string; to?: string } = {}, signal?: AbortSignal) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
+    return request<CursorBookingsResponse>(`/bookings/admin?${query}`, { signal });
   },
   adminBooking(id: string, signal?: AbortSignal) {
     return request<Booking>(`/bookings/admin/${id}`, { signal });
@@ -407,12 +411,15 @@ export const api = {
   ticket(id: string, signal?: AbortSignal) {
     return request<Ticket>(`/tickets/${id}`, { signal });
   },
-  tickets(signal?: AbortSignal) {
-    return request<Ticket[]>('/tickets', { signal });
+  tickets(params: { status?: string; search?: string; after?: string; before?: string; limit?: number; from?: string; to?: string } = {}, signal?: AbortSignal) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
+    return request<CursorTicketsResponse>(`/tickets?${query}`, { signal });
   },
-  adminSepayTransactions(status?: string, signal?: AbortSignal) {
-    const query = status ? `?status=${status}` : '';
-    return request<SepayTransactionsResponse>(`/payments/admin/sepay/transactions${query}`, { signal });
+  adminSepayTransactions(params: { status?: string; after?: string; before?: string; limit?: number; from?: string; to?: string } = {}, signal?: AbortSignal) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
+    return request<CursorSepayTransactionsResponse>(`/payments/admin/sepay/transactions?${query.toString()}`, { signal });
   },
   adminConfirmSepayTransaction(id: string, body: { force?: boolean; adminNote?: string }) {
     return request<SepayTransaction>(`/payments/admin/sepay/transactions/${id}/confirm`, {

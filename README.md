@@ -3,8 +3,20 @@
 ## Sprint 4 — Đối soát thủ công và quản trị hoàn tiền
 
 - Admin xác nhận giao dịch SePay cần rà soát tại `POST /api/v1/payments/admin/sepay/transactions/:id/confirm`. Nếu có lệch số tiền, booking hết hạn hoặc booking không còn chờ thanh toán, hệ thống trả cảnh báo; admin gửi lại `force: true` sau khi kiểm tra.
-- Danh sách booking quản trị: `GET /api/v1/bookings/admin` với `search`, `status`, `page`, `limit`; chi tiết: `GET /api/v1/bookings/admin/:id`.
 - Refund booking: `POST /api/v1/payments/admin/bookings/:bookingId/refund`; flow cập nhật payment/booking/ticket, giải phóng ghế và queue email.
+
+## Sprint 5 — Cursor pagination và query performance
+
+Bốn danh sách nghiệp vụ dùng cursor/keyset pagination để không tải toàn bộ dữ liệu hoặc chạy `COUNT(*)` ở mỗi request:
+
+- `GET /api/v1/bookings`: booking của customer hiện tại.
+- `GET /api/v1/tickets`: ticket của customer hiện tại.
+- `GET /api/v1/bookings/admin`: booking dành cho Admin.
+- `GET /api/v1/payments/admin/sepay/transactions`: giao dịch SePay dành cho Admin.
+
+Query dùng `limit` từ `1` đến `100` (mặc định `20`) và một trong hai cursor `after` hoặc `before`. Response có dạng `{ data, meta }`, trong đó `meta` gồm `limit`, `hasNextPage`, `hasPreviousPage`, `nextCursor` và `previousCursor`. Cursor là chuỗi opaque có version, hướng, giá trị sort, ID, scope filter/user và chữ ký HMAC; cursor bị sửa, dùng sai endpoint/filter/user hoặc dùng sai hướng sẽ trả `400`.
+
+Booking và ticket sort theo `createdAt DESC, id DESC`. SePay sort theo `transactionDate DESC, id DESC`; mọi query dùng `limit + 1` để xác định trang kế tiếp. Filter/search chạy trong backend trước keyset predicate. Migration `20261015090000_sprint5_cursor_indexes` thêm composite indexes cho ownership/status và keyset sort; chạy `npm run prisma:deploy` trước khi release. Movies/showtimes vẫn giữ offset pagination ở Sprint 5.
 
 Tài liệu dùng chung cho toàn bộ repository `ticket-booking`, mô tả frontend, backend, API contract, database, infrastructure, runtime flow và cách chạy hệ thống theo đúng source code hiện tại.
 
@@ -1974,8 +1986,17 @@ Errors: `400`, `401`, `404`, `409`, `503`.
 
 - Auth: Bearer JWT.
 - Success: `200`.
-- Trả array booking của user hiện tại, sort `createdAt desc`.
-- Chưa có pagination.
+- Query: `limit`, `after`, `before`, `status`, `search`; chỉ được gửi một trong `after`/`before`.
+- Trả `{ data, meta }` của booking thuộc user hiện tại, sort `createdAt desc, id desc`.
+- Filter được áp dụng trước keyset predicate; đổi filter hoặc page size phải bắt đầu lại từ đầu, không tái sử dụng cursor cũ.
+- `meta.nextCursor` dùng cho `after`, `meta.previousCursor` dùng cho `before`; cursor sai chữ ký/scope trả `400`.
+
+#### `GET /api/v1/bookings/admin`
+
+- Auth: Bearer JWT, role `ADMIN`.
+- Query: `limit`, `after`, `before`, `status`, `search`.
+- Trả `{ data, meta }`, sort `createdAt desc, id desc`; không chạy total count trên mỗi request.
+
 
 #### `GET /api/v1/bookings/:id`
 
@@ -2049,7 +2070,8 @@ Response:
 
 - Auth: Bearer JWT (Role `ADMIN`).
 - Success: `200`.
-- Danh sách 100 giao dịch SePay gần nhất, hỗ trợ lọc theo query `status`.
+- Query: `limit`, `after`, `before`, `status`.
+- Trả `{ data, meta }`, sort `transactionDate desc, id desc`; không còn giới hạn cố định `take: 100` và không chạy total count trên mỗi request.
 
 #### `PATCH /api/v1/payments/admin/sepay/transactions/:id`
 
@@ -2074,8 +2096,9 @@ Giao dịch không khớp mã, sai tiền hoặc đến sau khi intent hết h�
 
 - Auth: Bearer JWT.
 - Success: `200`.
-- Trả ticket thuộc user hiện tại, sort `createdAt desc`.
-- Include booking/showtime/movie/cinema/room và booking item/seat.
+- Query: `limit`, `after`, `before`, `status`, `search`.
+- Trả `{ data, meta }` ticket thuộc user hiện tại, sort `createdAt desc, id desc`.
+- Include booking/showtime/movie/cinema/room và booking item/seat; authorization vẫn nằm trong `where`, cursor không thay thế ownership check.
 
 #### `GET /api/v1/tickets/:id`
 
