@@ -21,3 +21,20 @@ export function logOperationalEvent(
     })}\n`,
   );
 }
+
+export async function measureServiceTiming<T>(
+  operation: string,
+  action: () => Promise<T>,
+): Promise<T> {
+  if (process.env.DB_QUERY_LOGGING !== 'true') return action();
+
+  const startedAt = performance.now();
+  try {
+    return await action();
+  } finally {
+    logOperationalEvent('info', 'service_timing', {
+      operation,
+      durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+    });
+  }
+}

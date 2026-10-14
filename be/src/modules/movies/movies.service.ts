@@ -6,6 +6,7 @@ import {
 import { MovieStatus, Prisma, RoomFormat, ShowtimeFormat } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
+import { measureServiceTiming } from '../../common/logging/operational-logger.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { TmdbClient } from './tmdb.client.js';
 import type { ListTmdbMoviesDto } from './dto/tmdb-movie.dto.js';
@@ -42,11 +43,15 @@ export class MoviesService {
   ) {}
 
   async findAll(query: ListMoviesDto) {
-    return this.findMovies(query, { publishedOnly: true });
+    return measureServiceTiming('movies.findAll', () =>
+      this.findMovies(query, { publishedOnly: true }),
+    );
   }
 
   async findAllAdmin(query: ListAdminMoviesDto) {
-    return this.findMovies(query, { publishedOnly: false });
+    return measureServiceTiming('movies.findAllAdmin', () =>
+      this.findMovies(query, { publishedOnly: false }),
+    );
   }
 
   async findTmdb(query: ListTmdbMoviesDto) {
@@ -225,7 +230,8 @@ export class MoviesService {
   }
 
   async findOne(id: string, provinceCode?: number) {
-    const movie = await this.prisma.movie.findFirst({
+    return measureServiceTiming('movies.findOne', async () => {
+      const movie = await this.prisma.movie.findFirst({
       where: { id, status: MovieStatus.PUBLISHED },
       include: {
         showtimes: {
@@ -243,7 +249,8 @@ export class MoviesService {
       throw new NotFoundException('Movie not found');
     }
 
-    return toMovieResponse(movie);
+      return toMovieResponse(movie);
+    });
   }
 
   async create(dto: CreateMovieDto) {

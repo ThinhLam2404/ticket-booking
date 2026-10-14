@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
+import { measureServiceTiming } from '../../common/logging/operational-logger.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { validateSeatLayout } from '../seats/seat-layout.js';
 import { CreateShowtimeDto } from './dto/create-showtime.dto.js';
@@ -81,17 +82,21 @@ export class ShowtimesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: ListShowtimesDto) {
-    return this.findShowtimes(query, {
-      publishedOnly: true,
-      includePast: false,
-    });
+    return measureServiceTiming('showtimes.findAll', () =>
+      this.findShowtimes(query, {
+        publishedOnly: true,
+        includePast: false,
+      }),
+    );
   }
 
   async findAllAdmin(query: ListAdminShowtimesDto) {
-    return this.findShowtimes(query, {
-      publishedOnly: false,
-      includePast: query.includePast,
-    });
+    return measureServiceTiming('showtimes.findAllAdmin', () =>
+      this.findShowtimes(query, {
+        publishedOnly: false,
+        includePast: query.includePast,
+      }),
+    );
   }
 
   private async findShowtimes(
@@ -212,7 +217,8 @@ export class ShowtimesService {
   }
 
   async findOne(id: string) {
-    const showtime = await this.prisma.showtime.findUnique({
+    return measureServiceTiming('showtimes.findOne', async () => {
+      const showtime = await this.prisma.showtime.findUnique({
       where: { id },
       select: {
         id: true,
@@ -290,11 +296,13 @@ export class ShowtimesService {
       throw new NotFoundException('Showtime not found');
     }
 
-    return toPublicResponse(showtime);
+      return toPublicResponse(showtime);
+    });
   }
 
   async findSeats(id: string) {
-    const showtime = await this.prisma.showtime.findUnique({
+    return measureServiceTiming('showtimes.findSeats', async () => {
+      const showtime = await this.prisma.showtime.findUnique({
       where: { id },
       select: {
         id: true,
@@ -328,11 +336,12 @@ export class ShowtimesService {
       throw new NotFoundException('Showtime not found');
     }
 
-    return toPublicResponse({
-      showtimeId: showtime.id,
-      startsAt: showtime.startsAt,
-      endsAt: showtime.endsAt,
-      seats: showtime.showtimeSeats,
+      return toPublicResponse({
+        showtimeId: showtime.id,
+        startsAt: showtime.startsAt,
+        endsAt: showtime.endsAt,
+        seats: showtime.showtimeSeats,
+      });
     });
   }
 

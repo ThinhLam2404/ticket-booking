@@ -101,7 +101,7 @@ Application có thể chạy trực tiếp bằng Node/NestJS và Vite cho devel
 - Swagger UI: `http://localhost:3000/api/docs` khi Swagger được bật
 - Prometheus metrics: `http://localhost:3000/api/v1/metrics` với `Authorization: Bearer <METRICS_TOKEN>`
 
-Global prefix, CORS allowlist, Helmet, body limit, trusted proxy, validation pipe và Swagger gate được cấu hình tại `be/src/config/app.config.ts`. Frontend đọc API URL từ `fe/.env` qua biến `VITE_API_URL`. Khi không cấu hình `SWAGGER_ENABLED`, Swagger mặc định bật ở development/test và tắt ở production; `true` luôn bật, `false` luôn tắt. Khi `DB_QUERY_LOGGING=true`, mỗi `http_request` log thêm `queryCount`, `durationMs` (tổng thời gian Prisma query event) và `slowQueryCount`; các trường này chỉ phản ánh query event mà Prisma phát ra, không phải pool wait. Log `db_query_slow` thêm fingerprint SQL đã chuẩn hóa giá trị literal thành `?`, không ghi bind values. Các cron `operational_monitor` và `booking_expiry` ghi event `scheduler_run` kèm duration, trạng thái và số booking đã xử lý để phân biệt chi phí nền với HTTP request. Chỉ bật diagnostics trong cửa sổ đo local/staging hoặc production ngắn hạn, không ghi SQL/bind values, rồi tắt lại sau khi đo.
+Global prefix, CORS allowlist, Helmet, body limit, trusted proxy, validation pipe và Swagger gate được cấu hình tại `be/src/config/app.config.ts`. Frontend đọc API URL từ `fe/.env` qua biến `VITE_API_URL`. Khi không cấu hình `SWAGGER_ENABLED`, Swagger mặc định bật ở development/test và tắt ở production; `true` luôn bật, `false` luôn tắt. Khi `DB_QUERY_LOGGING=true`, mỗi `http_request` log thêm `queryCount`, `durationMs` (tổng thời gian Prisma query event) và `slowQueryCount`; các trường này chỉ phản ánh query event mà Prisma phát ra, không phải pool wait. Log `db_query_slow` thêm fingerprint SQL đã chuẩn hóa giá trị literal thành `?`, không ghi bind values. Các cron `operational_monitor` và `booking_expiry` ghi event `scheduler_run` kèm duration, trạng thái và số booking đã xử lý để phân biệt chi phí nền với HTTP request. Các read operation chính của movies/showtimes ghi event `service_timing` với tên operation và tổng duration để đối chiếu với `http_request`; đây cũng chỉ là phép đo ứng dụng, không phải thời gian pool wait riêng biệt. Chỉ bật diagnostics trong cửa sổ đo local/staging hoặc production ngắn hạn, không ghi SQL/bind values, rồi tắt lại sau khi đo.
 
 ### 2.4. Kiến trúc hệ thống
 
@@ -278,7 +278,7 @@ SMTP_SECURE=false
 SMTP_USER=your-smtp-username
 SMTP_PASSWORD=your-smtp-password
 SMTP_FROM=CineBook <no-reply@example.com>
-PUBLIC_APP_URL=http://localhost:5173
+PUBLIC_APP_URL=https://cinebook.example.com
 MAIL_WORKER_ENABLED=true
 MAIL_WORKER_POLL_MS=10000
 MAIL_WORKER_STALE_LOCK_MS=300000
@@ -301,7 +301,7 @@ VERIFICATION_TOKEN_RETENTION_DAYS=2
 MAIL_OUTBOX_RETENTION_DAYS=90
 DOCKER_PUBLIC_APP_URL=http://localhost:8080
 DOCKER_CORS_ORIGINS=http://localhost:8080
-DOCKER_MAIL_WORKER_ENABLED=false
+DOCKER_MAIL_WORKER_ENABLED=true
 TMDB_ACCESS_TOKEN=<tmdb-api-read-access-token>
 SEED_ADMIN_EMAIL=admin@example.com
 SEED_ADMIN_PASSWORD=change-this-seed-password
@@ -323,7 +323,7 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `SMTP_USER`              | Không    | SMTP username nếu provider yêu cầu                             |
 | `SMTP_PASSWORD`          | Không    | SMTP password nếu provider yêu cầu                             |
 | `SMTP_FROM`              | Không    | Địa chỉ gửi email                                               |
-| `PUBLIC_APP_URL`         | Không    | Base URL frontend dùng trong link xác thực và link xem vé     |
+| `PUBLIC_APP_URL`         | Production | Base URL frontend dùng trong link xác thực và link xem vé; phải là URL public, không dùng `localhost` |
 | `MAIL_WORKER_ENABLED`    | Không    | Bật Worker Thread gửi mail; test/OpenAPI nên để `false`       |
 | `MAIL_WORKER_POLL_MS`    | Không    | Chu kỳ polling fallback khi outbox rỗng, default `10000`      |
 | `MAIL_WORKER_STALE_LOCK_MS` | Không | Thời gian reclaim lock PROCESSING, default `300000`           |
@@ -346,7 +346,7 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `MAIL_OUTBOX_RETENTION_DAYS` | Không | Retention mail đã gửi, default `90` ngày              |
 | `DOCKER_PUBLIC_APP_URL` | Docker | Ghi đè `PUBLIC_APP_URL` trong production-like Compose; default `http://localhost:8080` |
 | `DOCKER_CORS_ORIGINS` | Docker | Ghi đè `CORS_ORIGINS` trong production-like Compose; default `http://localhost:8080` |
-| `DOCKER_MAIL_WORKER_ENABLED` | Docker | Bật/tắt Mail Worker trong production-like Compose; default `false` |
+| `DOCKER_MAIL_WORKER_ENABLED` | Docker | Bật/tắt Mail Worker trong production-like Compose; default `true` |
 | `TMDB_ACCESS_TOKEN`      | Không    | TMDB API Read Access Token; cần nếu Admin tìm hoặc nhập phim  |
 | `SEED_ADMIN_EMAIL`       | Seed     | Email admin bootstrap, default `admin@example.com`             |
 | `SEED_ADMIN_PASSWORD`    | Seed     | Password admin bootstrap, bắt buộc khi seed                    |
@@ -2624,7 +2624,7 @@ Lệnh này build và chạy:
 - `redis`: lock/rate-limit store nội bộ trong container.
 - PostgreSQL không nằm trong production-like compose này; API kết nối database external có thể truy cập từ container, ví dụ Prisma Cloud.
 
-Mở `http://localhost:8080`; frontend gọi `/api/v1` qua Nginx proxy. API container chạy `prisma migrate deploy` trước khi start, nên migration phải được review và apply đúng database external. Trước `npm run docker:up`, cần có `be/.env` chứa `DATABASE_URL` mà container truy cập được, JWT secrets, `SEPAY_WEBHOOK_API_KEY`, `METRICS_TOKEN` tối thiểu 32 ký tự và các config bắt buộc. URL `localhost:5432` mặc định dành cho backend chạy trực tiếp trên host và không dùng được từ API container; production-like stack nên dùng Prisma Cloud hoặc một PostgreSQL external phù hợp. Compose mặc định tắt Mail Worker (`DOCKER_MAIL_WORKER_ENABLED=false`); muốn gửi email phải cấu hình SMTP và bật biến này có chủ đích. API chỉ nhận traffic từ frontend proxy trên network nội bộ; `TRUST_PROXY=1` dùng đúng client IP do Nginx chuyển tiếp. Dừng stack bằng:
+Mở `http://localhost:8080`; frontend gọi `/api/v1` qua Nginx proxy. API container chạy `prisma migrate deploy` trước khi start, nên migration phải được review và apply đúng database external. Trước `npm run docker:up`, cần có `be/.env` chứa `DATABASE_URL` mà container truy cập được, JWT secrets, `SEPAY_WEBHOOK_API_KEY`, `METRICS_TOKEN` tối thiểu 32 ký tự và các config bắt buộc. URL `localhost:5432` mặc định dành cho backend chạy trực tiếp trên host và không dùng được từ API container; production-like stack nên dùng Prisma Cloud hoặc một PostgreSQL external phù hợp. Compose mặc định bật Mail Worker (`DOCKER_MAIL_WORKER_ENABLED=true`); chỉ tắt biến này khi cố ý chạy API không có worker. Muốn gửi email production vẫn phải cấu hình đúng SMTP và kiểm tra readiness/log worker. API chỉ nhận traffic từ frontend proxy trên network nội bộ; `TRUST_PROXY=1` dùng đúng client IP do Nginx chuyển tiếp. Dừng stack bằng:
 
 ```bash
 npm run docker:down
