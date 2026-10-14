@@ -96,8 +96,12 @@ jobs:
         run: |
           if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
             git diff-tree --check --root -r "$HEAD_SHA"
-          else
+          elif git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
             git diff --check "$BASE_SHA" "$HEAD_SHA"
+          else
+            # A force-push can remove the previous commit from the remote,
+            # so GitHub's before SHA may not exist in the checkout.
+            git diff-tree --check --root -r "$HEAD_SHA"
           fi
 
   integration:
