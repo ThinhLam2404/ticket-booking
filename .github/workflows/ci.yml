@@ -65,6 +65,9 @@ jobs:
       - name: Check OpenAPI artifacts
         run: npm run api:check
 
+      - name: Check critical API contract
+        run: npm run test:api:contract
+
       - name: Run backend unit tests
         run: npm test
 
@@ -73,6 +76,28 @@ jobs:
 
       - name: Run E2E tests
         run: npm run test:e2e
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build frontend preview
+        run: npm run build:fe
+
+      - name: Run browser smoke tests
+        run: npm run test:browser:smoke
+
+      - name: Run isolated full-stack browser journeys
+        run: npm run test:browser:full
+
+      - name: Upload browser artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
 
       - name: Validate deployment configuration
         run: |

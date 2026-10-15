@@ -264,7 +264,20 @@ Definition of done:
 
 Mục tiêu: biến các flow quan trọng thành regression tự động để có thể refactor an toàn.
 
-Việc cần làm:
+Đã triển khai bước đầu:
+
+- Thêm Playwright Test với Chromium desktop/mobile, chạy serial để giữ fixture ổn định.
+- Thêm browser smoke cho customer catalogue, customer auth guard, admin auth guard và responsive overflow ở mobile.
+- Thêm commands `npm run test:browser`, `npm run test:browser:smoke`, `npm run test:browser:ui`.
+- CI cài Chromium, build frontend preview, chạy browser smoke và upload report/trace/screenshot khi fail.
+- Browser runner dùng frontend preview độc lập qua `PLAYWRIGHT_BASE_URL`, không cần database development cho smoke suite.
+- Thêm `npm run test:browser:full`: dựng PostgreSQL/Redis test stack trên port riêng, deploy migration, chạy API test và chạy Playwright với API test URL; cleanup tự động, có `KEEP_BROWSER_INFRA=1` để giữ stack khi debug.
+- Thêm frontend jsdom/Testing Library test cho verification state và resend cooldown.
+- Thêm isolated browser fixture cho customer/admin, movie, cinema, room, showtime và seats; full-stack suite bao phủ register/verification/login/logout, Couple hold/cancel, checkout + SePay webhook + multi-ticket/ticket-email Mailpit assertion và invalid-token error state.
+- Thêm `test:api:contract` cho các auth/health/booking/payment operation, schema chính và idempotency header; CI chạy full-stack browser + API contract gates.
+
+Việc cần làm tiếp:
+
 
 - Bổ sung component/helper tests cho auth unverified + resend cooldown, booking confirmed redirect và multi-ticket display.
 - Bổ sung browser tests cho register/verify/login, Couple seat, hold expiry/cancel, checkout/webhook và nhận nhiều ticket.

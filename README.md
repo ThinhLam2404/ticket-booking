@@ -18,6 +18,17 @@ Query dùng `limit` từ `1` đến `100` (mặc định `20`) và một trong h
 
 Booking và ticket sort theo `createdAt DESC, id DESC`. SePay sort theo `transactionDate DESC, id DESC`; mọi query dùng `limit + 1` để xác định trang kế tiếp. Filter/search chạy trong backend trước keyset predicate. Migration `20261015090000_sprint5_cursor_indexes` thêm composite indexes cho ownership/status và keyset sort; chạy `npm run prisma:deploy` trước khi release. Movies/showtimes vẫn giữ offset pagination ở Sprint 5.
 
+## Sprint 6 — Browser smoke và quality gate
+
+Đã thêm Playwright smoke suite tại `tests/browser/` với Chromium desktop và mobile. Chạy local bằng:
+
+```bash
+npm run build:fe
+npm run test:browser
+```
+
+Smoke suite hiện kiểm tra customer catalogue, auth guard cho `/bookings`, admin guard cho `/admin/bookings`, theme keyboard control và overflow ở viewport mobile. CI tự cài Chromium, build frontend preview, chạy `npm run test:browser:smoke` và lưu Playwright report/trace/screenshot khi thất bại. `npm run test:browser:full` dựng PostgreSQL/Redis cô lập trên port `55433/56380`, deploy migration, build/chạy API trên port `3301` rồi chạy cùng browser suite với `VITE_API_URL` trỏ vào API test. Full-stack runner đã có fixture browser riêng (`browser-customer@example.com`, `browser-admin@example.com`, phim/suất/ghế test), nhưng cần Docker daemon để chạy. Full-stack suite bao phủ register → Mailpit email verification → login → logout, Couple seat pair → hold → cancel, checkout → SePay webhook → phát hành hai ticket và kiểm tra ticket email trong Mailpit, cùng invalid-token error state. Khi Docker daemon khả dụng, chạy `npm run test:browser:full`. `npm run test:api:contract` kiểm tra các operation/schema quan trọng và idempotency header trong OpenAPI committed.
+
 Tài liệu dùng chung cho toàn bộ repository `ticket-booking`, mô tả frontend, backend, API contract, database, infrastructure, runtime flow và cách chạy hệ thống theo đúng source code hiện tại.
 
 ## Mục lục

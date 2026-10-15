@@ -30,6 +30,10 @@
     "test:e2e": "npm --prefix be run test:e2e",
     "test:cov": "npm --prefix be run test:cov",
     "test:all": "npm run test && npm run test:fe && npm run test:e2e",
+    "test:browser": "playwright test",
+    "test:browser:smoke": "playwright test tests/browser/app-smoke.spec.ts --project=chromium-desktop",
+    "test:browser:ui": "playwright test --ui",
+    "test:browser:full": "node scripts/run-browser-tests.mjs",
     "test:integration": "npm --prefix be run test:integration",
     "check": "npm run lint && npm run typecheck && npm run build && npm run test:all",
     "check:ci": "npm run api:check && npm run check && npm run test:integration",
@@ -45,12 +49,15 @@
     "api:types": "openapi-typescript openapi/ticket-booking.openapi.json --output fe/src/generated/openapi.d.ts",
     "api:generate": "npm run api:spec && npm run api:types",
     "api:check": "node scripts/check-api-artifacts.mjs",
+    "test:api:contract": "node scripts/check-api-contract.mjs",
     "docker:up": "docker compose --env-file be/.env -f docker-compose.app.yml up --build -d --wait",
     "docker:down": "docker compose --env-file be/.env -f docker-compose.app.yml down",
     "docker:logs": "docker compose --env-file be/.env -f docker-compose.app.yml logs -f --tail=100",
     "ops:backup-restore-drill": "node scripts/ops/run-backup-restore-drill.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.52.0",
     "concurrently": "^10.0.5",
     "openapi-typescript": "7.13.0"
   }

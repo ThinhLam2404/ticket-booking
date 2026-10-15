@@ -171,10 +171,9 @@ export class MailWorkerSupervisor
   }
 
   private isEnabled(): boolean {
-    if (this.config.get<string>('NODE_ENV') === 'test') return false;
     const configured = this.config.get<string>('MAIL_WORKER_ENABLED');
     if (configured !== undefined) return configured === 'true';
-    return true;
+    return this.config.get<string>('NODE_ENV') !== 'test';
   }
 
   private workerData(): MailWorkerData {
