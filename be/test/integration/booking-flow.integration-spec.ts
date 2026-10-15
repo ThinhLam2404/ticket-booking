@@ -114,6 +114,16 @@ describe('Booking flow integration', () => {
     });
   });
 
+  it('rejects existing access JWTs immediately after their session is revoked or user disabled', async () => {
+    const bookings = () => request(appA.getHttpServer()).get('/api/v1/bookings').set('Authorization', `Bearer ${fixture.customerA.token}`);
+    await bookings().expect(200);
+    await adminPrisma.authSession.updateMany({ where: { userId: fixture.customerA.id }, data: { revokedAt: new Date() } });
+    await bookings().expect(401);
+    await adminPrisma.authSession.updateMany({ where: { userId: fixture.customerA.id }, data: { revokedAt: null } });
+    await adminPrisma.user.update({ where: { id: fixture.customerA.id }, data: { disabledAt: new Date() } });
+    await bookings().expect(401);
+  });
+
   it('does not enqueue another verification email during the resend cooldown', async () => {
     const email = `resend-${Date.now()}@example.com`;
     await request(appA.getHttpServer())

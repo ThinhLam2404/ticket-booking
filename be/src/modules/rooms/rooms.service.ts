@@ -2,16 +2,18 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
+import { AuditService } from '../audit/audit.service.js';
 import { CreateRoomDto, UpdateRoomDto } from './dto/room.dto.js';
 
 @Injectable()
 export class RoomsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly audit: AuditService = null as unknown as AuditService) {}
 
   async findByCinema(cinemaId: string) {
     const rooms = await this.prisma.room.findMany({

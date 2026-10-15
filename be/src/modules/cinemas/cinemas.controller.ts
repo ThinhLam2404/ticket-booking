@@ -19,6 +19,9 @@ import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
+import { PermissionsGuard } from '../../common/auth/permissions.guard.js';
+import { Permissions } from '../../common/auth/permissions.decorator.js';
+import { AdminPermission } from '@prisma/client';
 import { CreateCinemaDto, UpdateCinemaDto } from './dto/cinema.dto.js';
 import { ListCinemasDto } from './dto/list-cinemas.dto.js';
 import { CinemasService } from './cinemas.service.js';
@@ -45,8 +48,9 @@ export class CinemasController {
   @ApiResponse({ status: 201, type: CinemaResponseDto })
   @ApiErrorResponses(400, 401, 403, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_CINEMAS)
   create(@Body() dto: CreateCinemaDto) {
     return this.cinemasService.create(dto);
   }
@@ -55,8 +59,9 @@ export class CinemasController {
   @ApiResponse({ status: 200, type: CinemaResponseDto })
   @ApiErrorResponses(400, 401, 403, 404)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_CINEMAS)
   update(@Param('id') id: string, @Body() dto: UpdateCinemaDto) {
     return this.cinemasService.update(id, dto);
   }
@@ -65,8 +70,9 @@ export class CinemasController {
   @ApiResponse({ status: 200, type: CinemaResponseDto })
   @ApiErrorResponses(401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_CINEMAS)
   remove(@Param('id') id: string) {
     return this.cinemasService.remove(id);
   }

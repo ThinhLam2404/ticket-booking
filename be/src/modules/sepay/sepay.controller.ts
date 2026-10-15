@@ -21,6 +21,9 @@ import { ApiErrorResponses } from '../../common/http/swagger.decorators.js';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
+import { PermissionsGuard } from '../../common/auth/permissions.guard.js';
+import { Permissions } from '../../common/auth/permissions.decorator.js';
+import { AdminPermission } from '@prisma/client';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
 import { SepayCheckoutResponseDto } from './dto/sepay-checkout.dto.js';
@@ -62,8 +65,9 @@ export class SepayController {
 
   @Get('admin/sepay/transactions')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
+  @Permissions(AdminPermission.MANAGE_PAYMENTS)
   @ApiResponse({ status: 200, type: CursorPaginatedTransactionsResponseDto })
   @ApiQuery({ name: 'status', required: false, enum: SepayTransactionStatus })
   @ApiErrorResponses(400, 401, 403)
@@ -73,8 +77,9 @@ export class SepayController {
 
   @Post('admin/bookings/:bookingId/refund')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
+  @Permissions(AdminPermission.MANAGE_PAYMENTS)
   @ApiResponse({ status: 201, type: RefundResponseDto })
   @ApiErrorResponses(401, 403, 404, 409)
   refundBooking(@CurrentUser() user: AuthUser, @Param('bookingId') bookingId: string, @Body() dto: RefundBookingDto) {
@@ -83,8 +88,9 @@ export class SepayController {
 
   @Post('admin/sepay/transactions/:id/confirm')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
+  @Permissions(AdminPermission.MANAGE_PAYMENTS)
   @ApiResponse({ status: 200, type: SepayTransactionResponseDto })
   @ApiErrorResponses(401, 403, 404, 409)
   confirmTransaction(
@@ -97,8 +103,9 @@ export class SepayController {
 
   @Patch('admin/sepay/transactions/:id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
+  @Permissions(AdminPermission.MANAGE_PAYMENTS)
   @ApiResponse({ status: 200, type: SepayTransactionResponseDto })
   @ApiErrorResponses(401, 403, 404)
   updateTransaction(

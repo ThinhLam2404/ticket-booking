@@ -25,6 +25,8 @@ function createPrismaMock() {
         : (operations as (client: typeof prisma) => unknown)(prisma),
     ),
     user: { findUnique: vi.fn() },
+    authSession: { findFirst: vi.fn().mockResolvedValue({ id: 'test-session' }) },
+    userAdminPermission: { findMany: vi.fn().mockResolvedValue([{ permission: 'MANAGE_MOVIES' }, { permission: 'MANAGE_CINEMAS' }, { permission: 'MANAGE_SHOWTIMES' }, { permission: 'VIEW_BOOKINGS' }, { permission: 'MANAGE_PAYMENTS' }, { permission: 'VIEW_SYSTEM' }, { permission: 'MANAGE_USERS' }, { permission: 'VIEW_AUDIT_LOGS' }]) },
     movie: {
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
@@ -87,6 +89,7 @@ describe('Admin catalog authorization (e2e)', () => {
       role: UserRole.CUSTOMER,
     });
     const token = app.get(JwtTokenService).createAccessToken({
+      sessionId: 'test-session',
       id: 'customer-1',
       email: 'customer@example.com',
       fullName: 'Customer',
@@ -107,6 +110,7 @@ describe('Admin catalog authorization (e2e)', () => {
       role: UserRole.ADMIN,
     });
     const token = app.get(JwtTokenService).createAccessToken({
+      sessionId: 'test-session',
       id: 'admin-1',
       email: 'admin@example.com',
       fullName: 'Admin',
@@ -134,6 +138,7 @@ describe('Admin catalog authorization (e2e)', () => {
       role: UserRole.CUSTOMER,
     });
     const customerToken = app.get(JwtTokenService).createAccessToken({
+      sessionId: 'test-session',
       id: 'customer-1',
       email: 'customer@example.com',
       fullName: 'Customer',
@@ -151,6 +156,7 @@ describe('Admin catalog authorization (e2e)', () => {
       role: UserRole.ADMIN,
     });
     const token = app.get(JwtTokenService).createAccessToken({
+      sessionId: 'test-session',
       id: 'admin-1',
       email: 'admin@example.com',
       fullName: 'Admin',

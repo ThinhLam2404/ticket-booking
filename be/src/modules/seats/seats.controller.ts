@@ -17,6 +17,9 @@ import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
+import { PermissionsGuard } from '../../common/auth/permissions.guard.js';
+import { Permissions } from '../../common/auth/permissions.decorator.js';
+import { AdminPermission } from '@prisma/client';
 import {
   BulkSeatLayoutItemDto,
   CreateSeatDto,
@@ -40,8 +43,9 @@ export class SeatsController {
   @ApiResponse({ status: 200, type: SeatResponseDto, isArray: true })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_CINEMAS)
   replaceLayout(
     @Param('roomId') roomId: string,
     @Body(new ParseArrayPipe({ items: BulkSeatLayoutItemDto }))
@@ -54,8 +58,9 @@ export class SeatsController {
   @ApiResponse({ status: 201, type: SeatResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_CINEMAS)
   create(@Param('roomId') roomId: string, @Body() dto: CreateSeatDto) {
     return this.seatsService.create(roomId, dto);
   }
@@ -64,8 +69,9 @@ export class SeatsController {
   @ApiResponse({ status: 200, type: SeatResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_CINEMAS)
   update(@Param('id') id: string, @Body() dto: UpdateSeatDto) {
     return this.seatsService.update(id, dto);
   }
@@ -74,8 +80,9 @@ export class SeatsController {
   @ApiResponse({ status: 200, type: SeatResponseDto })
   @ApiErrorResponses(401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_CINEMAS)
   remove(@Param('id') id: string) {
     return this.seatsService.remove(id);
   }

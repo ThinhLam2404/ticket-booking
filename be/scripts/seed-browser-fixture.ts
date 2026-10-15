@@ -1,4 +1,4 @@
-import { PrismaClient, SeatType, UserRole } from '@prisma/client';
+import { AdminPermission, PrismaClient, SeatType, UserRole } from '@prisma/client';
 import { hashPassword } from '../src/common/auth/password.js';
 
 const prisma = new PrismaClient();
@@ -15,6 +15,10 @@ async function main() {
     prisma.bookingItem.deleteMany(),
     prisma.booking.deleteMany(),
     prisma.refreshToken.deleteMany(),
+    prisma.authSession.deleteMany(),
+    prisma.passwordResetToken.deleteMany(),
+    prisma.userAdminPermission.deleteMany(),
+    prisma.auditLog.deleteMany(),
     prisma.emailVerificationToken.deleteMany(),
     prisma.showtimeSeat.deleteMany({ where: { showtimeId: 'browser-showtime' } }),
     prisma.showtime.deleteMany({ where: { id: 'browser-showtime' } }),
@@ -44,6 +48,10 @@ async function main() {
         emailVerifiedAt: new Date(),
       },
     ],
+    skipDuplicates: true,
+  });
+  await prisma.userAdminPermission.createMany({
+    data: Object.values(AdminPermission).map((permission) => ({ userId: 'browser-admin', permission })),
     skipDuplicates: true,
   });
 

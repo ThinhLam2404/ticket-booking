@@ -44,6 +44,7 @@ export class JwtTokenService {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        sid: user.sessionId,
         type: 'access',
       },
       this.accessSecret,
@@ -100,6 +101,7 @@ export class JwtTokenService {
         email: payload.email,
         fullName: payload.fullName,
         role: payload.role as UserRole,
+        sessionId: typeof payload.sid === 'string' ? payload.sid : undefined,
       };
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');

@@ -64,6 +64,7 @@ describe('SepayService', () => {
       config as never,
       { queueTicketEmail: vi.fn(), queueRefundEmail: vi.fn(), wakeWorker: vi.fn() } as never,
       redis as never,
+      { record: vi.fn() } as never,
     );
 
     return { service, prisma, bookingsService, config, redis };

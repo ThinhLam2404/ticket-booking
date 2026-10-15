@@ -18,6 +18,19 @@ Query dùng `limit` từ `1` đến `100` (mặc định `20`) và một trong h
 
 Booking và ticket sort theo `createdAt DESC, id DESC`. SePay sort theo `transactionDate DESC, id DESC`; mọi query dùng `limit + 1` để xác định trang kế tiếp. Filter/search chạy trong backend trước keyset predicate. Migration `20261015090000_sprint5_cursor_indexes` thêm composite indexes cho ownership/status và keyset sort; chạy `npm run prisma:deploy` trước khi release. Movies/showtimes vẫn giữ offset pagination ở Sprint 5.
 
+## Sprint 7 — Session và đăng nhập nhiều tab (đang triển khai)
+
+- Thêm `AuthSession`; `RefreshToken.familyId` hiện trỏ theo quy ước tới session ID. Login tạo session, rotation giữ nguyên session; session có thời hạn tuyệt đối bằng refresh TTL tại lần login. Logout/reuse thu hồi session và guard kiểm tra session/user ở mỗi authenticated request.
+- SPA dùng các endpoint JSON chuẩn `POST /auth/login`, `/auth/refresh`, `/auth/logout`. Refresh token được lưu trong `localStorage` để các tab cùng browser dùng chung session; access token hiện tại vẫn giữ trong memory và được khôi phục bằng refresh token khi mở tab hoặc reload. Các token JSON này cũng giữ backward compatibility cho client API.
+- BroadcastChannel đồng bộ login/logout giữa các tab; Web Locks serialize login/refresh/logout để refresh-token rotation không bị race giữa các tab. Refresh token nằm trong localStorage nên JavaScript có thể đọc được; production cần CSP/XSS protection nghiêm ngặt và không được coi localStorage là HttpOnly-level protection.
+- Khi refresh thất bại do token hết hạn/revoked, frontend xóa token local và yêu cầu đăng nhập lại.
+- Migration `20261016090000_auth_sessions` thu hồi refresh token cũ; JWT cũ không có `sid` bị reject. Migration `20261016100000_password_reset` thêm token reset một lần và loại email outbox `PASSWORD_RESET`. Chạy `npm run prisma:generate` và `npm run prisma:deploy` trước khi start; tất cả user phải login lại sau rollout. Không áp migration lên database development bằng runner integration.
+- Password reset dùng `POST /auth/password-reset/request` (phản hồi luôn `{ sent: true }` để không lộ email), email outbox có cooldown 60 giây, token hash SHA-256, hết hạn sau 30 phút và chỉ dùng một lần. `POST /auth/password-reset/confirm` đổi mật khẩu và thu hồi toàn bộ session/refresh token. Đổi mật khẩu khi đã đăng nhập dùng `POST /auth/password/change` và cũng thu hồi toàn bộ session.
+- Quản lý session dùng `GET /auth/sessions`, `DELETE /auth/sessions/:sessionId`, `POST /auth/sessions/revoke-others` và `POST /auth/sessions/revoke-all`; UI customer ở `/account/security`. Session chỉ trả về ID, thời điểm tạo/hết hạn và cờ phiên hiện tại, không trả refresh token.
+- Quản lý user dùng `GET /users/admin` và `PATCH /users/admin/:id/access`; chỉ admin có `MANAGE_USERS` được gọi. Có thể đổi role, disable/enable user và cập nhật permission; disable user hoặc hạ role khỏi ADMIN sẽ thu hồi session/refresh token. UI admin ở `/admin/users`; admin có thể xem/revoke session user qua `/users/admin/:id/sessions`.
+- Audit log có filter theo action, resource type, actor và khoảng thời gian qua `GET /admin/audit-logs`; UI admin ở `/admin/audit-logs`.
+- Browser regression nhiều tab tại `tests/browser/auth-tabs.spec.ts` chạy bằng `npm run test:browser:full`. Auth nhiều tab dùng localStorage refresh token, BroadcastChannel và Web Locks; không dùng cookie browser. RBAC chi tiết hiện có enum `AdminPermission`, bảng `UserAdminPermission`, `PermissionsGuard` và đã gắn vào các route admin catalog, scheduling, booking, payment và operations; admin cũ cần được seed quyền tương ứng trước khi gọi các route này. Audit nền tảng có `AuditLog`, `AuditService` allowlist summary, filter API `GET /api/v1/admin/audit-logs` và UI `/admin/audit-logs`.
+
 ## Sprint 6 — Browser smoke và quality gate
 
 Đã thêm Playwright smoke suite tại `tests/browser/` với Chromium desktop và mobile. Chạy local bằng:
@@ -240,7 +253,7 @@ Root điều phối cả hai ứng dụng bằng `package.json`; dependency và 
 
 ### 3.3. Frontend runtime
 
-Frontend là React SPA được build và serve bởi Vite. `fe/src/api.ts` là HTTP client dùng Fetch API, tự gắn Bearer access token, thử refresh một lần khi nhận `401`, hủy các query đọc dữ liệu cũ bằng `AbortSignal` khi điều hướng, filter hoặc location đổi liên tục, rồi xóa session nếu refresh thất bại. Access token, refresh token và user hiện tại được giữ trong `sessionStorage`.
+Frontend là React SPA được build và serve bởi Vite. `fe/src/api.ts` là HTTP client dùng Fetch API, tự gắn Bearer access token, thử refresh một lần khi nhận `401`, hủy các query đọc dữ liệu cũ bằng `AbortSignal` khi điều hướng, filter hoặc location đổi liên tục, rồi xóa session nếu refresh thất bại. Access token giữ trong memory; refresh token và user hiện tại được giữ trong `localStorage` để các tab cùng browser dùng chung session.
 
 Frontend theme dùng `system | light | dark`, lưu preference ở localStorage key `ticket_booking_theme`, áp dụng `data-theme` trên `<html>`, theo dõi `prefers-color-scheme` và cập nhật `theme-color`. Design direction là CineBook Cobalt Editorial với Space Grotesk cho display và Inter cho body/data; semantic tokens được định nghĩa trong `DESIGN.md` và `fe/src/App.css`.
 

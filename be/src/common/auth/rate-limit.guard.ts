@@ -22,7 +22,7 @@ const rules: Array<{
   rule: RateLimitRule;
 }> = [
   {
-    matches: (request) => request.path.endsWith('/auth/login'),
+    matches: (request) => /\/auth\/(browser\/)?login$/.test(request.path),
     rule: { prefix: 'login', limit: 10, windowSeconds: 60 },
   },
   {
@@ -38,8 +38,16 @@ const rules: Array<{
     rule: { prefix: 'verification', limit: 10, windowSeconds: 60 },
   },
   {
-    matches: (request) => request.path.endsWith('/auth/refresh'),
+    matches: (request) => /\/auth\/(browser\/)?refresh$/.test(request.path),
     rule: { prefix: 'refresh', limit: 20, windowSeconds: 60 },
+  },
+  {
+    matches: (request) => request.path.endsWith('/auth/password-reset/request'),
+    rule: { prefix: 'password-reset', limit: 5, windowSeconds: 300 },
+  },
+  {
+    matches: (request) => request.path.endsWith('/auth/password-reset/confirm'),
+    rule: { prefix: 'password-reset-confirm', limit: 10, windowSeconds: 300 },
   },
   {
     matches: (request) => request.path.endsWith('/payments/sepay/webhook'),

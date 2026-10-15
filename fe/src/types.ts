@@ -50,6 +50,26 @@ export type SepayCheckoutResponse = JsonResponse<'/api/v1/payments/bookings/{boo
 export type RegisterRequest = RequestBody<'/api/v1/auth/register', 'post'>;
 export type LoginRequest = RequestBody<'/api/v1/auth/login', 'post'>;
 export type RefreshTokenRequest = RequestBody<'/api/v1/auth/refresh', 'post'>;
+export type RequestPasswordResetRequest = RequestBody<'/api/v1/auth/password-reset/request', 'post'>;
+export type ResetPasswordRequest = RequestBody<'/api/v1/auth/password-reset/confirm', 'post'>;
+export type ChangePasswordRequest = RequestBody<'/api/v1/auth/password/change', 'post'>;
+export type AuthSession = JsonResponse<'/api/v1/auth/sessions', 'get'>[number];
+export type AdminUser = JsonResponse<'/api/v1/users/admin', 'get'>[number];
+export type UpdateAdminUserAccessRequest = RequestBody<'/api/v1/users/admin/{id}/access', 'patch'>;
+export type AdminAuditLog = {
+  id: string;
+  requestId: string | null;
+  actorUserId: string | null;
+  actorEmail: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  before: unknown;
+  after: unknown;
+  metadata: unknown;
+  createdAt: string;
+};
+export type AdminUserSession = JsonResponse<'/api/v1/users/admin/{id}/sessions', 'get'>[number];
 export type HoldRequest = RequestBody<'/api/v1/bookings/hold', 'post'>;
 
 export type MovieStatus = Movie['status'];

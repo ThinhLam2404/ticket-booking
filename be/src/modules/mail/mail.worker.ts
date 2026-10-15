@@ -10,6 +10,7 @@ import QRCode from 'qrcode';
 import type { MailWorkerData } from './mail-worker.supervisor.js';
 import { renderTicketEmail } from './templates/ticket-email.template.js';
 import { renderVerificationEmail } from './templates/verification-email.template.js';
+import { renderPasswordResetEmail } from './templates/password-reset-email.template.js';
 import { renderRefundEmail } from './templates/refund-email.template.js';
 
 const data = workerData as MailWorkerData;
@@ -140,7 +141,7 @@ async function processOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
         status: MailOutboxStatus.SENT,
         sentAt: new Date(),
         lockedAt: null,
-        ...(outbox.type === MailOutboxType.EMAIL_VERIFICATION && {
+        ...((outbox.type === MailOutboxType.EMAIL_VERIFICATION || outbox.type === MailOutboxType.PASSWORD_RESET) && {
           payload: { sent: true },
         }),
       },
@@ -176,6 +177,14 @@ async function renderOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
       fullName: payload.fullName,
       verificationUrl: `${data.publicAppUrl}/verify-email?token=${encodeURIComponent(payload.token)}`,
       expiresInHours: 24,
+    });
+  }
+  if (outbox.type === MailOutboxType.PASSWORD_RESET) {
+    const payload = outbox.payload as { fullName: string; token: string };
+    return renderPasswordResetEmail({
+      fullName: payload.fullName,
+      resetUrl: `${data.publicAppUrl}/reset-password?token=${encodeURIComponent(payload.token)}`,
+      expiresInMinutes: 30,
     });
   }
   if (outbox.type === MailOutboxType.REFUND_NOTIFICATION) {

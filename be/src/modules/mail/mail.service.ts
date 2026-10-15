@@ -9,6 +9,11 @@ type VerificationPayload = {
   token: string;
 };
 
+type PasswordResetPayload = {
+  fullName: string;
+  token: string;
+};
+
 @Injectable()
 export class MailService {
   constructor(
@@ -31,6 +36,22 @@ export class MailService {
           fullName: user.fullName,
           token,
         } satisfies VerificationPayload,
+      },
+    });
+  }
+
+  async queuePasswordResetEmail(
+    user: { id: string; email: string; fullName: string },
+    token: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const tokenHash = this.hashToken(token);
+    await client.mailOutbox.create({
+      data: {
+        type: MailOutboxType.PASSWORD_RESET,
+        recipient: user.email,
+        dedupeKey: `PASSWORD_RESET:${user.id}:${tokenHash}`,
+        payload: { fullName: user.fullName, token } satisfies PasswordResetPayload,
       },
     });
   }

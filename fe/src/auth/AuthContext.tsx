@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, clearAuth, getStoredUser, setAuth } from '../api';
+import { api, clearAuth, getStoredUser, setAuth, restoreAuth } from '../api';
 import type { EmailVerificationRequiredResponse, LoginRequest, RegisterRequest, User } from '../types';
 
 type AuthMode = 'login' | 'register';
@@ -28,12 +28,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(getStoredUser());
   const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const syncUser = () => setUser(getStoredUser());
+    const syncUser = () => {
+      setUser(getStoredUser());
+      if (!getStoredUser()) queryClient.clear();
+    };
     window.addEventListener(AUTH_EVENT, syncUser);
-    return () => window.removeEventListener(AUTH_EVENT, syncUser);
-  }, []);
+    let active = true;
+    void restoreAuth().catch(() => undefined).finally(() => { if (active) setInitializing(false); });
+    return () => { active = false; window.removeEventListener(AUTH_EVENT, syncUser); };
+  }, [queryClient]);
 
   const login = useCallback(async (body: LoginRequest) => {
     const response = await api.login(body);
@@ -45,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginAsAdmin = useCallback(async (body: LoginRequest) => {
     const response = await api.login(body);
     if (response.user.role !== 'ADMIN') {
+      await api.logout();
       clearAuth();
       setUser(null);
       queryClient.clear();
@@ -60,7 +67,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.logout();
-    clearAuth();
     setUser(null);
     queryClient.clear();
     notifyAuthChange();
@@ -80,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
   }), [authMode, closeAuth, login, loginAsAdmin, logout, openAuth, register, user]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{initializing ? <div role="status">Đang kiểm tra đăng nhập…</div> : children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

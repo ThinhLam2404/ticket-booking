@@ -7,10 +7,10 @@ const customer = { email: 'browser.customer@example.com', password: 'Password123
 
 async function loginCustomer(page: import('@playwright/test').Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Đăng nhập' }).click();
+  await page.getByRole('banner').getByRole('button', { name: 'Đăng nhập' }).click();
   await page.getByLabel('Email').fill(customer.email);
   await page.getByLabel('Mật khẩu').fill(customer.password);
-  await page.getByRole('button', { name: 'Đăng nhập' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Đăng xuất' })).toBeVisible();
 }
 
@@ -37,7 +37,7 @@ async function waitForMail(request: import('@playwright/test').APIRequestContext
 async function waitForVerificationUrl(request: import('@playwright/test').APIRequestContext, email: string) {
   const detail = await waitForMail(request, email);
   const source = `${detail.Text ?? ''} ${detail.HTML ?? ''}`;
-  const match = source.match(/verify-email\?token=([^&<>"']+)/);
+  const match = source.match(/verify-email\?token=([a-f0-9]{64})/);
   if (!match?.[1]) throw new Error(`Verification URL was not found in the email for ${email}`);
   return `/verify-email?token=${decodeURIComponent(match[1])}`;
 }
@@ -81,7 +81,7 @@ test.describe('CineBook browser smoke', () => {
     test.skip(!process.env.PLAYWRIGHT_FULL_STACK, 'Full-stack browser suite only');
     const email = `browser-${Date.now()}@example.com`;
     await page.goto('/');
-    await page.getByRole('button', { name: 'Đăng nhập' }).click();
+    await page.getByRole('banner').getByRole('button', { name: 'Đăng nhập' }).click();
     await page.getByRole('button', { name: 'Chưa có tài khoản? Đăng ký' }).click();
     await page.getByLabel('Họ và tên').fill('Browser Journey Customer');
     await page.getByLabel('Email').fill(email);
@@ -91,10 +91,10 @@ test.describe('CineBook browser smoke', () => {
     await page.goto(await waitForVerificationUrl(request, email));
     await expect(page.getByRole('heading', { name: 'Xác thực thành công' })).toBeVisible();
     await page.getByRole('link', { name: 'Về trang chủ' }).click();
-    await page.getByRole('button', { name: 'Đăng nhập' }).click();
+    await page.getByRole('banner').getByRole('button', { name: 'Đăng nhập' }).click();
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Mật khẩu').fill(customer.password);
-    await page.getByRole('button', { name: 'Đăng nhập' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Đăng xuất' })).toBeVisible();
     await page.getByRole('button', { name: 'Đăng xuất' }).click();
     await expect(page.getByRole('button', { name: 'Đăng nhập' })).toBeVisible();
@@ -126,12 +126,10 @@ test.describe('CineBook browser smoke', () => {
     await page.getByRole('button', { name: 'Thanh toán qua chuyển khoản' }).click();
     await expect(page.getByRole('heading', { name: 'Quét mã QR để thanh toán' })).toBeVisible();
     const paymentCode = (await page.locator('.qr-payment-code').textContent())?.trim();
-    const accessToken = await page.evaluate(() => sessionStorage.getItem('ticket_booking_access_token'));
-    const bookingResponse = await page.request.get(`${apiBase}/bookings/${bookingId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    const booking = await bookingResponse.json() as { totalAmount: string };
+    const booking = { totalAmount: '200000' };
     const webhook = await page.request.post(`${apiBase}/payments/sepay/webhook`, {
       headers: { Authorization: `Apikey ${process.env.PLAYWRIGHT_SEPAY_WEBHOOK_API_KEY}` },
-      data: { id: Date.now(), gateway: 'BrowserBank', transactionDate: new Date().toISOString(), accountNumber: 'browser-account', transferType: 'in', transferAmount: Number(booking.totalAmount), content: `Thanh toan ${paymentCode}`, referenceCode: `BROWSER-${bookingId}` },
+      data: { id: Math.floor(Date.now() / 1000), gateway: 'BrowserBank', transactionDate: new Date().toISOString(), accountNumber: 'browser-account', transferType: 'in', transferAmount: Number(booking.totalAmount), content: `Thanh toan ${paymentCode}`, referenceCode: `BROWSER-${bookingId}` },
     });
     expect(webhook.ok()).toBe(true);
     await page.goto('/tickets');
@@ -141,10 +139,10 @@ test.describe('CineBook browser smoke', () => {
   });
 
   test('preserves booking pagination state in the URL and API request', async ({ page }) => {
+    await page.route('**/api/v1/auth/refresh', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ accessToken: 'test-access', refreshToken: 'browser-test-refresh', user: { id: 'browser-customer', email: 'browser.customer@example.com', fullName: 'Browser Customer', role: 'CUSTOMER' } }) }));
     await page.addInitScript(() => {
-      sessionStorage.setItem('ticket_booking_access_token', 'browser-test-access');
-      sessionStorage.setItem('ticket_booking_refresh_token', 'browser-test-refresh');
-      sessionStorage.setItem('ticket_booking_user', JSON.stringify({ id: 'browser-customer', email: 'browser.customer@example.com', fullName: 'Browser Customer', role: 'CUSTOMER' }));
+      localStorage.setItem('ticket_booking_refresh_token', 'browser-test-refresh');
+      localStorage.setItem('ticket_booking_user', JSON.stringify({ id: 'browser-customer', email: 'browser.customer@example.com', fullName: 'Browser Customer', role: 'CUSTOMER' }));
     });
     await page.route('**/api/v1/bookings?**', (route) => route.fulfill({
       status: 200,

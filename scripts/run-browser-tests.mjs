@@ -72,7 +72,7 @@ let failed = false;
 try {
   compose(['up', '-d', '--wait']);
   run('npm', ['run', 'prisma:deploy'], environment);
-  run('npm', ['--prefix', 'be', 'exec', '--', 'tsx', 'scripts/seed-browser-fixture.ts'], environment);
+  run('node', ['--import', './be/node_modules/tsx/dist/loader.mjs', 'be/scripts/seed-browser-fixture.ts'], environment);
   run('npm', ['run', 'build:be'], environment);
   run('npm', ['run', 'build:fe'], environment);
   serverPid = startServer();

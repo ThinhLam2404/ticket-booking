@@ -2,11 +2,13 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma, SeatType } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
+import { AuditService } from '../audit/audit.service.js';
 import {
   BulkSeatLayoutItemDto,
   CreateSeatDto,
@@ -16,7 +18,7 @@ import { validateSeatLayout } from './seat-layout.js';
 
 @Injectable()
 export class SeatsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly audit: AuditService = null as unknown as AuditService) {}
 
   async findByRoom(roomId: string) {
     const seats = await this.prisma.seat.findMany({

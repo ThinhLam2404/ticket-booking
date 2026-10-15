@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   MovieStatus,
@@ -15,6 +16,7 @@ import { isUniqueConstraintError } from '../../common/database/prisma-errors.js'
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { measureServiceTiming } from '../../common/logging/operational-logger.js';
 import { PrismaService } from '../../database/prisma.service.js';
+import { AuditService } from '../audit/audit.service.js';
 import { validateSeatLayout } from '../seats/seat-layout.js';
 import { CreateShowtimeDto } from './dto/create-showtime.dto.js';
 import {
@@ -79,7 +81,7 @@ type CinemaRoomSchedule = {
 
 @Injectable()
 export class ShowtimesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly audit: AuditService = null as unknown as AuditService) {}
 
   async findAll(query: ListShowtimesDto) {
     return measureServiceTiming('showtimes.findAll', () =>

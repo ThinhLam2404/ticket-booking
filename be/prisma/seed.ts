@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { PrismaClient, RoomFormat, SeatType, ShowtimeFormat, UserRole } from '@prisma/client';
+import { AdminPermission, PrismaClient, RoomFormat, SeatType, ShowtimeFormat, UserRole } from '@prisma/client';
 import { hashPassword } from '../src/common/auth/password.js';
 import { buildSeatLayout, type SeatLayoutPreset } from '../src/modules/seats/seat-layout.js';
 import { DEFAULT_COUPLE_MULTIPLIER, DEFAULT_VIP_MULTIPLIER, getPolicyBasePrice } from '../src/modules/showtimes/showtime-policy.js';
@@ -328,7 +328,7 @@ async function seedDemoShowtime(cinema: StaticCinema) {
 async function main() {
   const cinemaData = await readCinemaData();
   const passwordHash = await hashPassword(adminPassword);
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: adminEmail.toLowerCase() },
     update: { fullName: 'System Admin', role: UserRole.ADMIN, emailVerifiedAt: new Date() },
     create: {
@@ -338,6 +338,10 @@ async function main() {
       role: UserRole.ADMIN,
       emailVerifiedAt: new Date(),
     },
+  });
+  await prisma.userAdminPermission.createMany({
+    data: Object.values(AdminPermission).map((permission) => ({ userId: admin.id, permission })),
+    skipDuplicates: true,
   });
 
   for (const movie of scheduledMovies) {

@@ -24,6 +24,9 @@ import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
+import { PermissionsGuard } from '../../common/auth/permissions.guard.js';
+import { Permissions } from '../../common/auth/permissions.decorator.js';
+import { AdminPermission } from '@prisma/client';
 import { CreateMovieDto } from './dto/create-movie.dto.js';
 import {
   ListAdminMoviesDto,
@@ -53,8 +56,9 @@ export class MoviesController {
   @ApiResponse({ status: 200, type: PaginatedMoviesResponseDto })
   @ApiErrorResponses(400, 401, 403)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_MOVIES)
   findAllAdmin(@Query() query: ListAdminMoviesDto) {
     return this.moviesService.findAllAdmin(query);
   }
@@ -63,8 +67,9 @@ export class MoviesController {
   @ApiResponse({ status: 200, type: PaginatedTmdbMoviesResponseDto })
   @ApiErrorResponses(400, 401, 403, 502, 503, 504)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_MOVIES)
   findTmdb(@Query() query: ListTmdbMoviesDto) {
     return this.moviesService.findTmdb(query);
   }
@@ -73,8 +78,9 @@ export class MoviesController {
   @ApiResponse({ status: 200, type: TmdbMovieImportResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409, 502, 503, 504)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_MOVIES)
   importTmdb(@Param('tmdbId', ParseIntPipe) tmdbId: number) {
     return this.moviesService.importTmdbMovie(tmdbId);
   }
@@ -83,8 +89,9 @@ export class MoviesController {
   @ApiResponse({ status: 200, type: MovieResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 502, 503, 504)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_MOVIES)
   resyncTmdb(@Param('tmdbId', ParseIntPipe) tmdbId: number) {
     return this.moviesService.resyncTmdbMovie(tmdbId);
   }
@@ -100,8 +107,9 @@ export class MoviesController {
   @ApiResponse({ status: 201, type: MovieResponseDto })
   @ApiErrorResponses(400, 401, 403, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_MOVIES)
   create(@Body() dto: CreateMovieDto) {
     return this.moviesService.create(dto);
   }
@@ -110,8 +118,9 @@ export class MoviesController {
   @ApiResponse({ status: 200, type: MovieResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_MOVIES)
   update(@Param('id') id: string, @Body() dto: UpdateMovieDto) {
     return this.moviesService.update(id, dto);
   }
@@ -120,8 +129,9 @@ export class MoviesController {
   @ApiResponse({ status: 200, type: MovieResponseDto })
   @ApiErrorResponses(401, 403, 404)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_MOVIES)
   archive(@Param('id') id: string) {
     return this.moviesService.archive(id);
   }

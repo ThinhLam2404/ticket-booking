@@ -2,18 +2,20 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { MovieStatus, Prisma } from '@prisma/client';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
 import { PrismaService } from '../../database/prisma.service.js';
+import { AuditService } from '../audit/audit.service.js';
 import { CreateCinemaDto, UpdateCinemaDto } from './dto/cinema.dto.js';
 import { ListCinemasDto } from './dto/list-cinemas.dto.js';
 import { PROVINCES } from '../locations/provinces.js';
 
 @Injectable()
 export class CinemasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly audit: AuditService = null as unknown as AuditService) {}
 
   async findAll(query: ListCinemasDto = {}) {
     const cinemas = await this.prisma.cinema.findMany({
@@ -70,16 +72,20 @@ export class CinemasService {
 
   async create(dto: CreateCinemaDto) {
     try {
-      const cinema = await this.prisma.cinema.create({
-        data: {
-          name: dto.name.trim(),
-          address: dto.address.trim(),
-          provinceCode: dto.provinceCode,
-        },
+      const result = await this.prisma.$transaction(async (transaction) => {
+        const cinema = await transaction.cinema.create({
+          data: {
+            name: dto.name.trim(),
+            address: dto.address.trim(),
+            provinceCode: dto.provinceCode,
+          },
+        });
+        if (this.audit) await this.audit.record({ action: 'CINEMA_CREATED', resourceType: 'Cinema', resourceId: cinema.id, after: { id: cinema.id } }, transaction);
+        return cinema;
       });
       return toPublicResponse({
-        ...cinema,
-        province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
+        ...result,
+        province: PROVINCES.find((province) => province.code === result.provinceCode) ?? null,
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {

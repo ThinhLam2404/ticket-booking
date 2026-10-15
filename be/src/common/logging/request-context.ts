@@ -3,6 +3,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 //NOTE - File này lưu requestId hiện tại trong toàn bộ vòng đời xử lý bất đồng bộ của một request.
 export type RequestContext = {
   requestId: string;
+  actorUserId?: string;
+  actorEmail?: string;
   dbQueryCount?: number;
   dbQueryDurationMs?: number;
   dbSlowQueryCount?: number;
@@ -24,6 +26,18 @@ export function runWithRequestContext<T>(
 
 export function getCurrentRequestId(): string | undefined {
   return requestContextStorage.getStore()?.requestId;
+}
+
+export function setCurrentActor(actor: { id?: string; email?: string }): void {
+  const context = requestContextStorage.getStore();
+  if (!context) return;
+  context.actorUserId = actor.id;
+  context.actorEmail = actor.email;
+}
+
+export function getCurrentActor(): { id?: string; email?: string } {
+  const context = requestContextStorage.getStore();
+  return { id: context?.actorUserId, email: context?.actorEmail };
 }
 
 export function recordDbQuery(durationMs: number, slow: boolean): void {

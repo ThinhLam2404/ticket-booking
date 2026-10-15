@@ -33,6 +33,9 @@ import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
+import { PermissionsGuard } from '../../common/auth/permissions.guard.js';
+import { Permissions } from '../../common/auth/permissions.decorator.js';
+import { AdminPermission } from '@prisma/client';
 import { CreateShowtimeDto } from './dto/create-showtime.dto.js';
 import {
   ListAdminShowtimesDto,
@@ -58,8 +61,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 200, type: PaginatedShowtimesResponseDto })
   @ApiErrorResponses(400, 401, 403)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   findAllAdmin(@Query() query: ListAdminShowtimesDto) {
     return this.showtimesService.findAllAdmin(query);
   }
@@ -68,8 +72,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 200, type: FreeSlotsResponseDto })
   @ApiErrorResponses(400, 401, 403, 404)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   findFreeSlots(
     @Param('roomId') roomId: string,
     @Query() query: FreeSlotsQueryDto,
@@ -81,8 +86,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 200, type: CinemaFreeSlotsResponseDto })
   @ApiErrorResponses(400, 401, 403, 404)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   findCinemaFreeSlots(
     @Param('cinemaId') cinemaId: string,
     @Query() query: FreeSlotsQueryDto,
@@ -94,8 +100,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 201, type: ShowtimePricingQuoteResponseDto })
   @ApiErrorResponses(400, 401, 403)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   quotePricing(@Body() dto: ShowtimePricingQuoteDto) {
     return this.showtimesService.quotePricing(dto);
   }
@@ -118,8 +125,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 200, type: CinemaBulkPreviewResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   previewCinemaBulk(@Body() dto: CinemaBulkShowtimeDto) {
     return this.showtimesService.previewCinemaBulk(dto);
   }
@@ -128,8 +136,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 201, type: ShowtimeResponseDto, isArray: true })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   createCinemaBulk(@Body() dto: CinemaBulkShowtimeDto) {
     return this.showtimesService.createCinemaBulk(dto);
   }
@@ -138,8 +147,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 200, type: BulkShowtimePreviewResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   previewBulk(@Body() dto: BulkShowtimeDto) {
     return this.showtimesService.previewBulk(dto);
   }
@@ -148,8 +158,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 201, type: ShowtimeResponseDto, isArray: true })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   createBulk(@Body() dto: BulkShowtimeDto) {
     return this.showtimesService.createBulk(dto);
   }
@@ -158,8 +169,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 201, type: ShowtimeResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   create(@Body() dto: CreateShowtimeDto) {
     return this.showtimesService.create(dto);
   }
@@ -168,8 +180,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 200, type: ShowtimeResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   update(@Param('id') id: string, @Body() dto: UpdateShowtimeDto) {
     return this.showtimesService.update(id, dto);
   }
@@ -178,8 +191,9 @@ export class ShowtimesController {
   @ApiResponse({ status: 200, type: ShowtimeResponseDto })
   @ApiErrorResponses(401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_SHOWTIMES)
   remove(@Param('id') id: string) {
     return this.showtimesService.remove(id);
   }

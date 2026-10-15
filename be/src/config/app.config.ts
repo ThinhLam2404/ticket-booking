@@ -61,6 +61,7 @@ export function configureApp(app: INestApplication): void {
   //NOTE - middleware http security cho headers
   app.use(helmet());
   app.enableCors({
+    credentials: true,
     origin: ((origin, callback) => {
       if (!origin || corsOrigins.includes(origin)) {
         callback(null, true);

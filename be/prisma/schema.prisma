@@ -13,6 +13,17 @@ enum UserRole {
   ADMIN
 }
 
+enum AdminPermission {
+  MANAGE_MOVIES
+  MANAGE_CINEMAS
+  MANAGE_SHOWTIMES
+  VIEW_BOOKINGS
+  MANAGE_PAYMENTS
+  VIEW_SYSTEM
+  MANAGE_USERS
+  VIEW_AUDIT_LOGS
+}
+
 enum MovieStatus {
   DRAFT
   PUBLISHED
@@ -88,6 +99,7 @@ enum MailOutboxStatus {
 
 enum MailOutboxType {
   EMAIL_VERIFICATION
+  PASSWORD_RESET
   TICKETS_ISSUED
   REFUND_NOTIFICATION
 }
@@ -99,12 +111,44 @@ model User {
   fullName                String
   role                    UserRole                 @default(CUSTOMER)
   emailVerifiedAt         DateTime?
+  disabledAt              DateTime?
+  authSessions            AuthSession[]
+  adminPermissions        UserAdminPermission[]
+  passwordResetTokens     PasswordResetToken[]
   bookings                Booking[]
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
   refunds                 Refund[]
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
+}
+
+model UserAdminPermission {
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission AdminPermission
+  createdAt  DateTime      @default(now())
+
+  @@id([userId, permission])
+  @@index([permission])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  requestId    String?
+  actorUserId  String?
+  actorEmail   String?
+  action       String
+  resourceType String
+  resourceId   String?
+  before       Json?
+  after        Json?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([resourceType, resourceId, createdAt])
 }
 
 model Movie {
@@ -205,6 +249,18 @@ model ShowtimeSeat {
   @@index([heldByBookingId])
 }
 
+model AuthSession {
+  id        String    @id
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
 model RefreshToken {
   id              String    @id @default(cuid())
   jti             String    @unique
@@ -224,6 +280,19 @@ model RefreshToken {
 }
 
 model EmailVerificationToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, consumedAt])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
   id         String    @id @default(cuid())
   tokenHash  String    @unique
   userId     String

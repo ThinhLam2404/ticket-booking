@@ -99,6 +99,241 @@
         ]
       }
     },
+    "/api/v1/auth/password-reset/request": {
+      "post": {
+        "operationId": "Auth_requestPasswordReset",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPasswordResetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Always returns the same response to avoid account enumeration."
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password-reset/confirm": {
+      "post": {
+        "operationId": "Auth_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset completed and all sessions revoked."
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "operationId": "Auth_sessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Active sessions for the authenticated user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuthSessionResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "Auth_revokeSession",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Session revoked."
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions/revoke-all": {
+      "post": {
+        "operationId": "Auth_revokeAllSessions",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "All sessions revoked."
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions/revoke-others": {
+      "post": {
+        "operationId": "Auth_revokeOtherSessions",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "All other sessions revoked."
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password/change": {
+      "post": {
+        "operationId": "Auth_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed and all sessions revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordChangedResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/register": {
       "post": {
         "operationId": "Auth_register",
@@ -408,22 +643,439 @@
         ]
       }
     },
+    "/api/v1/admin/audit-logs": {
+      "get": {
+        "operationId": "Audit_list",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "example": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "USER_ACCESS_UPDATED",
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "User",
+              "type": "string"
+            }
+          },
+          {
+            "name": "actorUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "user_123",
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered audit log entries."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin-audit"
+        ]
+      }
+    },
     "/api/v1/users/me": {
       "get": {
         "operationId": "Users_me",
         "parameters": [],
         "responses": {
           "200": {
+            "description": ""
+          },
+          "401": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserResponseDto"
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/admin": {
+      "get": {
+        "operationId": "Users_listAdmin",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "customer@example.com",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "DISABLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminUserResponseDto"
+                  }
                 }
               }
             }
           },
           "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/admin/{id}/sessions": {
+      "get": {
+        "operationId": "Users_sessions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminUserSessionDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/admin/{id}/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "Users_revokeSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Session revoked."
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/admin/{id}/sessions/revoke-all": {
+      "post": {
+        "operationId": "Users_revokeAllSessions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "All user sessions revoked."
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/admin/{id}/access": {
+      "patch": {
+        "operationId": "Users_updateAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserAccessDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "",
             "content": {
               "application/json": {
@@ -4960,6 +5612,100 @@
           "timestamp"
         ]
       },
+      "RequestPasswordResetDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "customer@example.com",
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "hex-reset-token"
+          },
+          "password": {
+            "type": "string",
+            "example": "NewPassword123!",
+            "format": "password",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ]
+      },
+      "AuthSessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0f4d5c78-7af2-4a0f-9a0f-1b7a5c5c0e1b"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-10-16T09:00:00.000Z"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-10-23T09:00:00.000Z"
+          },
+          "current": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "expiresAt",
+          "current"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "example": "CurrentPassword123!",
+            "format": "password",
+            "minLength": 8
+          },
+          "newPassword": {
+            "type": "string",
+            "example": "NewPassword123!",
+            "format": "password",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "PasswordChangedResponseDto": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "changed"
+        ]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {
@@ -5143,6 +5889,130 @@
         "required": [
           "refreshToken"
         ]
+      },
+      "AdminUserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "ADMIN"
+            ]
+          },
+          "disabledAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "MANAGE_MOVIES",
+                "MANAGE_CINEMAS",
+                "MANAGE_SHOWTIMES",
+                "VIEW_BOOKINGS",
+                "MANAGE_PAYMENTS",
+                "VIEW_SYSTEM",
+                "MANAGE_USERS",
+                "VIEW_AUDIT_LOGS"
+              ]
+            }
+          },
+          "activeSessionCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "fullName",
+          "role",
+          "disabledAt",
+          "permissions",
+          "activeSessionCount",
+          "createdAt"
+        ]
+      },
+      "AdminUserSessionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "0f4d5c78-7af2-4a0f-9a0f-1b7a5c5c0e1b"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-10-16T09:00:00.000Z"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-10-23T09:00:00.000Z"
+          },
+          "current": {
+            "type": "boolean",
+            "example": true
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "expiresAt",
+          "current",
+          "userId"
+        ]
+      },
+      "UpdateUserAccessDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "ADMIN"
+            ]
+          },
+          "disabled": {
+            "type": "boolean",
+            "example": false
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "MANAGE_MOVIES",
+                "MANAGE_CINEMAS",
+                "MANAGE_SHOWTIMES",
+                "VIEW_BOOKINGS",
+                "MANAGE_PAYMENTS",
+                "VIEW_SYSTEM",
+                "MANAGE_USERS",
+                "VIEW_AUDIT_LOGS"
+              ]
+            }
+          }
+        }
       },
       "MovieResponseDto": {
         "type": "object",

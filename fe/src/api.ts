@@ -17,7 +17,6 @@ import type {
   MovieDetails,
   MoviesResponse,
   RegisterRequest,
-  RefreshTokenRequest,
   ShowtimeResponse,
   ShowtimeSeatsResponse,
   ShowtimesResponse,
@@ -72,27 +71,82 @@ import type {
   FreeSlotsResponse,
   ProvincesResponse,
   OperationsStatus,
+  AuthSession,
+  AdminUser,
+  UpdateAdminUserAccessRequest,
+  AdminAuditLog,
+  AdminUserSession,
+  ChangePasswordRequest,
+  RequestPasswordResetRequest,
+  ResetPasswordRequest,
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1';
 
-const ACCESS_TOKEN_KEY = 'ticket_booking_access_token';
-const REFRESH_TOKEN_KEY = 'ticket_booking_refresh_token';
+const REFRESH_TOKEN_STORAGE_KEY = 'ticket_booking_refresh_token';
+const USER_STORAGE_KEY = 'ticket_booking_user';
+
+let accessToken: string | null = null;
+let storedUser: User | null = readStoredUser();
+
+function readStoredUser(): User | null {
+  try {
+    const value = window.localStorage.getItem(USER_STORAGE_KEY);
+    return value ? JSON.parse(value) as User : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredRefreshToken(): string | null {
+  try {
+    return window.localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredAuth(response: AuthResponse) {
+  try {
+    window.localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, response.refreshToken);
+    window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.user));
+  } catch {
+    // Authentication still works for the current tab when storage is unavailable.
+  }
+}
+
+const authChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('cinebook-auth') : null;
+authChannel?.addEventListener('message', (event) => {
+  if (event.data === 'logout') clearAuth(false);
+  if (event.data === 'login') void restoreAuth();
+});
 
 export function getAccessToken() {
-  return sessionStorage.getItem(ACCESS_TOKEN_KEY);
+  return accessToken;
 }
 
-export function setAuth(response: AuthResponse) {
-  sessionStorage.setItem(ACCESS_TOKEN_KEY, response.accessToken);
-  sessionStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
-  sessionStorage.setItem('ticket_booking_user', JSON.stringify(response.user));
+export function setAuth(response: Pick<AuthResponse, 'user' | 'accessToken'> & Partial<Pick<AuthResponse, 'refreshToken'>>) {
+
+  accessToken = response.accessToken;
+  storedUser = response.user;
+  if (response.refreshToken) writeStoredAuth(response as AuthResponse);
+  else {
+    try { window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.user)); } catch { /* Ignore unavailable storage. */ }
+  }
+  window.dispatchEvent(new Event('ticket-booking-auth'));
 }
 
-export function clearAuth() {
-  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-  sessionStorage.removeItem('ticket_booking_user');
+export function clearAuth(broadcast = true) {
+  accessToken = null;
+  storedUser = null;
+  try {
+    window.localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    window.localStorage.removeItem(USER_STORAGE_KEY);
+  } catch {
+    // Ignore unavailable storage while clearing in-memory credentials.
+  }
+  window.dispatchEvent(new Event('ticket-booking-auth'));
+  if (broadcast) authChannel?.postMessage('logout');
 }
 
 export class ApiClientError extends Error {
@@ -116,14 +170,7 @@ export class ApiClientError extends Error {
 }
 
 export function getStoredUser(): User | null {
-  const value = sessionStorage.getItem('ticket_booking_user');
-  if (!value) return null;
-  try {
-    return JSON.parse(value) as User;
-  } catch {
-    clearAuth();
-    return null;
-  }
+  return storedUser;
 }
 
 let refreshPromise: Promise<boolean> | null = null;
@@ -142,8 +189,8 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
     return response.json() as Promise<T>;
   }
 
-  const publicAuthPath = ['/auth/login', '/auth/register', '/auth/email/verify', '/auth/email/resend'].includes(path);
-  if (response.status === 401 && retry && !publicAuthPath && sessionStorage.getItem(REFRESH_TOKEN_KEY)) {
+  const publicAuthPath = path.startsWith('/auth/');
+  if (response.status === 401 && retry && !publicAuthPath && getAccessToken()) {
     const refreshed = await refreshToken();
     if (refreshed) return request<T>(path, init, false);
   }
@@ -178,24 +225,85 @@ async function refreshToken() {
 }
 
 async function performRefreshToken() {
-  const token = sessionStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!token) return false;
+  const perform = async () => {
+    // Read after acquiring the lock: another tab may have rotated the token
+    // while this tab was waiting.
+    const refreshToken = readStoredRefreshToken();
+    if (!refreshToken) return false;
+    const response = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) clearAuth(false);
+      return false;
+    }
+    setAuth((await response.json()) as AuthResponse);
+    return true;
+  };
+  if (!navigator.locks) return perform();
+  return navigator.locks.request('cinebook-refresh', perform);
+}
 
-  const body: RefreshTokenRequest = { refreshToken: token };
-  const response = await fetch(`${API_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    clearAuth();
-    return false;
-  }
-  setAuth((await response.json()) as AuthResponse);
-  return true;
+export async function restoreAuth() {
+  return refreshToken();
 }
 
 export const api = {
+  requestPasswordReset(body: RequestPasswordResetRequest) {
+    return request<{ sent: true }>('/auth/password-reset/request', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+  resetPassword(body: ResetPasswordRequest) {
+    return request<{ reset: true }>('/auth/password-reset/confirm', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+  changePassword(body: ChangePasswordRequest) {
+    return request<{ changed: true }>('/auth/password/change', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+  sessions() {
+    return request<AuthSession[]>('/auth/sessions');
+  },
+  revokeSession(sessionId: string) {
+    return request<void>(`/auth/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+  },
+  revokeOtherSessions() {
+    return request<void>('/auth/sessions/revoke-others', { method: 'POST', body: '{}' });
+  },
+  revokeAllSessions() {
+    return request<void>('/auth/sessions/revoke-all', { method: 'POST', body: '{}' });
+  },
+  adminUsers(filters: { search?: string; status?: 'ACTIVE' | 'DISABLED' } = {}) {
+    const params = new URLSearchParams();
+    if (filters.search) params.set('search', filters.search);
+    if (filters.status) params.set('status', filters.status);
+    return request<AdminUser[]>(`/users/admin${params.size ? `?${params.toString()}` : ''}`);
+  },
+  updateAdminUserAccess(id: string, body: UpdateAdminUserAccessRequest) {
+    return request<AdminUser>(`/users/admin/${encodeURIComponent(id)}/access`, { method: 'PATCH', body: JSON.stringify(body) });
+  },
+  adminUserSessions(id: string) {
+    return request<AdminUserSession[]>(`/users/admin/${encodeURIComponent(id)}/sessions`);
+  },
+  revokeAdminUserSession(id: string, sessionId: string) {
+    return request<void>(`/users/admin/${encodeURIComponent(id)}/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+  },
+  revokeAdminUserSessions(id: string) {
+    return request<void>(`/users/admin/${encodeURIComponent(id)}/sessions/revoke-all`, { method: 'POST', body: '{}' });
+  },
+  auditLogs(filters: { limit?: number; action?: string; resourceType?: string; actorUserId?: string; from?: string; to?: string } = {}) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== '') params.set(key, String(value));
+    return request<AdminAuditLog[]>(`/admin/audit-logs${params.size ? `?${params.toString()}` : ''}`);
+  },
   async register(body: RegisterRequest) {
     return request<EmailVerificationRequiredResponse>('/auth/register', {
       method: 'POST',
@@ -215,22 +323,30 @@ export const api = {
     });
   },
   async login(body: LoginRequest) {
-    const response = await request<AuthResponse>('/auth/login', {
+    const perform = () => request<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(body),
     });
+    const response = navigator.locks ? await navigator.locks.request('cinebook-refresh', perform) : await perform();
     setAuth(response);
+    authChannel?.postMessage('login');
     return response;
   },
   async logout() {
-    const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
-    if (refreshToken) {
-      await request('/auth/logout', {
-        method: 'POST',
-        body: JSON.stringify({ refreshToken }),
-      }, false).catch(() => undefined);
+    try {
+      const refreshToken = readStoredRefreshToken();
+      if (refreshToken) {
+        const perform = () => request('/auth/logout', {
+          method: 'POST',
+          body: JSON.stringify({ refreshToken }),
+        }, false);
+        if (navigator.locks) await navigator.locks.request('cinebook-refresh', perform);
+        else await perform();
+      }
+    } finally {
+      // Local credentials must be cleared even when the network is unavailable.
+      clearAuth();
     }
-    clearAuth();
   },
   provinces(signal?: AbortSignal) {
     return request<ProvincesResponse>('/locations/provinces', { signal });

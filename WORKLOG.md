@@ -296,6 +296,8 @@ Definition of done:
 
 ### Sprint 7 — Account, RBAC và audit log
 
+Đang triển khai nền tảng: AuthSession, JWT `sid`, guard kiểm tra revocation/disabled user, memory access token, localStorage refresh token dùng chung giữa các tab, Web Locks và BroadcastChannel. Đã bỏ browser HttpOnly cookie endpoints; frontend dùng lại `/auth/login`, `/auth/refresh`, `/auth/logout` để giữ contract JSON. Migration buộc login lại; browser test nhiều tab đã pass với Docker/PostgreSQL/Redis/Mailpit. Đã bổ sung password reset một lần qua mail outbox, đổi mật khẩu, thu hồi toàn bộ session, API/UI quản lý session và các cooldown/expiry cơ bản. Lint, typecheck, build, unit 122/122, e2e 9/9, frontend 11/11, integration 21/21 và OpenAPI check pass. Đã thêm nền RBAC chi tiết: enum/quyền theo domain, bảng gán quyền và PermissionsGuard trên route admin; thêm AuditLog/AuditService allowlist và endpoint đọc audit. Đã thêm API/UI quản lý user và permission (`/users/admin`, `/admin/users`), disable/enable user thu hồi session, revoke-all session và audit refund/user-access trong transaction. Đã bổ sung audit filter/UI (`/admin/audit-logs`) và API quản lý session user (`/users/admin/:id/sessions`, revoke session/revoke-all). Vẫn còn cần rà soát audit coverage cho mọi catalog/scheduling mutation và bổ sung test chuyên sâu. Refresh token localStorage có rủi ro XSS và không có mức bảo vệ như HttpOnly cookie.
+
 Mục tiêu: hoàn thiện quản trị tài khoản và trách nhiệm thao tác khi hệ thống chạy thật.
 
 Việc cần làm:

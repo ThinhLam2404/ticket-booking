@@ -6,3 +6,5 @@ export { AdminShowtimesPage } from "../features/admin/showtimes/AdminShowtimesPa
 export { AdminPaymentsPage } from "../features/admin/payments/AdminPaymentsPage";
 export { AdminBookingsPage } from "../features/admin/bookings/AdminBookingsPage";
 export { AdminBookingDetailPage } from "../features/admin/bookings/AdminBookingDetailPage";
+export { AdminUsersPage } from "../features/admin/users/AdminUsersPage";
+export { AdminAuditLogsPage } from "../features/admin/audit/AdminAuditLogsPage";

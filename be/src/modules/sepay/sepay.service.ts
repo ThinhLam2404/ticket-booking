@@ -27,6 +27,7 @@ import { MailService } from '../mail/mail.service.js';
 import { logOperationalEvent } from '../../common/logging/operational-logger.js';
 import { recordPaymentReviewRequired } from '../observability/metrics.service.js';
 import { RedisService } from '../redis/redis.service.js';
+import { AuditService } from '../audit/audit.service.js';
 import { assertCursorDirection, buildCursorMeta, cursorWhere, decodeCursor } from '../../common/http/cursor-pagination.js';
 
 const PAYMENT_CODE_PREFIX = 'CB';
@@ -42,6 +43,7 @@ export class SepayService {
     private readonly config: ConfigService,
     private readonly mailService: MailService,
     private readonly redis: RedisService,
+    private readonly audit: AuditService,
   ) {}
 
   async checkout(userId: string, bookingId: string) {
@@ -523,6 +525,7 @@ export class SepayService {
           dto.reason,
           tx,
         );
+        await this.audit.record({ actor: { id: adminId }, action: 'BOOKING_REFUNDED', resourceType: 'Booking', resourceId: bookingId, before: { id: bookingId, status: BookingStatus.CONFIRMED }, after: { id: bookingId, status: BookingStatus.CANCELLED, reason: dto.reason } }, tx);
         return created;
       });
       logOperationalEvent('info', 'booking_refunded', {

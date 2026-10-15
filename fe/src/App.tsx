@@ -5,13 +5,15 @@ import { LocationProvider } from './auth/LocationContext';
 import { AdminLayout, Layout, RequireAdmin, RequireAuth } from './components/ui';
 import { ThemeProvider } from './theme/ThemeContext';
 import { BookingPage, SeatsPage } from './pages/BookingPages';
-import { BookingsPage, TicketPage, TicketsPage } from './pages/AccountPages';
+import { BookingsPage, SecurityPage, TicketPage, TicketsPage } from './pages/AccountPages';
 import { CinemaPage, HomePage, MoviePage } from './pages/CatalogPages';
-import { VerifyEmailPage } from './pages/AuthPages';
+import { ResetPasswordPage, VerifyEmailPage } from './pages/AuthPages';
 import { AdminCinemasPage, AdminDashboardPage, AdminLoginPage, AdminMoviesPage,
   AdminPaymentsPage,
   AdminBookingsPage,
   AdminBookingDetailPage,
+  AdminUsersPage,
+  AdminAuditLogsPage,
   AdminRoomsPage, AdminSeatsPage, AdminShowtimesPage } from './pages/AdminPages';
 import './App.css';
 import './cobalt-editorial.css';
@@ -34,11 +36,13 @@ const router = createBrowserRouter([
       { path: 'cinemas', element: <CinemaPage /> },
       { path: 'movies/:movieId', element: <MoviePage /> },
       { path: 'verify-email', element: <VerifyEmailPage /> },
+      { path: 'reset-password', element: <ResetPasswordPage /> },
       { path: 'showtimes/:showtimeId/seats', element: <SeatsPage /> },
       {
         element: <RequireAuth />,
         children: [
           { path: 'bookings', element: <BookingsPage /> },
+          { path: 'account/security', element: <SecurityPage /> },
           { path: 'bookings/:bookingId', element: <BookingPage /> },
           { path: 'tickets', element: <TicketsPage /> },
           { path: 'tickets/:ticketId', element: <TicketPage /> },
@@ -63,6 +67,8 @@ const router = createBrowserRouter([
           { path: 'admin/payments', element: <AdminPaymentsPage /> },
           { path: 'admin/bookings', element: <AdminBookingsPage /> },
           { path: 'admin/bookings/:id', element: <AdminBookingDetailPage /> },
+          { path: 'admin/users', element: <AdminUsersPage /> },
+          { path: 'admin/audit-logs', element: <AdminAuditLogsPage /> },
         ],
       },
     ],

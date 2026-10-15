@@ -16,6 +16,9 @@ import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
+import { PermissionsGuard } from '../../common/auth/permissions.guard.js';
+import { Permissions } from '../../common/auth/permissions.decorator.js';
+import { AdminPermission } from '@prisma/client';
 import { CreateRoomDto, ListRoomsDto, UpdateRoomDto } from './dto/room.dto.js';
 import { RoomsService } from './rooms.service.js';
 
@@ -42,8 +45,9 @@ export class RoomsController {
   @ApiResponse({ status: 201, type: RoomResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_CINEMAS)
   create(@Body() dto: CreateRoomDto) {
     return this.roomsService.create(dto);
   }
@@ -52,8 +56,9 @@ export class RoomsController {
   @ApiResponse({ status: 200, type: RoomResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_CINEMAS)
   update(@Param('id') id: string, @Body() dto: UpdateRoomDto) {
     return this.roomsService.update(id, dto);
   }
@@ -62,8 +67,9 @@ export class RoomsController {
   @ApiResponse({ status: 200, type: RoomResponseDto })
   @ApiErrorResponses(401, 403, 404, 409)
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN)
+  @Permissions(AdminPermission.MANAGE_CINEMAS)
   remove(@Param('id') id: string) {
     return this.roomsService.remove(id);
   }

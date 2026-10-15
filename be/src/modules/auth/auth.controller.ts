@@ -1,4 +1,25 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
+import { CurrentUser } from '../../common/auth/current-user.decorator.js';
+import type { AuthUser } from '../../common/auth/auth-user.js';
+import {
+  ChangePasswordDto,
+  RequestPasswordResetDto,
+  ResetPasswordDto,
+} from './dto/password-reset.dto.js';
+import { AuthSessionResponseDto, PasswordChangedResponseDto } from './dto/session.dto.js';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthResponseDto } from '../../common/http/dto/response.dto.js';
 import {
@@ -17,7 +38,72 @@ import { RegisterDto } from './dto/register.dto.js';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+  ) {}
+
+  @Post('password-reset/request')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: 200, description: 'Always returns the same response to avoid account enumeration.' })
+  @ApiErrorResponses(400)
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Post('password-reset/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: 200, description: 'Password reset completed and all sessions revoked.' })
+  @ApiErrorResponses(400, 401)
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, type: [AuthSessionResponseDto], description: 'Active sessions for the authenticated user.' })
+  @ApiErrorResponses(401)
+  sessions(@CurrentUser() user: AuthUser) {
+    return this.authService.listSessions(user.id, user.sessionId);
+  }
+
+  @Delete('sessions/:sessionId')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiResponse({ status: 204, description: 'Session revoked.' })
+  @ApiErrorResponses(401)
+  revokeSession(@CurrentUser() user: AuthUser, @Req() request: Request) {
+    const sessionId = request.params.sessionId;
+    if (typeof sessionId !== 'string') throw new UnauthorizedException('Session is no longer active');
+    return this.authService.revokeSession(user.id, sessionId);
+  }
+
+  @Post('sessions/revoke-all')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiResponse({ status: 204, description: 'All sessions revoked.' })
+  @ApiErrorResponses(401)
+  revokeAllSessions(@CurrentUser() user: AuthUser) {
+    return this.authService.revokeAllSessions(user.id);
+  }
+
+  @Post('sessions/revoke-others')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiResponse({ status: 204, description: 'All other sessions revoked.' })
+  @ApiErrorResponses(401)
+  revokeOtherSessions(@CurrentUser() user: AuthUser) {
+    if (!user.sessionId) throw new UnauthorizedException('Session is no longer active');
+    return this.authService.revokeOtherSessions(user.id, user.sessionId);
+  }
+
+  @Post('password/change')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: 200, type: PasswordChangedResponseDto, description: 'Password changed and all sessions revoked.' })
+  @ApiErrorResponses(400, 401)
+  changePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(user.id, dto);
+  }
 
   @Post('register')
   @ApiResponse({ status: 201, type: EmailVerificationRequiredResponseDto })

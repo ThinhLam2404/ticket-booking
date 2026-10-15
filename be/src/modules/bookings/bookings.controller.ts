@@ -28,6 +28,9 @@ import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import type { AuthUser } from '../../common/auth/auth-user.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
+import { PermissionsGuard } from '../../common/auth/permissions.guard.js';
+import { Permissions } from '../../common/auth/permissions.decorator.js';
+import { AdminPermission } from '@prisma/client';
 import { Roles } from '../../common/auth/roles.decorator.js';
 import { BookingsService } from './bookings.service.js';
 
@@ -55,16 +58,18 @@ export class BookingsController {
   }
 
   @Get('admin')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
+  @Permissions(AdminPermission.VIEW_BOOKINGS)
   @ApiResponse({ status: 200, type: CursorPaginatedBookingsResponseDto })
   findAllAdmin(@Query() query: AdminBookingsQueryDto) {
     return this.bookingsService.findAllAdmin(query);
   }
 
   @Get('admin/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('ADMIN')
+  @Permissions(AdminPermission.VIEW_BOOKINGS)
   @ApiResponse({ status: 200 })
   findOneAdmin(@Param('id') id: string) {
     return this.bookingsService.findOneAdmin(id);
