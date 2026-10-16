@@ -43,10 +43,13 @@ export type TmdbMovieDetails = TmdbMovieListItem & {
 
 @Injectable()
 export class TmdbClient {
-  private readonly baseUrl = 'https://api.themoviedb.org/3';
-  private readonly imageBaseUrl = 'https://image.tmdb.org/t/p';
+  private readonly baseUrl: string | undefined;
+  private readonly imageBaseUrl: string | undefined;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService) {
+    this.baseUrl = this.config.get<string>('TMDB_BASE_URL')?.trim() || undefined;
+    this.imageBaseUrl = this.config.get<string>('TMDB_IMAGE_BASE_URL')?.trim() || undefined;
+  }
 
   async listMovies(search: string | undefined, page: number) {
     const params = new URLSearchParams({
@@ -124,7 +127,7 @@ export class TmdbClient {
   }
 
   image(path: string | null | undefined, size: 'w500' | 'w1280') {
-    return path ? `${this.imageBaseUrl}/${size}${path}` : null;
+    return path && this.imageBaseUrl ? `${this.imageBaseUrl}/${size}${path}` : null;
   }
 
   private async requestWithLanguageFallback<T>(
@@ -161,6 +164,9 @@ export class TmdbClient {
         await new Promise((resolve) => setTimeout(resolve, attempt * 300));
       }
       try {
+        if (!this.baseUrl) {
+          throw new ServiceUnavailableException('TMDB integration is not configured');
+        }
         response = await fetch(`${this.baseUrl}${path}?${params.toString()}`, {
           headers: {
             Accept: 'application/json',

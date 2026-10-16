@@ -44,6 +44,10 @@ Smoke suite hiện kiểm tra customer catalogue, auth guard cho `/bookings`, ad
 
 Tài liệu dùng chung cho toàn bộ repository `ticket-booking`, mô tả frontend, backend, API contract, database, infrastructure, runtime flow và cách chạy hệ thống theo đúng source code hiện tại.
 
+### Frontend visual direction — CineBook Cinematic Minimal
+
+Frontend customer dùng hướng Cinematic Minimal: poster/backdrop tạo cảm xúc theo tham chiếu MUBI và Criterion, còn bố cục đặt vé giữ ngắn gọn, trực quan và ưu tiên lịch chiếu. Khu vực admin dùng cấu trúc dữ liệu rõ ràng theo tinh thần Elastic. Design system chi tiết nằm trong `DESIGN.md`; triển khai CSS refresh dùng token Cinematic Minimal tại `fe/src/cinebook-refresh.css`. Thay đổi này chỉ ảnh hưởng trình bày, không thay đổi route, API contract, quy tắc giữ ghế hoặc thanh toán. Khi kiểm tra UI, cần xác nhận light/dark/system, mobile <=720px, poster/backdrop lỗi hoặc thiếu, loading/empty/error và các luồng chọn ghế/thanh toán.
+
 ## Mục lục
 
 1. [Tổng quan](#1-tổng-quan)
@@ -255,7 +259,7 @@ Root điều phối cả hai ứng dụng bằng `package.json`; dependency và 
 
 Frontend là React SPA được build và serve bởi Vite. `fe/src/api.ts` là HTTP client dùng Fetch API, tự gắn Bearer access token, thử refresh một lần khi nhận `401`, hủy các query đọc dữ liệu cũ bằng `AbortSignal` khi điều hướng, filter hoặc location đổi liên tục, rồi xóa session nếu refresh thất bại. Access token giữ trong memory; refresh token và user hiện tại được giữ trong `localStorage` để các tab cùng browser dùng chung session.
 
-Frontend theme dùng `system | light | dark`, lưu preference ở localStorage key `ticket_booking_theme`, áp dụng `data-theme` trên `<html>`, theo dõi `prefers-color-scheme` và cập nhật `theme-color`. Design direction là CineBook Cobalt Editorial với Space Grotesk cho display và Inter cho body/data; semantic tokens được định nghĩa trong `DESIGN.md` và `fe/src/App.css`.
+Frontend theme dùng `system | light | dark`, lưu preference ở localStorage key `ticket_booking_theme`, áp dụng `data-theme` trên `<html>`, theo dõi `prefers-color-scheme` và cập nhật `theme-color`. Design direction là CineBook Cinematic Minimal với Cinema Copper cho action accent, Space Grotesk cho display và Inter cho body/data; semantic tokens được định nghĩa trong `DESIGN.md` và `fe/src/App.css`.
 
 Admin UI có modal nhập phim từ TMDB trong màn quản lý phim. Modal gọi API backend, không gọi TMDB trực tiếp và không biết `TMDB_ACCESS_TOKEN`.
 
@@ -269,7 +273,7 @@ Customer UI hiện có:
 - Không nhận hold mới khi suất chiếu còn tối đa 5 phút; client hiển thị lỗi suất quá gần giờ chiếu.
 - Checkout SePay bằng mã QR/chuyển khoản và nhận webhook xác nhận thanh toán.
 - Booking history và ticket history.
-- Login/register và logout; nút logout dùng màu violet ở trạng thái thường và đỏ trầm khi hover.
+- Login/register và logout; nút logout dùng màu brand ở trạng thái thường và đỏ trầm khi hover.
 
 ### 3.4. Repository layout
 
@@ -340,6 +344,8 @@ DOCKER_PUBLIC_APP_URL=http://localhost:8080
 DOCKER_CORS_ORIGINS=http://localhost:8080
 DOCKER_MAIL_WORKER_ENABLED=true
 TMDB_ACCESS_TOKEN=<tmdb-api-read-access-token>
+TMDB_BASE_URL=https://api.tmdb.org/3
+TMDB_IMAGE_BASE_URL=https://image.tmdb.org/t/p
 SEED_ADMIN_EMAIL=admin@example.com
 SEED_ADMIN_PASSWORD=change-this-seed-password
 ```
@@ -386,8 +392,10 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `DOCKER_CORS_ORIGINS` | Docker | Ghi đè `CORS_ORIGINS` trong production-like Compose; default `http://localhost:8080` |
 | `DOCKER_MAIL_WORKER_ENABLED` | Docker | Bật/tắt Mail Worker trong production-like Compose; default `true` |
 | `TMDB_ACCESS_TOKEN`      | Không    | TMDB API Read Access Token; cần nếu Admin tìm hoặc nhập phim  |
+| `TMDB_BASE_URL`          | Không    | Base URL TMDB API; mặc định `https://api.tmdb.org/3`            |
+| `TMDB_IMAGE_BASE_URL`    | Không    | Base URL ảnh TMDB; mặc định `https://image.tmdb.org/t/p`       |
 | `SEED_ADMIN_EMAIL`       | Seed     | Email admin bootstrap, default `admin@example.com`             |
-| `SEED_ADMIN_PASSWORD`    | Seed     | Password admin bootstrap, bắt buộc khi seed                    |
+| `SEED_ADMIN_PASSWORD`    | Seed     | Password admin bootstrap, bắt buộc khi seed; mỗi lần seed sẽ đồng bộ lại password của tài khoản admin |
 | `SEPAY_BANK_CODE`        | Không    | Mã ngân hàng SePay/VietQR (ví dụ: `MB`, `VCB`, `ACB`)          |
 | `SEPAY_ACCOUNT_NUMBER`   | Không    | Số tài khoản ngân hàng nhận tiền                              |
 | `SEPAY_ACCOUNT_NAME`     | Không    | Tên chủ tài khoản nhận tiền                                    |
@@ -1025,7 +1033,7 @@ Bổ sung phân loại phòng/suất và chuẩn hóa giá theo từng suất:
 - Thêm `MailOutbox` để gửi email bất đồng bộ, dedupe theo nghiệp vụ và retry khi SMTP lỗi.
 - Mail worker chạy trong Node.js Worker Thread riêng, không dùng Nest `@Cron`; worker xử lý drain liên tục, sleep bằng polling fallback khi rỗng, và nhận `wake` sau khi transaction tạo outbox commit.
 - Worker có graceful shutdown, restart với backoff khi crash, stale-lock recovery, stable `Message-ID` theo outbox và readiness status.
-- Email xác thực tài khoản dùng template CineBook Cobalt Editorial HTML/table inline CSS và plain-text fallback. Email vé gồm thông tin phim/rạp/suất, tổng tiền, từng mã vé, QR inline CID và link xem vé.
+- Email xác thực tài khoản dùng template CineBook Cinematic Minimal HTML/table inline CSS và plain-text fallback. Email vé gồm thông tin phim/rạp/suất, tổng tiền, từng mã vé, QR inline CID và link xem vé.
 
 #### `20260930013408_refresh_token_reuse_hardening`, `20260930021640_backfill_refresh_token_families` và `20260930030000_backfill_refresh_token_families`
 
@@ -2870,7 +2878,7 @@ Không chạy `prisma migrate dev` trên Prisma Cloud/production; dùng `prisma 
 - Dockerfile, local production-like Compose stack, structured request/domain logs, Prometheus metrics, Discord alerts, Admin operations status và GitHub Actions CI đã có; distributed tracing và CD deploy staging/production chưa có.
 - Safe direct-URL backup/atomic restore scripts và isolated CI drill đã có; chưa chạy restore/cutover/rollback trên staging hoặc production vì chưa chọn hosting target.
 - Chưa có lịch backup production, off-site encrypted storage hoặc retention policy; các script hiện là primitive vận hành và CI drill, không phải backup service tự động.
-- `prisma:seed` cập nhật admin role/name nhưng không đổi password nếu admin đã tồn tại.
+- `prisma:seed` cập nhật admin role/name và đồng bộ password từ `SEED_ADMIN_PASSWORD` mỗi lần chạy.
 
 ### 15.2. Roadmap đề xuất
 

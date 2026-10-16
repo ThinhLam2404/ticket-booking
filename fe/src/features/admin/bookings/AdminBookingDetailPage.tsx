@@ -1,32 +1,27 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../api";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/ui";
 import { money, formatDate, formatTime } from "../../../utils/format";
-import { AdminPage, ConfirmDialog } from "../shared";
+import { AdminPage, ConfirmDialog, ReasonDialog, bookingStatusText, movieStatusText, paymentStatusText, seatTypeText, ticketStatusText } from "../shared";
 
 type BookingStatus = "PENDING" | "CONFIRMED" | "CANCELLED" | "EXPIRED";
 
 function statusBadge(status: BookingStatus) {
-  const labels: Record<BookingStatus, string> = {
-    PENDING: "Chờ thanh toán",
-    CONFIRMED: "Đã xác nhận",
-    CANCELLED: "Đã hủy",
-    EXPIRED: "Đã hết hạn",
-  };
-  return <span className={`status ${status.toLowerCase()}`}>{labels[status]}</span>;
+  return <span className={`status ${status.toLowerCase()}`}>{bookingStatusText[status]}</span>;
 }
 
 function seatTypeBadge(type: string) {
-  const labels: Record<string, string> = { STANDARD: "Thường", VIP: "VIP", COUPLE: "Đôi" };
-  return <span className="seat-type-badge">{labels[type] ?? type}</span>;
+  return <span className="seat-type-badge">{seatTypeText(type as "STANDARD" | "VIP" | "COUPLE")}</span>;
 }
 
 export function AdminBookingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
-  const [confirm, setConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [confirm, setConfirm] = useState<{ title: string; message: ReactNode; onConfirm: () => void } | null>(null);
+  const [refundReasonDialog, setRefundReasonDialog] = useState(false);
 
   const bookingQuery = useQuery({
     queryKey: ["admin-booking", id],
@@ -38,6 +33,7 @@ export function AdminBookingDetailPage() {
     mutationFn: (dto: { reason: string; adminNote?: string }) => api.adminRefundBooking(id!, dto),
     onSuccess: () => {
       setConfirm(null);
+      setRefundReasonDialog(false);
       void queryClient.invalidateQueries({ queryKey: ["admin-booking", id] });
       void queryClient.invalidateQueries({ queryKey: ["admin-sepay-transactions"] });
     },
@@ -67,23 +63,12 @@ export function AdminBookingDetailPage() {
   const canRefund = booking.payment?.status === "SUCCEEDED" && booking.status === "CONFIRMED" && !booking.tickets.some((t) => t.status === "USED");
   const canCancel = booking.status === "PENDING";
 
-  const handleRefund = () => {
-    setConfirm({
-      title: "Hoàn tiền đặt vé",
-      message: `Đặt vé <strong>#${booking.id}</strong> — ${money(booking.totalAmount)}. Ghế sẽ được giải phóng, vé bị hủy, email hoàn tiền sẽ gửi cho khách.`,
-      onConfirm: () => {
-        const reason = prompt("Lý do hoàn tiền (bắt buộc):");
-        if (!reason) return alert("Vui lòng nhập lý do");
-        const adminNote = prompt("Ghi chú admin (tùy chọn):") || undefined;
-        refundMutation.mutate({ reason, adminNote });
-      },
-    });
-  };
+  const handleRefund = () => setRefundReasonDialog(true);
 
   const handleCancel = () => {
     setConfirm({
       title: "Hủy đặt vé",
-      message: `Hủy đặt vé <strong>#${booking.id}</strong>? Ghế sẽ được giải phóng.`,
+      message: <>Hủy đặt vé <strong>#{booking.id}</strong>? Ghế sẽ được giải phóng.</>,
       onConfirm: () => cancelMutation.mutate(),
     });
   };
@@ -155,7 +140,7 @@ export function AdminBookingDetailPage() {
               <dt>Phim</dt>
               <dd>
                 <strong>{movie?.title ?? "—"}</strong>
-                {movie && <small className="text-muted">{movie.duration} phút · {movie.status}</small>}
+                {movie && <small className="text-muted">{movie.duration} phút · {movieStatusText(movie.status)}</small>}
               </dd>
 
               <dt>Rạp / Phòng</dt>
@@ -197,7 +182,7 @@ export function AdminBookingDetailPage() {
                         <td>{item.showtimeSeat?.seat?.type && seatTypeBadge(item.showtimeSeat.seat.type)}</td>
                         <td>{money(getSeatPrice(item))}</td>
                         <td>
-                          {item.ticket && <span className={`status ${item.ticket.status.toLowerCase()}`}>{item.ticket.status === "ACTIVE" ? "Đang hoạt động" : item.ticket.status === "USED" ? "Đã dùng" : "Đã hủy"}</span>}
+                          {item.ticket && <span className={`status ${item.ticket.status.toLowerCase()}`}>{ticketStatusText[item.ticket.status] ?? item.ticket.status}</span>}
                         </td>
                       </tr>
                     ))}
@@ -213,7 +198,7 @@ export function AdminBookingDetailPage() {
             <div className="detail-card">
               <div className="detail-card-header">
                 <p className="eyebrow">THANH TOÁN</p>
-                <span className={`status ${booking.payment.status.toLowerCase()}`}>{booking.payment.status === "SUCCEEDED" ? "Thành công" : booking.payment.status === "PENDING" ? "Đang xử lý" : booking.payment.status === "FAILED" ? "Thất bại" : "Đã hoàn tiền"}</span>
+                <span className={`status ${booking.payment.status.toLowerCase()}`}>{paymentStatusText[booking.payment.status] ?? booking.payment.status}</span>
               </div>
               <dl className="detail-grid">
                 <dt>Mã thanh toán</dt>
@@ -253,7 +238,7 @@ export function AdminBookingDetailPage() {
                     {booking.tickets.map((ticket) => (
                       <tr key={ticket.id}>
                         <td><code>{ticket.code}</code></td>
-                        <td><span className={`status ${ticket.status.toLowerCase()}`}>{ticket.status === "ACTIVE" ? "Đang hoạt động" : ticket.status === "USED" ? "Đã dùng" : "Đã hủy"}</span></td>
+                        <td><span className={`status ${ticket.status.toLowerCase()}`}>{ticketStatusText[ticket.status] ?? ticket.status}</span></td>
                         <td>{ticket.usedAt ? formatDateTime(ticket.usedAt) : <span className="text-muted">—</span>}</td>
                         <td>{formatDateTime(ticket.createdAt)}</td>
                       </tr>
@@ -304,8 +289,24 @@ export function AdminBookingDetailPage() {
       {confirm && (
         <ConfirmDialog
           state={confirm}
-          loading={refundMutation.isPending || cancelMutation.isPending}
+          loading={cancelMutation.isPending}
           onClose={() => setConfirm(null)}
+        />
+      )}
+      {refundReasonDialog && (
+        <ReasonDialog
+          state={{
+            title: "Hoàn tiền đặt vé",
+            message: <>Đặt vé <strong>#{booking.id}</strong> — {money(booking.totalAmount)}. Ghế sẽ được giải phóng, vé bị hủy và email hoàn tiền sẽ gửi cho khách.</>,
+            reasonLabel: "Lý do hoàn tiền",
+            reasonPlaceholder: "Ví dụ: Khách yêu cầu do thay đổi lịch",
+            noteLabel: "Ghi chú admin (tùy chọn)",
+            notePlaceholder: "Thông tin bổ sung cho nội bộ",
+            onSubmit: (reason, adminNote) => refundMutation.mutate({ reason, adminNote }),
+          }}
+          loading={refundMutation.isPending}
+          error={refundMutation.error ? "Không thể hoàn tiền." : undefined}
+          onClose={() => setRefundReasonDialog(false)}
         />
       )}
     </AdminPage>

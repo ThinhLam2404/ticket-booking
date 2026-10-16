@@ -1,0 +1,259 @@
+/* CineBook Cinematic Minimal refresh
+ * Composition references: MUBI / Criterion for customer discovery,
+ * Elastic for operational clarity. Brand tokens use a restrained Cinema Copper accent.
+ */
+
+:root {
+  --page-gutter: clamp(16px, 3vw, 32px);
+  --content-max: 1440px;
+  --section-space: clamp(56px, 8vw, 112px);
+  --surface-shadow: 0 16px 42px rgba(8, 16, 31, .08);
+}
+
+html { background: var(--canvas); }
+body { overflow-x: hidden; }
+
+.app-shell { background: var(--canvas); }
+.app-shell-booking-flow .topbar {
+  position: relative;
+  top: auto;
+  transform: none !important;
+  box-shadow: none;
+}
+.app-shell .topbar {
+  height: 68px;
+  background: var(--surface-1);
+}
+.app-shell .topbar-inner {
+  width: min(var(--content-max), calc(100% - (var(--page-gutter) * 2)));
+  gap: 24px;
+}
+.app-shell .brand { color: var(--text-primary); font-size: 1.18rem; letter-spacing: -.04em; }
+.app-shell .brand > span:last-child > span { color: var(--accent); }
+.app-shell .brand-mark { width: 28px; height: 28px; border-radius: 7px; color: var(--on-accent); }
+.app-shell .desktop-nav { gap: 20px; }
+.app-shell .desktop-nav a { font-size: .78rem; letter-spacing: .01em; }
+.app-shell .topbar-actions { gap: 8px; }
+.app-shell .location-pill,
+.app-shell .search-button { min-height: 36px; background: var(--surface-2); border-radius: 8px; }
+.app-shell .login-button { min-height: 38px; padding-inline: 16px; }
+
+.app-shell main > .spotlight-hero {
+  min-height: clamp(480px, 68vh, 660px);
+  border: 0;
+}
+.app-shell .spotlight-content {
+  width: min(var(--content-max), calc(100% - (var(--page-gutter) * 2)));
+  min-height: clamp(480px, 68vh, 660px);
+  padding-bottom: clamp(48px, 7vw, 88px);
+}
+.app-shell .spotlight-shade {
+  background: linear-gradient(90deg, rgba(8, 16, 31, .94) 0%, rgba(8, 16, 31, .68) 45%, rgba(8, 16, 31, .08) 100%), linear-gradient(0deg, rgba(8, 16, 31, .82), transparent 60%);
+}
+.app-shell .spotlight-copy { max-width: 610px; }
+.app-shell .spotlight-copy h1 {
+  max-width: 620px;
+  margin: 10px 0 14px;
+  font-size: clamp(2.5rem, 5vw, 5rem);
+  line-height: .96;
+}
+.app-shell .spotlight-copy > p:not(.eyebrow) { max-width: 540px; color: #e5edf7; font-size: .92rem; }
+.app-shell .spotlight-copy .eyebrow { color: #f2b28f; }
+.app-shell .spotlight-copy .hero-duration { color: #e5edf7; }
+.app-shell .hero-actions { gap: 8px; }
+.app-shell .hero-actions .primary { min-width: 140px; }
+
+.app-shell main > .quick-booking,
+.app-shell main > .catalog-section,
+.app-shell main > .promotion-section {
+  width: min(var(--content-max), calc(100% - (var(--page-gutter) * 2)));
+}
+.app-shell main > .quick-booking {
+  margin-top: -32px;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: var(--surface-shadow);
+}
+.app-shell .quick-booking-heading { padding-bottom: 14px; margin-bottom: 14px; }
+.app-shell .quick-booking-heading h2 { font-size: .82rem; letter-spacing: .12em; }
+.app-shell .quick-booking-grid { gap: 10px; }
+.app-shell .quick-step { font-size: .7rem; }
+.app-shell .quick-step b { width: 20px; height: 20px; border-radius: 5px; }
+
+.app-shell .catalog-section,
+.app-shell .promotion-section,
+.app-shell .showtimes-section { padding-top: var(--section-space); }
+.app-shell .section-heading { margin-bottom: 28px; padding-bottom: 16px; }
+.app-shell .section-heading h2 { font-size: clamp(1.65rem, 3vw, 2.8rem); }
+.app-shell .catalog-section > .filter-tabs { top: var(--section-space); }
+.app-shell .filter-chip,
+.app-shell .date-chip { border-radius: 8px; }
+.app-shell .movie-grid { gap: 16px; }
+.app-shell .movie-card { border-radius: 12px; box-shadow: none; }
+.app-shell .movie-card:hover { transform: translateY(-3px); box-shadow: var(--surface-shadow); }
+.app-shell .movie-info { gap: 7px; padding: 13px; }
+.app-shell .movie-info h3 { font-family: var(--display-font); font-size: .96rem; }
+.app-shell .movie-buy { border-radius: 7px; }
+
+.app-shell main > .movie-detail-hero { background-position: center; }
+.app-shell .movie-detail-grid {
+  width: min(1240px, calc(100% - (var(--page-gutter) * 2)));
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: clamp(32px, 5vw, 64px);
+  padding: 56px 0 64px;
+}
+.app-shell .detail-poster-wrap { box-shadow: 0 22px 42px rgba(8, 16, 31, .18); }
+.app-shell .detail-copy h1 { font-size: clamp(2.4rem, 5vw, 5rem); }
+.app-shell .detail-meta-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.app-shell .showtimes-section { width: min(1240px, calc(100% - (var(--page-gutter) * 2))); }
+.app-shell .showtime-days { gap: 14px; }
+.app-shell .showtime-day { box-shadow: var(--surface-shadow); }
+.app-shell .showtime-day-heading { padding: 16px 18px; }
+.app-shell .showtime-list { gap: 8px; padding: 16px; }
+.app-shell .showtime-card { border-radius: 8px; }
+.app-shell .showtime-card:hover { transform: translateY(-2px); }
+
+.app-shell .site-footer { margin-top: var(--section-space); padding-top: 48px; }
+.app-shell .mobile-nav { background: var(--surface-1); box-shadow: 0 -8px 24px rgba(8, 16, 31, .1); }
+.app-shell .mobile-nav a.active,
+.app-shell .mobile-nav button:hover { color: var(--accent); }
+
+.admin-shell { background: var(--canvas); }
+.admin-shell .admin-sidebar { background: var(--surface-1); }
+.admin-shell .admin-main main > .admin-page { padding-top: 48px; }
+.admin-shell .admin-stat-card,
+.admin-shell .admin-panel,
+.admin-shell .admin-table-wrap { border-radius: 12px; box-shadow: none; }
+.admin-shell .admin-stat-card { min-height: 164px; }
+.admin-shell .admin-stat-card:hover { transform: translateY(-2px); box-shadow: var(--surface-shadow); }
+.admin-shell .admin-toolbar { border-radius: 10px; background: var(--surface-1); }
+.admin-shell .admin-table-wrap { overflow-x: auto; }
+.admin-shell .admin-table th { letter-spacing: .1em; }
+
+@media (max-width: 900px) {
+  .app-shell .desktop-nav { gap: 12px; }
+  .app-shell .movie-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .app-shell .topbar { height: 60px; }
+  .app-shell .seat-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    min-width: 0;
+  }
+  .app-shell .seat-map-panel,
+  .app-shell .seat-summary-panel {
+    width: 100%;
+    min-width: 0;
+  }
+  .app-shell .seat-map-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .app-shell .topbar-inner { width: calc(100% - 32px); }
+  .app-shell .topbar-actions { gap: 5px; }
+  .app-shell .spotlight-hero,
+  .app-shell .spotlight-content { min-height: 500px; }
+  .app-shell .spotlight-content { width: 100%; padding: 0 16px 28px; }
+  .app-shell .spotlight-copy h1 { font-size: clamp(2.2rem, 11vw, 3.5rem); }
+  .app-shell .spotlight-copy > p:not(.eyebrow) { font-size: .8rem; }
+  .app-shell main > .quick-booking { margin-top: 16px; padding: 16px; }
+  .app-shell .quick-booking-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .app-shell .quick-booking-grid { grid-template-columns: 1fr 1fr; }
+  .app-shell .quick-booking-submit { grid-column: 1 / -1; }
+  .app-shell .catalog-section > .filter-tabs { position: static; margin-bottom: 20px; }
+  .app-shell .catalog-section,
+  .app-shell .promotion-section,
+  .app-shell .showtimes-section { padding-top: 56px; }
+  .app-shell .movie-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .app-shell .movie-info { padding: 11px; }
+  .app-shell .movie-showtimes { display: none; }
+  .app-shell main > .movie-detail-hero { background-position: 64% center; }
+  .app-shell .movie-detail-grid { width: calc(100% - 32px); padding: 32px 0 40px; }
+  .app-shell .detail-poster-wrap { width: min(190px, 56vw); }
+  .app-shell .detail-meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .app-shell .detail-copy h1 { font-size: clamp(2rem, 10vw, 3.4rem); }
+  .app-shell .showtimes-section { width: calc(100% - 32px); }
+  .app-shell .showtime-card { min-width: 138px; }
+  .admin-shell .admin-main main > .admin-page { padding-top: 28px; }
+  .admin-shell .admin-dashboard-actions {
+    width: 100%;
+    min-width: 0;
+    gap: 8px;
+  }
+  .admin-shell .admin-dashboard-actions > * {
+    min-width: 0;
+    flex: 1 1 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .app-shell .account-security-page .security-card .card-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .app-shell .account-security-page .security-card .account-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+  .app-shell .account-security-page .security-card .account-actions > * {
+    width: 100%;
+  }
+}
+
+/* Contrast guard: keep every accent-filled interactive surface readable.
+ * This layer intentionally comes after the legacy editorial overrides so
+ * hover/selected states cannot fall back to theme text colors. */
+.app-shell .movie-buy:hover,
+.app-shell .movie-buy:focus-visible,
+.app-shell .primary:hover,
+.app-shell .primary:focus-visible,
+.app-shell .filter-chip.active,
+.app-shell .date-chip.active,
+.app-shell .seat.chosen,
+.app-shell .seat-token,
+.app-shell .payment-option.active .payment-logo,
+.app-shell .auth-mark,
+.admin-shell .primary:hover,
+.admin-shell .primary:focus-visible,
+.admin-shell .account-avatar {
+  color: var(--on-accent);
+}
+
+.app-shell .movie-buy:hover,
+.app-shell .movie-buy:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.app-shell .filter-chip.active,
+.app-shell .date-chip.active,
+.app-shell .seat.chosen,
+.app-shell .payment-option.active .payment-logo {
+  color: var(--on-accent);
+}
+
+.app-shell .date-chip.active small,
+.app-shell .date-chip.active strong,
+.app-shell .date-chip.active span {
+  color: var(--on-accent);
+}
+
+.app-shell .seat-token,
+.app-shell .auth-mark,
+.app-shell .payment-option.active .payment-logo {
+  background: var(--accent);
+}
+
+.admin-shell .admin-sidebar-nav a.active {
+  color: var(--accent);
+}
+.admin-shell .admin-sidebar-nav a.active > span:first-child {
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

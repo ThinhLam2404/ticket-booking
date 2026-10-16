@@ -36,6 +36,14 @@ class EnvironmentVariables {
   TMDB_ACCESS_TOKEN?: string;
 
   @IsOptional()
+  @IsUrl({ require_tld: false })
+  TMDB_BASE_URL = 'https://api.tmdb.org/3';
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
+
+  @IsOptional()
   @IsString()
   SEPAY_BANK_CODE?: string;
 

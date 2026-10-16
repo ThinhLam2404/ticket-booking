@@ -1,6 +1,6 @@
-# CineBook — Cobalt Editorial Design System
+# CineBook — Cinematic Minimal Design System
 
-Design conventions for the ticket-booking frontend (`fe/`). The current visual direction is **CineBook Cobalt Editorial**: cinematic editorial discovery for customers and a precise operations workspace for admins. It combines the image-led hierarchy of Standard Hotels and M+ with the data clarity of Elastic, Highlight and Hex.
+Design conventions for the ticket-booking frontend (`fe/`). The current visual direction is **CineBook Cinematic Minimal**: image-led movie discovery for customers and a precise operations workspace for admins. It takes composition cues from the MUBI and Criterion references in Inspo, then applies a restrained Cinema Copper action accent and the data clarity of Elastic, Highlight and Hex. The design is intentionally simple: posters and backdrops create emotion, while copper marks actions and selection.
 
 ## Source of truth
 
@@ -29,7 +29,7 @@ Keep `fe/src/index.css`, `fe/src/App.css`, theme files and Stitch references ali
 
 ## Semantic color tokens
 
-The palette uses electric cobalt as the shared brand accent. Light mode is a cool paper workspace; dark mode is a deep blue-black cinema surface. Do not swap colors mechanically: preserve semantic roles and contrast.
+The palette uses a restrained Cinema Copper on dark cinema surfaces and a Bordeaux Berry accent on light surfaces. Light mode is a cool paper workspace; dark mode is a deep blue-black cinema surface. Do not swap colors mechanically: preserve semantic roles and contrast. The warm/berry brand accents are reserved for actions and selection; green, amber, red and informational blue remain semantic only.
 
 | Token | Light | Dark | Usage |
 |---|---|---|---|
@@ -44,11 +44,12 @@ The palette uses electric cobalt as the shared brand accent. Light mode is a coo
 | `text-muted` | `#64748b` | `#8e9bad` | captions and inactive content |
 | `border` | `#d3dce8` | `#2a3d57` | structural hairlines |
 | `border-strong` | `#9eadc0` | `#526882` | focused and emphasized borders |
-| `brand` | `#0b64dd` | `#3b82f6` | primary action, links and selection |
-| `brand-deep` | `#094dab` | `#2563c7` | pressed and deep brand state |
-| `brand-hover` | `#0755bd` | `#60a5fa` | hover state |
-| `brand-soft` | `#e5f0ff` | `#102e5e` | selected backgrounds and subtle labels |
-| `focus-ring` | `rgba(11,100,221,.22)` | `rgba(96,165,250,.28)` | keyboard focus |
+| `brand` | `#7b304b` | `#b86f4c` | primary action, links and selection |
+| `brand-deep` | `#60233a` | `#934b2b` | pressed and deep brand state |
+| `brand-hover` | `#8f3e5d` | `#c78462` | hover state |
+| `brand-soft` | `#f5e8ee` | `#102e5e` | selected backgrounds and subtle labels |
+| `on-accent` | `#ffffff` | `#ffffff` | text and icons on brand surfaces |
+| `focus-ring` | `rgba(123,48,75,.24)` | `rgba(199,132,98,.3)` | keyboard focus |
 | `overlay` | `rgba(14,27,53,.52)` | `rgba(0,0,0,.72)` | modal and drawer scrim |
 | `success-bg` | `#e6f6ed` | `#123a2a` | success surface |
 | `success-text` | `#166534` | `#b8f0ce` | success content |
@@ -62,7 +63,7 @@ The palette uses electric cobalt as the shared brand accent. Light mode is a coo
 | `qr-ink` | `#101820` | `#101820` | QR foreground, invariant |
 | `image-scrim` | `rgba(8,16,31,.18)` | `rgba(0,0,0,.56)` | poster/backdrop overlays |
 
-Green, amber, red and informational blue are semantic only. Cobalt is the only brand accent. Avoid neon status colors, arbitrary gradients and blurred glow halos.
+Green, amber, red and informational blue are semantic only. Cinema Copper is the only brand accent. Avoid neon status colors, arbitrary gradients and blurred glow halos.
 
 ## Typography
 
@@ -73,7 +74,7 @@ Green, amber, red and informational blue are semantic only. Cobalt is the only b
 - Admin page title: `clamp(2rem, 3vw, 2.75rem)`, line-height `1`, tracking `-.045em`.
 - Body: `14–16px`, line-height `1.45–1.6`.
 - Table and metadata: `12–14px`; numbers use tabular figures.
-- Eyebrow: `11–12px`, weight `700`, tracking `.16em`, cobalt or semantic tone.
+- Eyebrow: `11–12px`, weight `700`, tracking `.16em`, Cinema Copper or semantic tone.
 - Do not use gradient text, decorative webfonts or all-caps paragraphs.
 
 ## Spacing, grid and shape
@@ -94,26 +95,36 @@ Green, amber, red and informational blue are semantic only. Cobalt is the only b
 
 ### Customer
 
-- Use image-led editorial composition inspired by Standard Hotels and M+.
-- Hero content may overlap or sit beside a large poster/backdrop, but copy must remain readable in both themes.
-- Catalogue pages use clear index/filter hierarchy, not a generic SaaS bento dashboard.
-- Movie detail prioritizes artwork, title, metadata, showtimes and the booking CTA.
-- Booking and checkout emphasize a clear step hierarchy, persistent summary and visible time/payment state.
-- Mobile uses restrained bottom navigation and vertically ordered actions.
+- Use **Cinematic Minimal** composition: a poster/backdrop should establish mood, but the first viewport must also expose the film title, metadata and a clear booking action.
+- Use MUBI as the primary reference for movie detail: image-led hierarchy, restrained typography and showtimes close to the film context. Use Criterion as a secondary reference for a single focused home hero, not for full-screen streaming chrome.
+- The home page order is: compact header, featured film, quick booking, catalogue tabs, then supporting content. Do not let a decorative hero push the booking controls too far below the fold.
+- Catalogue pages use clear index/filter hierarchy, not a generic SaaS bento dashboard. Poster cards keep actions and availability legible at a glance.
+- Movie detail prioritizes artwork, title, metadata, showtimes and the booking CTA. Trailer is secondary and disabled clearly when unavailable.
+- Booking and checkout emphasize a clear step hierarchy, persistent summary and visible time/payment state. Keep the seat map or payment state as the visual focus of its step.
+- Mobile uses restrained bottom navigation and vertically ordered actions. Use two poster columns when the viewport supports it; use one column for dense operational content.
 
 ### Admin
 
-- Use Elastic and Highlight for grid, search and filter clarity; use Hex only for restrained metric composition.
-- Sidebar navigation is stable on desktop; mobile uses a restrained drawer.
-- Tables remain intentionally horizontally scrollable when data density requires it.
-- Dashboard metrics, filters and recent activity use clear surface levels and aligned columns.
-- Forms and dialogs are dense, technical and easy to scan; avoid decorative dashboard noise.
+- Use Elastic as the primary reference for grid, search, filter and data clarity; use Highlight and Hex only for restrained metric composition.
+- Sidebar navigation is stable on desktop; mobile uses a restrained drawer with the same information architecture.
+- Tables remain intentionally horizontally scrollable when data density requires it; never hide critical columns to force a card layout.
+- Dashboard metrics, filters and recent activity use clear surface levels, aligned columns and concise labels. Status colors communicate operational meaning only.
+- Forms and dialogs are dense, technical and easy to scan; avoid decorative dashboard noise and oversized gradients.
+
+### Reference study
+
+- Inspo references: MUBI (`mubi-com--en-ar-films-rec`), Criterion (`criterion-com`) and Elastic (`elastic-co--cloud`).
+- MUBI reference: [desktop](https://0nme3pk5am3urwa9.public.blob.vercel-storage.com/captures/mubi-com--en-ar-films-rec/hero.1440.webp) · [mobile](https://0nme3pk5am3urwa9.public.blob.vercel-storage.com/captures/mubi-com--en-ar-films-rec/mobile.384.webp).
+- Criterion reference: [desktop](https://0nme3pk5am3urwa9.public.blob.vercel-storage.com/captures/criterion-com/hero.1440.webp) · [mobile](https://0nme3pk5am3urwa9.public.blob.vercel-storage.com/captures/criterion-com/mobile.384.webp).
+- Elastic reference: [full capture](https://0nme3pk5am3urwa9.public.blob.vercel-storage.com/captures/elastic-co--cloud/full.1440.webp).
+- These are composition references only. CineBook keeps its own Vietnamese copy, Cinema Copper accent, Space Grotesk + Inter typography, accessibility rules and product behavior.
 
 ## Components and interaction
 
-- Primary buttons use solid cobalt or a very restrained cobalt-to-deep-cobalt gradient only when needed for emphasis; no luminous outer glow.
+- Primary buttons use solid Cinema Copper or a very restrained copper-to-deep-copper treatment only when needed for emphasis; no luminous outer glow.
 - Secondary buttons use `surface-2` with `border`; hover raises the border to `brand`.
 - Focus uses a visible `focus-ring` on every keyboard-interactive surface.
+- Every accent-filled interactive surface uses `on-accent` for text/icons in default, hover, focus and selected states. This includes primary actions, movie-card purchase links, active filters/dates, chosen seats, payment logos and auth marks.
 - Hover lifts stay at or below `3px`; transitions use `transform`, `opacity`, `background` and `border-color` over `.18–.24s`.
 - Pressed buttons use `translateY(1px)`.
 - Disabled controls use `opacity: .48` and `cursor: not-allowed`.
@@ -144,6 +155,15 @@ Every route and interactive surface must design and preserve:
 - No invented illustration when a poster, backdrop or existing media placeholder works.
 - No visual-only controls that do not preserve existing behavior.
 - No changes to API contracts, route paths, seat rules, booking timers or payment polling as part of the redesign.
+
+## Stitch synchronization
+
+- Canonical Stitch project: `projects/17571770747423594898` (`CineBook Cinematic Minimal`).
+- Canonical design system: `assets/16221615337981433871` (`CineBook Cinematic Minimal`, Space Grotesk + Inter, Cinema Copper `#b86f4c`).
+- Reference screens generated with that system:
+  - Desktop home: `projects/17571770747423594898/screens/1d57fea6404e4eb19e73753e8a37e4ab`.
+  - Mobile home: `projects/17571770747423594898/screens/83109faeb52c4c88bd2d3a7bb78a0d4b`.
+- The previous Stitch project `projects/5412677534890310186` was deleted so stale Cobalt, Amber and Violet screens are no longer canonical.
 
 ## Verification workflow
 

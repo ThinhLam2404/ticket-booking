@@ -163,14 +163,16 @@ export function Layout() {
     }
   }
 
-  return <div className="app-shell">
+  const isBookingSurface = /^(\/showtimes|\/bookings|\/tickets)(\/|$)/.test(location.pathname);
+
+  return <div className={`app-shell${isBookingSurface ? ' app-shell-booking-flow' : ''}`}>
     <header className={`topbar topbar-${headerState}`}>
       <div className="topbar-inner">
-        <Link className="brand" to="/"><span className="brand-mark">▰</span><span>Cine<span>Book</span></span></Link>
+        <Link className="brand" to="/"><span className="brand-mark" aria-hidden="true">▰</span><span>Cine<span>Book</span></span></Link>
         <nav className="desktop-nav" aria-label="Điều hướng chính">
           <Link className={navClass(location.pathname, '/')} to="/#now-showing">Phim</Link>
           <Link className={navClass(location.pathname, '/cinemas')} to="/cinemas">Rạp & Giá Vé</Link>
-          {user && <Link className={navClass(location.pathname, '/bookings')} to="/bookings">Booking</Link>}
+          {user && <Link className={navClass(location.pathname, '/bookings')} to="/bookings">Đặt vé</Link>}
           {user && <Link className={navClass(location.pathname, '/tickets')} to="/tickets">Vé của tôi</Link>}
         </nav>
         <div className="topbar-actions">
@@ -184,7 +186,7 @@ export function Layout() {
     <main><Outlet /></main>
     <footer className="site-footer">
       <div className="footer-grid">
-        <div className="footer-brand"><Link className="brand" to="/"><span className="brand-mark">▰</span><span>Cine<span>Book</span></span></Link><p>Hệ thống đặt vé xem phim trực tuyến hiện đại. Chọn suất chiếu, giữ ghế và bước vào thế giới điện ảnh.</p><strong>Hotline hỗ trợ: 1900 6868</strong></div>
+        <div className="footer-brand"><Link className="brand" to="/"><span className="brand-mark" aria-hidden="true">▰</span><span>Cine<span>Book</span></span></Link><p>Hệ thống đặt vé xem phim trực tuyến hiện đại. Chọn suất chiếu, giữ ghế và bước vào thế giới điện ảnh.</p><strong>Hotline hỗ trợ: 1900 6868</strong></div>
          <div><h3>Về CineBook</h3><Link to="/cinemas">Cụm rạp toàn quốc</Link><Link to="/#now-showing">Phim đang chiếu</Link><a href="tel:19006868">Liên hệ hỗ trợ</a></div>
          <div><h3>Chính sách</h3><span className="footer-link">Chính sách thanh toán</span><span className="footer-link">Điều khoản sử dụng</span><span className="footer-link">Bảo mật thông tin</span></div>
         <div><h3>Đối tác</h3><div className="partner-list"><span>IMAX</span><span>Dolby</span><span>MoMo</span><span>VNPAY</span><span>Visa</span><span>ZaloPay</span></div></div>
@@ -251,7 +253,7 @@ export function AdminLayout() {
         <Link className="admin-back-link" to="/" onClick={closeSidebar}><span>←</span> Trang khách</Link>
       </div>
     </aside>
-    <div className="admin-main"><header className="admin-mobile-header"><ThemeSwitch compact /><button className="admin-menu-button" type="button" aria-label="Mở menu quản trị" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}>☰</button><Link className="brand" to="/"><span className="brand-mark">▰</span><span>Cine<span>Book</span></span></Link><span>CINEBOOK CONTROL</span></header><main><Outlet /></main></div>
+    <div className="admin-main"><header className="admin-mobile-header"><ThemeSwitch compact /><button className="admin-menu-button" type="button" aria-label="Mở menu quản trị" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}>☰</button><Link className="brand" to="/"><span className="brand-mark" aria-hidden="true">▰</span><span>Cine<span>Book</span></span></Link><span>CINEBOOK CONTROL</span></header><main><Outlet /></main></div>
   </div>;
 }
 

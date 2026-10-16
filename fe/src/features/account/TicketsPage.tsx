@@ -25,7 +25,7 @@ export function TicketsPage() {
   const move = (cursor: string | null, direction: 'after' | 'before') => { if (!cursor) return; setParams((current) => { current.set(direction, cursor); current.delete(direction === 'after' ? 'before' : 'after'); return current; }); };
   return <section className="records-page tickets-page account-records-page">
     <div className="breadcrumb"><Link to="/">Trang chủ</Link><span>›</span><span>Tài khoản</span><span>›</span><strong>Vé của tôi</strong></div>
-    <div className="records-heading"><PageHeader eyebrow="TÀI KHOẢN / VÉ ĐIỆN TỬ" title="Vé của tôi"><span className="ticket-count">{tickets.length} vé đang tải</span></PageHeader><p>Quản lý vé đã đặt và mã QR vào phòng chiếu.</p></div>
+    <div className="records-heading"><PageHeader eyebrow="TÀI KHOẢN / VÉ ĐIỆN TỬ" title="Vé của tôi"><span className="ticket-count">{query.isPending ? 'Đang tải vé…' : `${tickets.length} vé`}</span></PageHeader><p>Quản lý vé đã đặt và mã QR vào phòng chiếu.</p></div>
     <div className="record-toolbar"><div className="filter-tabs" aria-label="Lọc vé">{ticketFilters.map(([value, label]) => <button key={value} className={`filter-chip ${filter === value ? 'active' : ''}`} type="button" onClick={() => updateFilter(value)}>{label}</button>)}</div><label className="record-search"><span aria-hidden="true">⌕</span><span className="sr-only">Tìm vé</span><input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tìm theo tên phim hoặc mã vé…" /></label></div>
     {query.isPending && <LoadingState label="Đang tải vé…" />}
     {query.isError && <ErrorState cause={query.error} fallback="Không thể tải vé." onRetry={() => void query.refetch()} />}

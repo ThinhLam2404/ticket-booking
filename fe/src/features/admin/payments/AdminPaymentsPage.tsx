@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../../../api";
 import { EmptyState, ErrorState, LoadingState } from "../../../components/ui";
 import { formatDate, formatTime, money } from "../../../utils/format";
-import { AdminPage } from "../shared";
+import { AdminPage, ConfirmDialog, ReasonDialog } from "../shared";
 
 export function AdminPaymentsPage() {
   const [params, setParams] = useSearchParams();
@@ -15,7 +15,8 @@ export function AdminPaymentsPage() {
     from: params.get("from") ?? undefined,
     to: params.get("to") ?? undefined,
   };
-  const [refundConfirm, setRefundConfirm] = useState<{ id: string; bookingId: string; amount: string } | null>(null);
+  const [refundConfirm, setRefundConfirm] = useState<{ bookingId: string; amount: string } | null>(null);
+  const [paymentWarning, setPaymentWarning] = useState<{ id: string; force: boolean; message: string } | null>(null);
   const queryClient = useQueryClient();
   const txQuery = useQuery({
     queryKey: ["admin-sepay-transactions", filterStatus, cursor],
@@ -46,7 +47,10 @@ export function AdminPaymentsPage() {
   });
   const confirmMutation = useMutation({
     mutationFn: ({ id, force }: { id: string; force?: boolean }) => api.adminConfirmSepayTransaction(id, { force }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-sepay-transactions"] }),
+    onSuccess: () => {
+      setPaymentWarning(null);
+      void queryClient.invalidateQueries({ queryKey: ["admin-sepay-transactions"] });
+    },
   });
   const refundMutation = useMutation({
     mutationFn: ({ bookingId, reason, adminNote }: { bookingId: string; reason: string; adminNote?: string }) =>
@@ -60,6 +64,19 @@ export function AdminPaymentsPage() {
   const transactions = txQuery.data?.data ?? [];
   const meta = txQuery.data?.meta;
   const booking = (tx: typeof transactions[number]) => tx.booking;
+
+  const askConfirm = (tx: typeof transactions[number]) => {
+    const b = booking(tx);
+    const warn = b ? [] : ["Không tìm thấy đặt vé liên kết"];
+    if (b && b.totalAmount && tx.transferAmount && b.totalAmount !== tx.transferAmount) warn.push("Lệch số tiền");
+    if (b && new Date(b.showtimeStartsAt) < new Date()) warn.push("Suất chiếu đã diễn ra");
+    if (b && b.status !== "PENDING") warn.push(`Trạng thái đặt vé: ${b.status === "CONFIRMED" ? "Đã xác nhận" : b.status === "CANCELLED" ? "Đã hủy" : "Đã hết hạn"}`);
+    if (!warn.length) {
+      confirmMutation.mutate({ id: tx.id });
+      return;
+    }
+    setPaymentWarning({ id: tx.id, force: true, message: `Cảnh báo: ${warn.join(", ")}. Vẫn xác nhận giao dịch?` });
+  };
 
   return (
     <AdminPage>
@@ -77,17 +94,17 @@ export function AdminPaymentsPage() {
         <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>ID SePay</th><th>Cổng</th><th>Số tiền</th><th>Nội dung CK</th><th>Thời gian</th><th>Đặt vé liên kết</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
           {transactions.map((tx) => {
             const b = booking(tx);
-            return <tr key={tx.id}><td><strong>#{tx.sepayId}</strong></td><td>{tx.gateway}</td><td><strong>{money(tx.transferAmount)}</strong></td><td><code className="payment-code-pill">{tx.content}</code></td><td>{formatDate(tx.transactionDate)} {formatTime(tx.transactionDate)}</td><td>{b ? <div className="booking-context"><strong>#{b.id}</strong><small>{b.movieTitle}</small><small>{b.seatLabels?.join(", ") || "—"}</small><small>{b.userEmail}</small><span className={`status ${b.status.toLowerCase()}`}>{b.status}</span></div> : <span className="text-muted">—</span>}</td><td><span className={`status ${tx.status.toLowerCase()}`}>{tx.status}</span></td><td>
-              {tx.status === "REVIEW_REQUIRED" && <div className="action-button-group"><button type="button" className="primary btn-sm" disabled={confirmMutation.isPending} onClick={() => { const warn = b ? [] : ["Không tìm thấy đặt vé liên kết"]; if (b && b.totalAmount && tx.transferAmount && b.totalAmount !== tx.transferAmount) warn.push("Lệch số tiền"); if (b && new Date(b.showtimeStartsAt) < new Date()) warn.push("Suất chiếu đã diễn ra"); if (b && b.status !== "PENDING") warn.push(`Đặt vé: ${b.status}`); if (warn.length && !window.confirm(`Cảnh báo: ${warn.join(", ")}.
-Vẫn xác nhận?`)) return; confirmMutation.mutate({ id: tx.id, force: warn.length > 0 }); }}>Xác nhận giao dịch</button>{b && b.status !== "CANCELLED" && b.status !== "EXPIRED" && <button type="button" className="secondary btn-sm" disabled={updateMutation.isPending || refundMutation.isPending} onClick={() => setRefundConfirm({ id: tx.id, bookingId: b.id, amount: b.totalAmount })}>Hoàn tiền</button>}</div>}
-              {tx.status === "CONFIRMED" && b && b.status === "CONFIRMED" && <button type="button" className="secondary btn-sm" disabled={refundMutation.isPending} onClick={() => setRefundConfirm({ id: tx.id, bookingId: b.id, amount: b.totalAmount })}>Hoàn tiền</button>}
+            return <tr key={tx.id}><td><strong>#{tx.sepayId}</strong></td><td>{tx.gateway}</td><td><strong>{money(tx.transferAmount)}</strong></td><td><code className="payment-code-pill">{tx.content}</code></td><td>{formatDate(tx.transactionDate)} {formatTime(tx.transactionDate)}</td><td>{b ? <div className="booking-context"><strong>#{b.id}</strong><small>{b.movieTitle}</small><small>{b.seatLabels?.join(", ") || "—"}</small><small>{b.userEmail}</small><span className={`status ${b.status.toLowerCase()}`}>{b.status === "PENDING" ? "Chờ thanh toán" : b.status === "CONFIRMED" ? "Đã xác nhận" : b.status === "CANCELLED" ? "Đã hủy" : "Đã hết hạn"}</span></div> : <span className="text-muted">—</span>}</td><td><span className={`status ${tx.status.toLowerCase()}`}>{tx.status === "REVIEW_REQUIRED" ? "Cần xử lý" : tx.status === "CONFIRMED" ? "Đã xác nhận" : "Đã hoàn tiền"}</span></td><td>
+              {tx.status === "REVIEW_REQUIRED" && <div className="action-button-group"><button type="button" className="primary btn-sm" disabled={confirmMutation.isPending} onClick={() => askConfirm(tx)}>Xác nhận giao dịch</button>{b && b.status !== "CANCELLED" && b.status !== "EXPIRED" && <button type="button" className="secondary btn-sm" disabled={updateMutation.isPending || refundMutation.isPending} onClick={() => setRefundConfirm({ bookingId: b.id, amount: b.totalAmount })}>Hoàn tiền</button>}</div>}
+              {tx.status === "CONFIRMED" && b && b.status === "CONFIRMED" && <button type="button" className="secondary btn-sm" disabled={refundMutation.isPending} onClick={() => setRefundConfirm({ bookingId: b.id, amount: b.totalAmount })}>Hoàn tiền</button>}
               {!b && <a className="secondary compact-button" href={`/admin/bookings/${tx.paymentIntentId}`}>Xem đặt vé</a>}
             </td></tr>;
           })}
         </tbody></table></div>
       )}
       {meta && <div className="cursor-pagination"><button className="secondary" disabled={!meta.hasPreviousPage || txQuery.isFetching} onClick={() => move(meta.previousCursor, "before")}>← Trước</button><span>{meta.hasNextPage ? "Có thêm giao dịch" : "Cuối danh sách"}</span><button className="secondary" disabled={!meta.hasNextPage || txQuery.isFetching} onClick={() => move(meta.nextCursor, "after")}>Tiếp →</button></div>}
-      {refundConfirm && <div className="modal-overlay" onClick={() => setRefundConfirm(null)}><div className="modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><h3>Xác nhận hoàn tiền</h3><button className="modal-close" onClick={() => setRefundConfirm(null)}>×</button></div><div className="modal-body"><p>Đặt vé <strong>#{refundConfirm.bookingId}</strong> — {money(refundConfirm.amount)}</p><p className="text-muted">Ghế sẽ được giải phóng, vé bị hủy, email hoàn tiền sẽ gửi cho khách.</p><label>Lý do <span className="required">*</span><textarea id="refund-reason" rows={3} placeholder="Ví dụ: Khách yêu cầu do thay đổi lịch" /></label><label>Ghi chú admin<textarea id="refund-admin-note" rows={2} placeholder="Tùy chọn" /></label></div><div className="modal-footer"><button className="secondary" onClick={() => setRefundConfirm(null)}>Hủy</button><button className="danger" disabled={refundMutation.isPending} onClick={() => { const reason = (document.getElementById("refund-reason") as HTMLTextAreaElement)?.value?.trim(); const adminNote = (document.getElementById("refund-admin-note") as HTMLTextAreaElement)?.value?.trim() || undefined; if (!reason) return alert("Vui lòng nhập lý do"); refundMutation.mutate({ bookingId: refundConfirm.bookingId, reason, adminNote }); }}>{refundMutation.isPending ? "Đang xử lý…" : "Xác nhận hoàn tiền"}</button></div></div></div>}
+      {paymentWarning && <ConfirmDialog state={{ title: "Xác nhận giao dịch có cảnh báo", message: paymentWarning.message, onConfirm: () => confirmMutation.mutate({ id: paymentWarning.id, force: paymentWarning.force }) }} loading={confirmMutation.isPending} error={confirmMutation.error ? "Không thể xác nhận giao dịch." : undefined} onClose={() => setPaymentWarning(null)} />}
+      {refundConfirm && <ReasonDialog state={{ title: "Xác nhận hoàn tiền", message: <>Đặt vé <strong>#{refundConfirm.bookingId}</strong> — {money(refundConfirm.amount)}. Ghế sẽ được giải phóng, vé bị hủy và email hoàn tiền sẽ gửi cho khách.</>, reasonLabel: "Lý do hoàn tiền", reasonPlaceholder: "Ví dụ: Khách yêu cầu do thay đổi lịch", noteLabel: "Ghi chú admin (tùy chọn)", notePlaceholder: "Thông tin bổ sung cho nội bộ", onSubmit: (reason, adminNote) => refundMutation.mutate({ bookingId: refundConfirm.bookingId, reason, adminNote }) }} loading={refundMutation.isPending} error={refundMutation.error ? "Không thể hoàn tiền." : undefined} onClose={() => setRefundConfirm(null)} />}
     </AdminPage>
   );
 }

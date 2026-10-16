@@ -1,22 +1,37 @@
+import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { LocationProvider } from './auth/LocationContext';
-import { AdminLayout, Layout, RequireAdmin, RequireAuth } from './components/ui';
+import { AdminLayout, Layout, LoadingState, RequireAdmin, RequireAuth } from './components/ui';
 import { ThemeProvider } from './theme/ThemeContext';
-import { BookingPage, SeatsPage } from './pages/BookingPages';
-import { BookingsPage, SecurityPage, TicketPage, TicketsPage } from './pages/AccountPages';
-import { CinemaPage, HomePage, MoviePage } from './pages/CatalogPages';
-import { ResetPasswordPage, VerifyEmailPage } from './pages/AuthPages';
-import { AdminCinemasPage, AdminDashboardPage, AdminLoginPage, AdminMoviesPage,
-  AdminPaymentsPage,
-  AdminBookingsPage,
-  AdminBookingDetailPage,
-  AdminUsersPage,
-  AdminAuditLogsPage,
-  AdminRoomsPage, AdminSeatsPage, AdminShowtimesPage } from './pages/AdminPages';
 import './App.css';
 import './cobalt-editorial.css';
+import './cinebook-refresh.css';
+
+const HomePage = lazy(() => import('./features/catalog/HomePage').then((module) => ({ default: module.HomePage })));
+const CinemaPage = lazy(() => import('./features/catalog/CinemaPage').then((module) => ({ default: module.CinemaPage })));
+const MoviePage = lazy(() => import('./features/catalog/MoviePage').then((module) => ({ default: module.MoviePage })));
+const SeatsPage = lazy(() => import('./features/booking/SeatsPage').then((module) => ({ default: module.SeatsPage })));
+const BookingPage = lazy(() => import('./features/booking/BookingPage').then((module) => ({ default: module.BookingPage })));
+const BookingsPage = lazy(() => import('./features/account/BookingsPage').then((module) => ({ default: module.BookingsPage })));
+const SecurityPage = lazy(() => import('./features/account/SecurityPage').then((module) => ({ default: module.SecurityPage })));
+const TicketPage = lazy(() => import('./features/account/TicketPage').then((module) => ({ default: module.TicketPage })));
+const TicketsPage = lazy(() => import('./features/account/TicketsPage').then((module) => ({ default: module.TicketsPage })));
+const ResetPasswordPage = lazy(() => import('./features/auth/ResetPasswordPage').then((module) => ({ default: module.ResetPasswordPage })));
+const VerifyEmailPage = lazy(() => import('./features/auth/VerifyEmailPage').then((module) => ({ default: module.VerifyEmailPage })));
+const AdminLoginPage = lazy(() => import('./features/admin/AdminLoginPage').then((module) => ({ default: module.AdminLoginPage })));
+const AdminDashboardPage = lazy(() => import('./features/admin/dashboard/AdminDashboardPage').then((module) => ({ default: module.AdminDashboardPage })));
+const AdminMoviesPage = lazy(() => import('./features/admin/movies/AdminMoviesPage').then((module) => ({ default: module.AdminMoviesPage })));
+const AdminCinemasPage = lazy(() => import('./features/admin/cinemas/AdminCinemasPage').then((module) => ({ default: module.AdminCinemasPage })));
+const AdminRoomsPage = lazy(() => import('./features/admin/cinemas/AdminCinemasPage').then((module) => ({ default: module.AdminRoomsPage })));
+const AdminSeatsPage = lazy(() => import('./features/admin/cinemas/AdminCinemasPage').then((module) => ({ default: module.AdminSeatsPage })));
+const AdminShowtimesPage = lazy(() => import('./features/admin/showtimes/AdminShowtimesPage').then((module) => ({ default: module.AdminShowtimesPage })));
+const AdminPaymentsPage = lazy(() => import('./features/admin/payments/AdminPaymentsPage').then((module) => ({ default: module.AdminPaymentsPage })));
+const AdminBookingsPage = lazy(() => import('./features/admin/bookings/AdminBookingsPage').then((module) => ({ default: module.AdminBookingsPage })));
+const AdminBookingDetailPage = lazy(() => import('./features/admin/bookings/AdminBookingDetailPage').then((module) => ({ default: module.AdminBookingDetailPage })));
+const AdminUsersPage = lazy(() => import('./features/admin/users/AdminUsersPage').then((module) => ({ default: module.AdminUsersPage })));
+const AdminAuditLogsPage = lazy(() => import('./features/admin/audit/AdminAuditLogsPage').then((module) => ({ default: module.AdminAuditLogsPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,7 +95,9 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <LocationProvider>
-          <RouterProvider router={router} />
+          <Suspense fallback={<LoadingState label="Đang tải trang…" />}>
+            <RouterProvider router={router} />
+          </Suspense>
         </LocationProvider>
       </AuthProvider>
     </ThemeProvider>

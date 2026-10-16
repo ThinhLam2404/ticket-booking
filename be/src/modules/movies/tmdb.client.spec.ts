@@ -12,7 +12,11 @@ describe('TmdbClient trailer selection', () => {
   });
 
   it('falls back to English video detail when Vietnamese detail has no trailer', async () => {
-    const client = new TmdbClient(new ConfigService({ TMDB_ACCESS_TOKEN: 'token' }));
+    const client = new TmdbClient(new ConfigService({
+      TMDB_ACCESS_TOKEN: 'token',
+      TMDB_BASE_URL: 'https://api.tmdb.org/3',
+      TMDB_IMAGE_BASE_URL: 'https://image.tmdb.org/t/p',
+    }));
     const requests: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (input: string) => {
       requests.push(input);

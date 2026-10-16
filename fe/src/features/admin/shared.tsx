@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useDialogFocus } from "../../components/useDialogFocus";
 import type { MovieStatus, SeatType, Showtime } from "../../types";
@@ -8,8 +8,18 @@ export type FormMode = "create" | "edit";
 
 export type ConfirmState = {
   title: string;
-  message: string;
+  message: ReactNode;
   onConfirm: () => void;
+};
+
+export type ReasonDialogState = {
+  title: string;
+  message: ReactNode;
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
+  noteLabel?: string;
+  notePlaceholder?: string;
+  onSubmit: (reason: string, note?: string) => void;
 };
 
 export const movieStatuses: MovieStatus[] = ["DRAFT", "PUBLISHED", "ARCHIVED"];
@@ -19,6 +29,11 @@ export const showtimeFormats = ["TWO_D_SUBTITLED", "TWO_D_DUBBED", "THREE_D_SUBT
 export const roomFormatText: Record<(typeof roomFormats)[number], string> = { STANDARD: "Tiêu chuẩn", IMAX: "IMAX", FOUR_DX: "4DX", SCREEN_X: "ScreenX" };
 export const showtimeFormatText: Record<(typeof showtimeFormats)[number], string> = { TWO_D_SUBTITLED: "2D · Phụ đề", TWO_D_DUBBED: "2D · Lồng tiếng", THREE_D_SUBTITLED: "3D · Phụ đề", THREE_D_DUBBED: "3D · Lồng tiếng" };
 export const editableSeatTypes: SeatType[] = ["STANDARD", "VIP"];
+export const bookingStatusText: Record<string, string> = { PENDING: "Chờ thanh toán", CONFIRMED: "Đã xác nhận", CANCELLED: "Đã hủy", EXPIRED: "Đã hết hạn" };
+export const paymentStatusText: Record<string, string> = { PENDING: "Đang xử lý", SUCCEEDED: "Thành công", FAILED: "Thất bại", REFUNDED: "Đã hoàn tiền" };
+export const ticketStatusText: Record<string, string> = { ACTIVE: "Đang hoạt động", USED: "Đã dùng", CANCELLED: "Đã hủy" };
+export const roleText: Record<string, string> = { CUSTOMER: "Khách hàng", ADMIN: "Quản trị viên" };
+export const permissionText: Record<string, string> = { MANAGE_MOVIES: "Quản lý phim", MANAGE_CINEMAS: "Quản lý cụm rạp", MANAGE_SHOWTIMES: "Quản lý suất chiếu", VIEW_BOOKINGS: "Xem đặt vé", MANAGE_PAYMENTS: "Quản lý thanh toán", VIEW_SYSTEM: "Xem hệ thống", MANAGE_USERS: "Quản lý người dùng", VIEW_AUDIT_LOGS: "Xem nhật ký thao tác" };
 
 export function movieStatusText(status: MovieStatus) {
   return status === "DRAFT"
@@ -113,7 +128,7 @@ export function ConfirmDialog({
       >
         <p className="eyebrow">XÁC NHẬN THAO TÁC</p>
         <h2 id="confirm-title">{state.title}</h2>
-        <p className="admin-copy">{state.message}</p>
+        <div className="admin-copy">{state.message}</div>
         {error && <p className="form-error">{error}</p>}
         <div className="form-actions">
           <button
@@ -132,6 +147,48 @@ export function ConfirmDialog({
           >
             {loading ? "Đang xử lý…" : "Xác nhận"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ReasonDialog({
+  state,
+  loading,
+  error,
+  onClose,
+}: {
+  state: ReasonDialogState;
+  loading: boolean;
+  error?: string;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  useDialogFocus(true, dialogRef, onClose);
+  useEffect(() => {
+    reasonRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div ref={dialogRef} className="admin-modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="reason-dialog-title" tabIndex={-1}>
+        <button className="modal-close" type="button" aria-label="Đóng" onClick={onClose}>×</button>
+        <p className="eyebrow">THÔNG TIN THAO TÁC</p>
+        <h2 id="reason-dialog-title">{state.title}</h2>
+        <div className="admin-copy">{state.message}</div>
+        <label className="admin-field admin-field-wide">
+          <span>{state.reasonLabel ?? "Lý do"} <strong aria-hidden="true">*</strong></span>
+          <textarea ref={reasonRef} required rows={3} value={reason} placeholder={state.reasonPlaceholder} onChange={(event) => setReason(event.target.value)} />
+        </label>
+        {state.noteLabel && <label className="admin-field admin-field-wide"><span>{state.noteLabel}</span><textarea rows={2} value={note} placeholder={state.notePlaceholder} onChange={(event) => setNote(event.target.value)} /></label>}
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="form-actions">
+          <button className="secondary" type="button" disabled={loading} onClick={onClose}>Hủy</button>
+          <button className="danger" type="button" disabled={loading || !reason.trim()} onClick={() => state.onSubmit(reason.trim(), note.trim() || undefined)}>{loading ? "Đang xử lý…" : "Xác nhận"}</button>
         </div>
       </div>
     </div>

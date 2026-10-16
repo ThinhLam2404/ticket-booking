@@ -281,7 +281,10 @@ async function seedDemoShowtime(cinema: StaticCinema) {
   });
   if (existingShowtime?._count.bookings) return;
 
-  const startsAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  // Keep the demo showtime in a deterministic local-time slot between the
+  // generated 09:00 and 15:00 screenings. This makes the seed repeatable
+  // without colliding with stale generated showtimes from a previous day.
+  const startsAt = new Date(`${seededDate(1)}T12:00:00+07:00`);
   const endsAt = new Date(startsAt.getTime() + 169 * 60 * 1000);
   if (existingShowtime) {
     await prisma.showtimeSeat.deleteMany({ where: { showtimeId } });
@@ -330,7 +333,7 @@ async function main() {
   const passwordHash = await hashPassword(adminPassword);
   const admin = await prisma.user.upsert({
     where: { email: adminEmail.toLowerCase() },
-    update: { fullName: 'System Admin', role: UserRole.ADMIN, emailVerifiedAt: new Date() },
+    update: { fullName: 'System Admin', passwordHash, role: UserRole.ADMIN, emailVerifiedAt: new Date() },
     create: {
       email: adminEmail.toLowerCase(),
       fullName: 'System Admin',
