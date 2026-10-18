@@ -22,6 +22,14 @@ const rules: Array<{
   rule: RateLimitRule;
 }> = [
   {
+    matches: (request) => /\/auth\/admin-invitations\/(preview|accept)$/.test(request.path),
+    rule: { prefix: 'admin-invitation-public', limit: 10, windowSeconds: 60 },
+  },
+  {
+    matches: (request) => request.method !== 'GET' && /\/users\/admin\/invitations(?:\/|$)/.test(request.path),
+    rule: { prefix: 'admin-invitation-mutation', limit: 10, windowSeconds: 60 },
+  },
+  {
     matches: (request) => /\/auth\/(browser\/)?login$/.test(request.path),
     rule: { prefix: 'login', limit: 10, windowSeconds: 60 },
   },

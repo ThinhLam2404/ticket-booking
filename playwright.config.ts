@@ -12,6 +12,9 @@ export default defineConfig({
   expect: { timeout: 5_000 },
   reporter: process.env.CI ? [['line'], ['html', { open: 'never' }]] : 'list',
   use: {
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
+      : {},
     baseURL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

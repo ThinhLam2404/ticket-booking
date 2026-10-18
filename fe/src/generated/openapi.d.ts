@@ -68,6 +68,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/admin-invitations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Auth_previewAdminInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/admin-invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Auth_acceptAdminInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/password-reset/request": {
         parameters: {
             query?: never;
@@ -286,6 +318,54 @@ export interface paths {
         get: operations["Audit_list"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/admin/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Invitations_list"];
+        put?: never;
+        post: operations["Invitations_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/admin/invitations/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Invitations_resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/admin/invitations/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Invitations_revoke"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1098,6 +1178,39 @@ export interface components {
              */
             timestamp: string;
         };
+        PreviewAdminInvitationDto: {
+            /** @example invitation-token */
+            token: string;
+        };
+        AdminInvitationPreviewResponseDto: {
+            /** Format: email */
+            email: string;
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        AcceptAdminInvitationDto: {
+            /** @example invitation-token */
+            token: string;
+            /** @example Nguyen Van A */
+            fullName: string;
+            /**
+             * Format: email
+             * @example new-admin@example.com
+             */
+            email: string;
+            /**
+             * Format: password
+             * @example Password123!
+             */
+            password: string;
+        };
+        AdminInvitationAcceptedResponseDto: {
+            /** @example true */
+            accepted: boolean;
+            /** Format: email */
+            email: string;
+        };
         RequestPasswordResetDto: {
             /**
              * Format: email
@@ -1228,6 +1341,54 @@ export interface components {
              * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.refresh-token-example
              */
             refreshToken: string;
+        };
+        AdminInvitationResponseDto: {
+            id: string;
+            /** Format: email */
+            email: string;
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
+            invitedById: string;
+            acceptedById: string | null;
+            /** @enum {string} */
+            status: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+            /** @enum {string} */
+            emailStatus: "PENDING" | "SENT" | "FAILED" | "UNKNOWN";
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            acceptedAt: string | null;
+            /** Format: date-time */
+            revokedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateAdminInvitationDto: {
+            /**
+             * Format: email
+             * @example new-admin@example.com
+             */
+            email: string;
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
+        };
+        AdminInvitationMutationResponseDto: {
+            id: string;
+            /** Format: email */
+            email: string;
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
+            invitedById: string;
+            acceptedById: string | null;
+            /** @enum {string} */
+            status: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+            /** @enum {string} */
+            emailStatus: "PENDING" | "SENT" | "FAILED" | "UNKNOWN";
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            acceptedAt: string | null;
+            /** Format: date-time */
+            revokedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
         };
         AdminUserResponseDto: {
             id: string;
@@ -2619,6 +2780,94 @@ export interface operations {
             };
         };
     };
+    Auth_previewAdminInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewAdminInvitationDto"];
+            };
+        };
+        responses: {
+            /** @description Preview an active admin invitation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInvitationPreviewResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Auth_acceptAdminInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptAdminInvitationDto"];
+            };
+        };
+        responses: {
+            /** @description Accept an admin invitation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInvitationAcceptedResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
     Auth_requestPasswordReset: {
         parameters: {
             query?: never;
@@ -3077,6 +3326,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                search?: string;
                 action?: string;
                 resourceType?: string;
                 actorUserId?: string;
@@ -3095,6 +3345,204 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    Invitations_list: {
+        parameters: {
+            query?: {
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInvitationResponseDto"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Invitations_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminInvitationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInvitationMutationResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Invitations_resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInvitationMutationResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Invitations_revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInvitationMutationResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
             };
         };
     };

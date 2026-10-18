@@ -8,9 +8,10 @@ import { PermissionsGuard } from '../../common/auth/permissions.guard.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtTokenService } from './jwt-token.service.js';
+import { InvitationsModule } from '../users/invitations.module.js';
 
 @Module({
-  imports: [DatabaseModule, MailModule, AuditModule],
+  imports: [DatabaseModule, MailModule, AuditModule, InvitationsModule],
   controllers: [AuthController],
   providers: [AuthService, JwtTokenService, JwtAuthGuard, RolesGuard, PermissionsGuard],
   exports: [AuthService, JwtTokenService, JwtAuthGuard, RolesGuard, PermissionsGuard],

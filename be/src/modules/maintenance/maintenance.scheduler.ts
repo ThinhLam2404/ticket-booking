@@ -45,6 +45,15 @@ export class MaintenanceScheduler {
           sentAt: { lt: outboxCutoff },
         },
       }),
+      this.prisma.adminInvitation.deleteMany({
+        where: {
+          OR: [
+            { expiresAt: { lt: outboxCutoff } },
+            { acceptedAt: { lt: outboxCutoff } },
+            { revokedAt: { lt: outboxCutoff } },
+          ],
+        },
+      }),
     ]);
   }
 

@@ -12,6 +12,8 @@ import { renderTicketEmail } from './templates/ticket-email.template.js';
 import { renderVerificationEmail } from './templates/verification-email.template.js';
 import { renderPasswordResetEmail } from './templates/password-reset-email.template.js';
 import { renderRefundEmail } from './templates/refund-email.template.js';
+import { renderAdminInvitationEmail } from './templates/admin-invitation-email.template.js';
+import { invitationDeliveryToken, invitationTokenHash } from './admin-invitation-delivery.js';
 
 const data = workerData as MailWorkerData;
 const prisma = new PrismaClient({
@@ -125,6 +127,18 @@ async function claimNext() {
 
 async function processOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
   try {
+    if (outbox.type === MailOutboxType.ADMIN_INVITATION) {
+      const token = invitationDeliveryToken(outbox.payload);
+      const active = token ? await prisma.adminInvitation.findFirst({
+        where: { tokenHash: invitationTokenHash(token), email: outbox.recipient, acceptedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
+        select: { id: true },
+      }) : null;
+      if (!active) {
+        // Superseded/expired mail must not retry or retain its bearer token.
+        await prisma.mailOutbox.deleteMany({ where: { id: outbox.id } });
+        return;
+      }
+    }
     const rendered = await renderOutbox(outbox);
     await transporter.sendMail({
       from: data.smtpFrom,
@@ -141,7 +155,7 @@ async function processOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
         status: MailOutboxStatus.SENT,
         sentAt: new Date(),
         lockedAt: null,
-        ...((outbox.type === MailOutboxType.EMAIL_VERIFICATION || outbox.type === MailOutboxType.PASSWORD_RESET) && {
+        ...((outbox.type === MailOutboxType.EMAIL_VERIFICATION || outbox.type === MailOutboxType.PASSWORD_RESET || outbox.type === MailOutboxType.ADMIN_INVITATION) && {
           payload: { sent: true },
         }),
       },
@@ -185,6 +199,14 @@ async function renderOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
       fullName: payload.fullName,
       resetUrl: `${data.publicAppUrl}/reset-password?token=${encodeURIComponent(payload.token)}`,
       expiresInMinutes: 30,
+    });
+  }
+  if (outbox.type === MailOutboxType.ADMIN_INVITATION) {
+    const payload = outbox.payload as { token: string; permissions: string[] };
+    return renderAdminInvitationEmail({
+      invitationUrl: `${data.publicAppUrl}/admin/accept-invitation?token=${encodeURIComponent(payload.token)}`,
+      permissions: payload.permissions,
+      expiresInHours: 24,
     });
   }
   if (outbox.type === MailOutboxType.REFUND_NOTIFICATION) {

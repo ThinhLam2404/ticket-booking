@@ -80,6 +80,14 @@ export class UsersService {
     const nextRole = dto.role ?? before.role;
     const disabledAt = dto.disabled === undefined ? before.disabledAt : dto.disabled ? new Date() : null;
     const updated = await this.prisma.$transaction(async (transaction) => {
+      if (nextRole === UserRole.ADMIN) {
+        const actorUser = await transaction.user.findUnique({ where: { id: actor.id }, include: { adminPermissions: true } });
+        const allowed = new Set(actorUser?.adminPermissions.map((item) => item.permission));
+        const requested = dto.permissions ?? before.adminPermissions.map((item) => item.permission);
+        if (!actorUser || actorUser.disabledAt || actorUser.role !== UserRole.ADMIN || !allowed.has('MANAGE_USERS') || requested.some((permission) => !allowed.has(permission))) {
+          throw new ForbiddenException('You cannot grant permissions you do not have');
+        }
+      }
       const user = await transaction.user.update({ where: { id: userId }, data: { role: nextRole, disabledAt } });
       if (dto.permissions !== undefined || nextRole !== UserRole.ADMIN) {
         await transaction.userAdminPermission.deleteMany({ where: { userId } });

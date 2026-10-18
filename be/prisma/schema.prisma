@@ -100,6 +100,7 @@ enum MailOutboxStatus {
 enum MailOutboxType {
   EMAIL_VERIFICATION
   PASSWORD_RESET
+  ADMIN_INVITATION
   TICKETS_ISSUED
   REFUND_NOTIFICATION
 }
@@ -118,6 +119,8 @@ model User {
   bookings                Booking[]
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
+  adminInvitationsSent    AdminInvitation[]        @relation("AdminInvitationSender")
+  adminInvitationAccepted AdminInvitation[]        @relation("AdminInvitationAcceptor")
   refunds                 Refund[]
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
@@ -290,6 +293,27 @@ model EmailVerificationToken {
 
   @@index([userId, consumedAt])
   @@index([expiresAt])
+}
+
+model AdminInvitation {
+  id              String           @id @default(cuid())
+  email           String
+  fullName        String?
+  permissions     AdminPermission[]
+  tokenHash       String           @unique
+  invitedById     String
+  invitedBy       User             @relation("AdminInvitationSender", fields: [invitedById], references: [id], onDelete: Restrict)
+  acceptedById    String?
+  acceptedBy      User?            @relation("AdminInvitationAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([email, expiresAt])
+  @@index([invitedById, createdAt])
+  @@index([acceptedAt, revokedAt, expiresAt])
 }
 
 model PasswordResetToken {

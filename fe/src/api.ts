@@ -76,6 +76,11 @@ import type {
   UpdateAdminUserAccessRequest,
   AdminAuditLog,
   AdminUserSession,
+  AdminInvitation,
+  CreateAdminInvitationRequest,
+  AcceptAdminInvitationRequest,
+  AdminInvitationPreview,
+  AdminInvitationAccepted,
   ChangePasswordRequest,
   RequestPasswordResetRequest,
   ResetPasswordRequest,
@@ -299,7 +304,26 @@ export const api = {
   revokeAdminUserSessions(id: string) {
     return request<void>(`/users/admin/${encodeURIComponent(id)}/sessions/revoke-all`, { method: 'POST', body: '{}' });
   },
-  auditLogs(filters: { limit?: number; action?: string; resourceType?: string; actorUserId?: string; from?: string; to?: string } = {}) {
+  adminInvitations(search?: string) {
+    const params = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : '';
+    return request<AdminInvitation[]>(`/users/admin/invitations${params}`);
+  },
+  createAdminInvitation(body: CreateAdminInvitationRequest) {
+    return request<AdminInvitation>('/users/admin/invitations', { method: 'POST', body: JSON.stringify(body) });
+  },
+  resendAdminInvitation(id: string) {
+    return request<AdminInvitation>(`/users/admin/invitations/${encodeURIComponent(id)}/resend`, { method: 'POST', body: '{}' });
+  },
+  revokeAdminInvitation(id: string) {
+    return request<AdminInvitation>(`/users/admin/invitations/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: '{}' });
+  },
+  previewAdminInvitation(body: { token: string }) {
+    return request<AdminInvitationPreview>('/auth/admin-invitations/preview', { method: 'POST', body: JSON.stringify(body) });
+  },
+  acceptAdminInvitation(body: AcceptAdminInvitationRequest) {
+    return request<AdminInvitationAccepted>('/auth/admin-invitations/accept', { method: 'POST', body: JSON.stringify(body) });
+  },
+  auditLogs(filters: { limit?: number; search?: string; action?: string; resourceType?: string; actorUserId?: string; from?: string; to?: string } = {}) {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== '') params.set(key, String(value));
     return request<AdminAuditLog[]>(`/admin/audit-logs${params.size ? `?${params.toString()}` : ''}`);

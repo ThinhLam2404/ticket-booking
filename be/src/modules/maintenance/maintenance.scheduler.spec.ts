@@ -7,6 +7,7 @@ function createScheduler(config: Record<string, string> = {}) {
     refreshToken: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     emailVerificationToken: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     mailOutbox: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    adminInvitation: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
   };
   return {
     prisma,

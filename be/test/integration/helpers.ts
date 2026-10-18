@@ -66,6 +66,7 @@ export async function resetIntegrationState() {
 
   await adminPrisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      "AdminInvitation",
       "RefreshToken",
       "AuthSession",
       "PasswordResetToken",

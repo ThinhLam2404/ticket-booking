@@ -1,5 +1,38 @@
 # Movie Ticket Booking System and API
 
+## Benchmark performance local
+
+Benchmark tổng hợp cho các thay đổi về query/pagination/batch nằm tại `scripts/benchmark-ticket-booking.mjs`. Script chỉ dùng dữ liệu synthetic trong PostgreSQL cô lập, không gọi SePay, SMTP, TMDB hoặc frontend production.
+
+Khởi động stack benchmark trên port riêng rồi deploy migration:
+
+```bash
+INTEGRATION_POSTGRES_PORT=55434 INTEGRATION_REDIS_PORT=56381 \
+INTEGRATION_SMTP_PORT=55026 INTEGRATION_SMTP_API_PORT=58026 \
+docker compose -p ticket-booking-benchmark -f be/docker-compose.integration.yml up -d --wait
+
+DATABASE_URL='postgresql://ticket_booking_test:ticket_booking_test@127.0.0.1:55434/ticket_booking_test?schema=public' \
+REDIS_URL='redis://127.0.0.1:56381/0' NODE_ENV=test \
+JWT_ACCESS_SECRET=benchmark-access JWT_REFRESH_SECRET=benchmark-refresh \
+npm run prisma:deploy
+```
+
+Seed 100.000 booking, tạo dữ liệu catalog/suất chiếu và chạy các phép đo:
+
+```bash
+DATABASE_URL='postgresql://ticket_booking_test:ticket_booking_test@127.0.0.1:55434/ticket_booking_test?schema=public' \
+BENCHMARK_BOOKINGS=100000 BENCHMARK_SHOWTIMES=100 BENCHMARK_ITERATIONS=10 \
+npm run benchmark:ticket-booking -- --seed
+```
+
+Các phép đo gồm deep offset so với cursor pagination, batch showtime creation, grouped seat price updates và selective relation reads. Kết quả là synthetic local benchmark; khi ghi CV cần nêu dataset/điều kiện đo và không coi số liệu này là production SLO.
+
+Dừng stack sau khi hoàn tất:
+
+```bash
+docker compose -p ticket-booking-benchmark -f be/docker-compose.integration.yml down --volumes --remove-orphans
+```
+
 ## Sprint 4 — Đối soát thủ công và quản trị hoàn tiền
 
 - Admin xác nhận giao dịch SePay cần rà soát tại `POST /api/v1/payments/admin/sepay/transactions/:id/confirm`. Nếu có lệch số tiền, booking hết hạn hoặc booking không còn chờ thanh toán, hệ thống trả cảnh báo; admin gửi lại `force: true` sau khi kiểm tra.
@@ -18,7 +51,7 @@ Query dùng `limit` từ `1` đến `100` (mặc định `20`) và một trong h
 
 Booking và ticket sort theo `createdAt DESC, id DESC`. SePay sort theo `transactionDate DESC, id DESC`; mọi query dùng `limit + 1` để xác định trang kế tiếp. Filter/search chạy trong backend trước keyset predicate. Migration `20261015090000_sprint5_cursor_indexes` thêm composite indexes cho ownership/status và keyset sort; chạy `npm run prisma:deploy` trước khi release. Movies/showtimes vẫn giữ offset pagination ở Sprint 5.
 
-## Sprint 7 — Session và đăng nhập nhiều tab (đang triển khai)
+## Sprint 7 — Session, RBAC, audit và lời mời quản trị (đang triển khai)
 
 - Thêm `AuthSession`; `RefreshToken.familyId` hiện trỏ theo quy ước tới session ID. Login tạo session, rotation giữ nguyên session; session có thời hạn tuyệt đối bằng refresh TTL tại lần login. Logout/reuse thu hồi session và guard kiểm tra session/user ở mỗi authenticated request.
 - SPA dùng các endpoint JSON chuẩn `POST /auth/login`, `/auth/refresh`, `/auth/logout`. Refresh token được lưu trong `localStorage` để các tab cùng browser dùng chung session; access token hiện tại vẫn giữ trong memory và được khôi phục bằng refresh token khi mở tab hoặc reload. Các token JSON này cũng giữ backward compatibility cho client API.
@@ -28,7 +61,11 @@ Booking và ticket sort theo `createdAt DESC, id DESC`. SePay sort theo `transac
 - Password reset dùng `POST /auth/password-reset/request` (phản hồi luôn `{ sent: true }` để không lộ email), email outbox có cooldown 60 giây, token hash SHA-256, hết hạn sau 30 phút và chỉ dùng một lần. `POST /auth/password-reset/confirm` đổi mật khẩu và thu hồi toàn bộ session/refresh token. Đổi mật khẩu khi đã đăng nhập dùng `POST /auth/password/change` và cũng thu hồi toàn bộ session.
 - Quản lý session dùng `GET /auth/sessions`, `DELETE /auth/sessions/:sessionId`, `POST /auth/sessions/revoke-others` và `POST /auth/sessions/revoke-all`; UI customer ở `/account/security`. Session chỉ trả về ID, thời điểm tạo/hết hạn và cờ phiên hiện tại, không trả refresh token.
 - Quản lý user dùng `GET /users/admin` và `PATCH /users/admin/:id/access`; chỉ admin có `MANAGE_USERS` được gọi. Có thể đổi role, disable/enable user và cập nhật permission; disable user hoặc hạ role khỏi ADMIN sẽ thu hồi session/refresh token. UI admin ở `/admin/users`; admin có thể xem/revoke session user qua `/users/admin/:id/sessions`.
-- Audit log có filter theo action, resource type, actor và khoảng thời gian qua `GET /admin/audit-logs`; UI admin ở `/admin/audit-logs`.
+- Admin có `MANAGE_USERS` có thể tạo lời mời qua `POST /users/admin/invitations`, xem/gửi lại/thu hồi qua các endpoint cùng resource. Người nhận xem lời mời tại `POST /auth/admin-invitations/preview` và chấp nhận tại `POST /auth/admin-invitations/accept`; frontend dùng `/admin/accept-invitation?token=...`. Link email được dựng từ `PUBLIC_APP_URL` trong `.env`, không hardcode. Lời mời hết hạn sau 24 giờ, token chỉ lưu dạng hash trong bảng invitation, email outbox được xóa payload sau khi gửi.
+- Invitation kiểm tra lại trạng thái/role/quyền người mời khi preview và accept. Create được serialize theo email bằng PostgreSQL advisory transaction lock; resend/accept/revoke khóa row invitation trước khi kiểm tra và cập nhật. Resend kiểm tra lời mời khác còn hiệu lực cùng email, xoay token và cooldown 60 giây. API public preview/accept và mutation invitation có Redis rate limit riêng (10 request/phút/IP). Danh sách trả tối đa 100 lời mời mới nhất; bản ghi hết hạn được giữ thêm 90 ngày theo `MAIL_OUTBOX_RETENTION_DAYS`, không xóa ngay khi vừa hết hạn. Regression unit tests nằm ở `be/src/modules/users/invitations.service.spec.ts`; các test dùng mock không thay thế kiểm thử race/rollback trên PostgreSQL thật.
+- Integration invitation tại `be/test/integration/admin-invitations.integration-spec.ts` chạy qua `npm run test:integration` trên PostgreSQL/Redis cô lập: tạo đồng thời, accept đồng thời, rollback khi audit thất bại và token cũ sau resend. Mail worker kiểm tra token còn trỏ đến invitation đang hiệu lực trước SMTP; outbox cũ/hết hạn/đã thu hồi được bỏ và xóa token payload bằng cách xóa bản ghi. Email đã bắt đầu gửi trước revoke vẫn có thể đến inbox, nhưng token bị backend từ chối; kiểm tra trước SMTP không phải cam kết hủy email đang truyền.
+- Browser invitation tại `tests/browser/admin-invitations.spec.ts` chạy trong `npm run test:browser:full`: tạo lời mời qua UI → nhận Mailpit → kiểm tra origin URL email theo cấu hình → accept → login qua UI → API quyền được cấp trả 200, quyền không cấp trả 403, token đã dùng trả 401. Có thể đặt `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` nếu cần dùng Chromium đã cài tại đường dẫn riêng; mặc định vẫn dùng browser Playwright quản lý.
+- Audit log có filter theo action, resource type, actor và khoảng thời gian qua `GET /admin/audit-logs`; UI admin ở `/admin/audit-logs`. Invitation ghi các action `ADMIN_INVITATION_CREATED`, `ADMIN_INVITATION_RESENT`, `ADMIN_INVITATION_REVOKED` và `ADMIN_INVITATION_ACCEPTED`.
 - Browser regression nhiều tab tại `tests/browser/auth-tabs.spec.ts` chạy bằng `npm run test:browser:full`. Auth nhiều tab dùng localStorage refresh token, BroadcastChannel và Web Locks; không dùng cookie browser. RBAC chi tiết hiện có enum `AdminPermission`, bảng `UserAdminPermission`, `PermissionsGuard` và đã gắn vào các route admin catalog, scheduling, booking, payment và operations; admin cũ cần được seed quyền tương ứng trước khi gọi các route này. Audit nền tảng có `AuditLog`, `AuditService` allowlist summary, filter API `GET /api/v1/admin/audit-logs` và UI `/admin/audit-logs`.
 
 ## Sprint 6 — Browser smoke và quality gate
@@ -366,7 +403,7 @@ SEED_ADMIN_PASSWORD=change-this-seed-password
 | `SMTP_USER`              | Không    | SMTP username nếu provider yêu cầu                             |
 | `SMTP_PASSWORD`          | Không    | SMTP password nếu provider yêu cầu                             |
 | `SMTP_FROM`              | Không    | Địa chỉ gửi email                                               |
-| `PUBLIC_APP_URL`         | Production | Base URL frontend dùng trong link xác thực và link xem vé; phải là URL public, không dùng `localhost` |
+| `PUBLIC_APP_URL`         | Production | Base URL frontend dùng trong link xác thực, link xem vé và lời mời quản trị; phải là URL public, không dùng `localhost` |
 | `MAIL_WORKER_ENABLED`    | Không    | Bật Worker Thread gửi mail; test/OpenAPI nên để `false`       |
 | `MAIL_WORKER_POLL_MS`    | Không    | Chu kỳ polling fallback khi outbox rỗng, default `10000`      |
 | `MAIL_WORKER_STALE_LOCK_MS` | Không | Thời gian reclaim lock PROCESSING, default `300000`           |

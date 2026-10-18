@@ -70,6 +70,11 @@ export type AdminAuditLog = {
   createdAt: string;
 };
 export type AdminUserSession = JsonResponse<'/api/v1/users/admin/{id}/sessions', 'get'>[number];
+export type AdminInvitation = JsonResponse<'/api/v1/users/admin/invitations', 'get'>[number];
+export type CreateAdminInvitationRequest = RequestBody<'/api/v1/users/admin/invitations', 'post'>;
+export type AcceptAdminInvitationRequest = RequestBody<'/api/v1/auth/admin-invitations/accept', 'post'>;
+export type AdminInvitationPreview = JsonResponse<'/api/v1/auth/admin-invitations/preview', 'post'>;
+export type AdminInvitationAccepted = JsonResponse<'/api/v1/auth/admin-invitations/accept', 'post'>;
 export type HoldRequest = RequestBody<'/api/v1/bookings/hold', 'post'>;
 
 export type MovieStatus = Movie['status'];

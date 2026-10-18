@@ -8,6 +8,7 @@ import {
   Post,
   Req,
   UnauthorizedException,
+  Optional,
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -34,13 +35,32 @@ import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RefreshTokenDto } from './dto/refresh-token.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
+import { AcceptAdminInvitationDto, PreviewAdminInvitationDto, AdminInvitationPreviewResponseDto, AdminInvitationAcceptedResponseDto } from './dto/admin-invitation.dto.js';
+import { InvitationsService } from '../users/invitations.service.js';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    @Optional() private readonly invitations: InvitationsService = null as unknown as InvitationsService,
   ) {}
+
+  @Post('admin-invitations/preview')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: 200, type: AdminInvitationPreviewResponseDto, description: 'Preview an active admin invitation.' })
+  @ApiErrorResponses(400, 401)
+  previewAdminInvitation(@Body() dto: PreviewAdminInvitationDto) {
+    return this.invitations.preview(dto.token);
+  }
+
+  @Post('admin-invitations/accept')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: 200, type: AdminInvitationAcceptedResponseDto, description: 'Accept an admin invitation.' })
+  @ApiErrorResponses(400, 401, 409)
+  acceptAdminInvitation(@Body() dto: AcceptAdminInvitationDto) {
+    return this.invitations.accept(dto);
+  }
 
   @Post('password-reset/request')
   @HttpCode(HttpStatus.OK)

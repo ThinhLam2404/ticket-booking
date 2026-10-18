@@ -14,6 +14,11 @@ type PasswordResetPayload = {
   token: string;
 };
 
+type AdminInvitationPayload = {
+  token: string;
+  permissions: string[];
+};
+
 @Injectable()
 export class MailService {
   constructor(
@@ -52,6 +57,23 @@ export class MailService {
         recipient: user.email,
         dedupeKey: `PASSWORD_RESET:${user.id}:${tokenHash}`,
         payload: { fullName: user.fullName, token } satisfies PasswordResetPayload,
+      },
+    });
+  }
+
+  async queueAdminInvitationEmail(
+    email: string,
+    invitationId: string,
+    token: string,
+    permissions: string[],
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    await client.mailOutbox.create({
+      data: {
+        type: MailOutboxType.ADMIN_INVITATION,
+        recipient: email,
+        dedupeKey: `ADMIN_INVITATION:${invitationId}:${this.hashToken(token)}`,
+        payload: { token, permissions } satisfies AdminInvitationPayload,
       },
     });
   }

@@ -35,6 +35,7 @@
     "test:browser:ui": "playwright test --ui",
     "test:browser:full": "node scripts/run-browser-tests.mjs",
     "test:integration": "npm --prefix be run test:integration",
+    "benchmark:ticket-booking": "node scripts/benchmark-ticket-booking.mjs",
     "check": "npm run lint && npm run typecheck && npm run build && npm run test:all",
     "check:ci": "npm run api:check && npm run check && npm run test:integration",
     "infra:up": "docker compose -f be/docker-compose.yml up -d --wait",

@@ -31,6 +31,7 @@ const AdminPaymentsPage = lazy(() => import('./features/admin/payments/AdminPaym
 const AdminBookingsPage = lazy(() => import('./features/admin/bookings/AdminBookingsPage').then((module) => ({ default: module.AdminBookingsPage })));
 const AdminBookingDetailPage = lazy(() => import('./features/admin/bookings/AdminBookingDetailPage').then((module) => ({ default: module.AdminBookingDetailPage })));
 const AdminUsersPage = lazy(() => import('./features/admin/users/AdminUsersPage').then((module) => ({ default: module.AdminUsersPage })));
+const AdminAcceptInvitationPage = lazy(() => import('./features/admin/users/AdminInvitation').then((module) => ({ default: module.AdminAcceptInvitationPage })));
 const AdminAuditLogsPage = lazy(() => import('./features/admin/audit/AdminAuditLogsPage').then((module) => ({ default: module.AdminAuditLogsPage })));
 
 const queryClient = new QueryClient({
@@ -67,6 +68,7 @@ const router = createBrowserRouter([
     ],
   },
   { path: 'admin/login', element: <AdminLoginPage /> },
+  { path: 'admin/accept-invitation', element: <AdminAcceptInvitationPage /> },
   {
     element: <RequireAdmin />,
     children: [
