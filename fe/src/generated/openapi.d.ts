@@ -2671,6 +2671,14 @@ export interface components {
             /** @example 1 */
             reviewRequired: number;
         };
+        DiagnosticOperationsDto: {
+            /** @enum {string} */
+            service: "database" | "redis" | "mail-worker";
+            /** @enum {string} */
+            status: "up" | "down" | "unknown";
+            /** @example Ping thành công. */
+            detail: string;
+        };
         OperationsStatusDto: {
             /**
              * @example up
@@ -2681,10 +2689,11 @@ export interface components {
              * @example up
              * @enum {string}
              */
-            redis: "up" | "down";
+            redis: "up" | "down" | "unknown";
             mailWorker: components["schemas"]["MailWorkerOperationsDto"];
             mailOutbox: components["schemas"]["MailOutboxOperationsDto"];
             payments: components["schemas"]["PaymentOperationsDto"];
+            diagnostics: components["schemas"]["DiagnosticOperationsDto"][];
             /**
              * Format: date-time
              * @example 2026-10-02T08:00:00.000Z

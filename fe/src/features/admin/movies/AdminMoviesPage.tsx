@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../api";
@@ -56,6 +56,7 @@ function TmdbMovieModal({ onClose }: { onClose: () => void }) {
   const [batch, setBatch] = useState<{ success: number; failed: number } | null>(null);
   const [failedIds, setFailedIds] = useState<number[]>([]);
   const [queuePending, setQueuePending] = useState(false);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const query = useQuery({
     queryKey: ["tmdb-movies", submittedSearch, page],
     queryFn: ({ signal }) =>
@@ -72,6 +73,10 @@ function TmdbMovieModal({ onClose }: { onClose: () => void }) {
   const currentSelected = currentEligible.filter((movie) => selected.has(movie.tmdbId));
   const allCurrentSelected = currentEligible.length > 0 && currentSelected.length === currentEligible.length;
   const hasPending = queuePending || [...operations.values()].some((operation) => operation.state === "pending");
+
+  useEffect(() => {
+    resultsRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [submittedSearch, page]);
 
   function updateOperation(tmdbId: number, operation: TmdbOperation) {
     setOperations((current) => new Map(current).set(tmdbId, operation));
@@ -203,7 +208,7 @@ function TmdbMovieModal({ onClose }: { onClose: () => void }) {
         {query.isError && <ErrorState cause={query.error} fallback="Không thể tải danh sách TMDB." onRetry={() => void query.refetch()} />}
         {query.isSuccess && !movies.length && <EmptyState>Không tìm thấy phim trên TMDB.</EmptyState>}
         {movies.length > 0 && (
-          <div className="tmdb-results">
+          <div ref={resultsRef} className="tmdb-results">
             {movies.map((movie) => {
               const operation = operations.get(movie.tmdbId);
               const isSelected = selected.has(movie.tmdbId);
@@ -328,6 +333,7 @@ export function AdminMoviesPage() {
   const [tmdbOpen, setTmdbOpen] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [mutationError, setMutationError] = useState("");
+  const [pendingMovieActions, setPendingMovieActions] = useState<Set<string>>(new Set());
   const query = useQuery({
     queryKey: ["admin-movies", search, status],
     queryFn: ({ signal }) => api.adminMovies({ search: search || undefined, status: status || undefined, pageSize: 100 }, signal),
@@ -371,7 +377,13 @@ export function AdminMoviesPage() {
     setConfirm({
       title: "Lưu trữ phim?",
       message: `Phim “${movie.title}” sẽ không còn xuất hiện trong danh mục khách hàng.`,
-      onConfirm: () => archiveMutation.mutate(movie.id),
+      onConfirm: () => {
+        if (pendingMovieActions.has(movie.id)) return;
+        setPendingMovieActions((current) => new Set(current).add(movie.id));
+        void archiveMutation.mutateAsync(movie.id).catch((cause) => setMutationError(mutationMessage(cause))).finally(() => {
+          setPendingMovieActions((current) => { const next = new Set(current); next.delete(movie.id); return next; });
+        });
+      },
     });
   }
 
@@ -405,7 +417,13 @@ export function AdminMoviesPage() {
                 <td><StatusBadge status={movie.status} /></td>
                 <td>{formatDate(movie.updatedAt)}</td>
                 <td><div className="admin-actions">
-                  {movie.status !== "PUBLISHED" && movie.status !== "ARCHIVED" && <button className="primary compact-button" type="button" disabled={publishMutation.isPending} onClick={() => publishMutation.mutate(movie)}>Đưa vào đang chiếu</button>}
+                  {movie.status !== "PUBLISHED" && movie.status !== "ARCHIVED" && <button className="primary compact-button" type="button" disabled={pendingMovieActions.has(movie.id)} onClick={() => {
+                     if (pendingMovieActions.has(movie.id)) return;
+                     setPendingMovieActions((current) => new Set(current).add(movie.id));
+                     void publishMutation.mutateAsync(movie).catch((cause) => setMutationError(mutationMessage(cause))).finally(() => {
+                       setPendingMovieActions((current) => { const next = new Set(current); next.delete(movie.id); return next; });
+                     });
+                   }}>Đưa vào đang chiếu</button>}
                   <button className="secondary compact-button" type="button" onClick={() => { setMutationError(""); setModal({ mode: "edit", movie }); }}>Sửa</button>
                   <button className="danger compact-button" type="button" disabled={movie.status === "ARCHIVED" || archiveMutation.isPending} onClick={() => askArchive(movie)}>Lưu trữ</button>
                 </div></td>

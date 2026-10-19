@@ -9548,6 +9548,36 @@
           "reviewRequired"
         ]
       },
+      "DiagnosticOperationsDto": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "enum": [
+              "database",
+              "redis",
+              "mail-worker"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "unknown"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "example": "Ping thành công."
+          }
+        },
+        "required": [
+          "service",
+          "status",
+          "detail"
+        ]
+      },
       "OperationsStatusDto": {
         "type": "object",
         "properties": {
@@ -9563,7 +9593,8 @@
             "type": "string",
             "enum": [
               "up",
-              "down"
+              "down",
+              "unknown"
             ],
             "example": "up"
           },
@@ -9575,6 +9606,12 @@
           },
           "payments": {
             "$ref": "#/components/schemas/PaymentOperationsDto"
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticOperationsDto"
+            }
           },
           "timestamp": {
             "type": "string",
@@ -9588,6 +9625,7 @@
           "mailWorker",
           "mailOutbox",
           "payments",
+          "diagnostics",
           "timestamp"
         ]
       }

@@ -33,6 +33,12 @@ Dừng stack sau khi hoàn tất:
 docker compose -p ticket-booking-benchmark -f be/docker-compose.integration.yml down --volumes --remove-orphans
 ```
 
+## Chẩn đoán trạng thái vận hành
+
+`GET /api/v1/admin/operations/status` yêu cầu quyền `VIEW_SYSTEM` và trả trạng thái PostgreSQL, Redis, mail worker cùng các chi tiết chẩn đoán an toàn. Chi tiết không chứa secret, stack trace hoặc thông báo lỗi nội bộ; khi không thể kiểm tra, trạng thái chẩn đoán là `unknown` và số liệu phụ thuộc database không được suy diễn thành 0. Dashboard hiển thị khu vực vận hành độc lập với lỗi tải phim/rạp/suất chiếu và có mục “Xem chi tiết chẩn đoán”.
+
+Các thao tác thêm/cập nhật/xóa trong Admin dùng trạng thái pending theo mutation/entity, giữ dialog khi request thất bại, chỉ đóng sau thành công và chỉ làm mới cache sau khi server xác nhận thành công. Các form preview/lập lịch còn loại bỏ response lỗi thời khi người dùng đổi dữ liệu trong lúc request đang chạy.
+
 ## Sprint 4 — Đối soát thủ công và quản trị hoàn tiền
 
 - Admin xác nhận giao dịch SePay cần rà soát tại `POST /api/v1/payments/admin/sepay/transactions/:id/confirm`. Nếu có lệch số tiền, booking hết hạn hoặc booking không còn chờ thanh toán, hệ thống trả cảnh báo; admin gửi lại `force: true` sau khi kiểm tra.

@@ -27,12 +27,23 @@ export class MailWorkerOperationsDto {
   restartsLast5Minutes!: number;
 }
 
+export class DiagnosticOperationsDto {
+  @ApiProperty({ enum: ['database', 'redis', 'mail-worker'] })
+  service!: 'database' | 'redis' | 'mail-worker';
+
+  @ApiProperty({ enum: ['up', 'down', 'unknown'] })
+  status!: 'up' | 'down' | 'unknown';
+
+  @ApiProperty({ example: 'Ping thành công.' })
+  detail!: string;
+}
+
 export class OperationsStatusDto {
   @ApiProperty({ enum: ['up', 'down'], example: 'up' })
   database!: 'down' | 'up';
 
-  @ApiProperty({ enum: ['up', 'down'], example: 'up' })
-  redis!: 'down' | 'up';
+  @ApiProperty({ enum: ['up', 'down', 'unknown'], example: 'up' })
+  redis!: 'down' | 'up' | 'unknown';
 
   @ApiProperty({ type: MailWorkerOperationsDto })
   mailWorker!: MailWorkerOperationsDto;
@@ -42,6 +53,9 @@ export class OperationsStatusDto {
 
   @ApiProperty({ type: PaymentOperationsDto })
   payments!: PaymentOperationsDto;
+
+  @ApiProperty({ type: [DiagnosticOperationsDto] })
+  diagnostics!: DiagnosticOperationsDto[];
 
   @ApiProperty({ example: '2026-10-02T08:00:00.000Z', format: 'date-time' })
   timestamp!: string;

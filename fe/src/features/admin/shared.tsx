@@ -143,7 +143,9 @@ export function ConfirmDialog({
             className="danger"
             type="button"
             disabled={loading}
-            onClick={state.onConfirm}
+            onClick={() => {
+              void Promise.resolve(state.onConfirm()).catch(() => undefined);
+            }}
           >
             {loading ? "Đang xử lý…" : "Xác nhận"}
           </button>
@@ -188,7 +190,9 @@ export function ReasonDialog({
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="form-actions">
           <button className="secondary" type="button" disabled={loading} onClick={onClose}>Hủy</button>
-          <button className="danger" type="button" disabled={loading || !reason.trim()} onClick={() => state.onSubmit(reason.trim(), note.trim() || undefined)}>{loading ? "Đang xử lý…" : "Xác nhận"}</button>
+          <button className="danger" type="button" disabled={loading || !reason.trim()} onClick={() => {
+            void Promise.resolve(state.onSubmit(reason.trim(), note.trim() || undefined)).catch(() => undefined);
+          }}>{loading ? "Đang xử lý…" : "Xác nhận"}</button>
         </div>
       </div>
     </div>

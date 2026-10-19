@@ -106,7 +106,7 @@ export function TrailerModal({ movieTitle, trailerKey, onClose }: { movieTitle: 
       <div className={`trailer-frame trailer-frame-${frameState}`}>
         {frameState === 'loading' && <div className="trailer-frame-state" role="status"><span className="spinner" />Đang tải trailer…</div>}
         {frameState === 'error' && <div className="trailer-frame-state trailer-frame-error" role="alert"><strong>Không thể phát trailer trong cửa sổ này.</strong><span>Thử lại hoặc mở trực tiếp trên YouTube.</span><button className="secondary compact-button" type="button" onClick={() => setAttempt((value) => value + 1)}>Thử lại</button></div>}
-        <iframe key={attempt} title={`Trailer ${movieTitle}`} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerKey)}?autoplay=1&rel=0`} onLoad={() => setFrameState('ready')} onError={() => setFrameState('error')} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+        {frameState !== 'error' && <iframe key={`${trailerKey}-${attempt}`} title={`Trailer ${movieTitle}`} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerKey)}?autoplay=1&rel=0`} onLoad={() => setFrameState('ready')} onError={() => setFrameState('error')} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />}
       </div>
       <div className="trailer-modal-footer"><span>Nhấn ESC hoặc chọn đóng để quay lại trang phim.</span><div className="trailer-modal-actions"><a className="secondary compact-button" href={directUrl} target="_blank" rel="noopener noreferrer">Mở trên YouTube</a><button className="secondary compact-button" type="button" onClick={onClose}>Đóng</button></div></div>
     </section>

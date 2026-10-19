@@ -123,7 +123,12 @@ function writeStoredAuth(response: AuthResponse) {
 const authChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('cinebook-auth') : null;
 authChannel?.addEventListener('message', (event) => {
   if (event.data === 'logout') clearAuth(false);
-  if (event.data === 'login') void restoreAuth();
+  if (event.data === 'login') {
+    void restoreAuth().catch(() => {
+      // A background cross-tab refresh must not create an unhandled rejection.
+      // The active tab keeps its current credentials until a later request decides otherwise.
+    });
+  }
 });
 
 export function getAccessToken() {
@@ -358,15 +363,16 @@ export const api = {
   },
   async logout() {
     try {
-      const refreshToken = readStoredRefreshToken();
-      if (refreshToken) {
-        const perform = () => request('/auth/logout', {
+      const perform = () => {
+        const refreshToken = readStoredRefreshToken();
+        if (!refreshToken) return Promise.resolve();
+        return request('/auth/logout', {
           method: 'POST',
           body: JSON.stringify({ refreshToken }),
         }, false);
-        if (navigator.locks) await navigator.locks.request('cinebook-refresh', perform);
-        else await perform();
-      }
+      };
+      if (navigator.locks) await navigator.locks.request('cinebook-refresh', perform);
+      else await perform();
     } finally {
       // Local credentials must be cleared even when the network is unavailable.
       clearAuth();
@@ -413,8 +419,8 @@ export const api = {
     const params = provinceCode ? `?provinceCode=${provinceCode}` : '';
     return request<MovieDetails>(`/movies/${id}${params}`, { signal });
   },
-  showtimes(filters: { movieId?: string; cinemaId?: string; provinceCode?: number; format?: string; roomFormat?: string; specialOnly?: boolean; from?: string; to?: string } = {}, signal?: AbortSignal) {
-    const params = new URLSearchParams({ page: '1', pageSize: '100' });
+  showtimes(filters: { movieId?: string; cinemaId?: string; provinceCode?: number; format?: string; roomFormat?: string; specialOnly?: boolean; from?: string; to?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) {
+    const params = new URLSearchParams({ page: String(filters.page ?? 1), pageSize: String(filters.pageSize ?? 100) });
     for (const [key, value] of Object.entries(filters)) {
       if (value) params.set(key, String(value));
     }

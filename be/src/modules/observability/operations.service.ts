@@ -6,7 +6,12 @@ import { RedisService } from '../redis/redis.service.js';
 
 export type OperationsStatus = {
   database: 'down' | 'up';
-  redis: 'down' | 'up';
+  redis: 'down' | 'up' | 'unknown';
+  diagnostics: Array<{
+    service: 'database' | 'redis' | 'mail-worker';
+    status: 'up' | 'down' | 'unknown';
+    detail: string;
+  }>;
   mailWorker: {
     status: ReturnType<MailWorkerSupervisor['getStatus']>;
     restartsLast5Minutes: number;
@@ -65,6 +70,11 @@ export class OperationsService {
       mailWorker,
       mailOutbox: { pending, failed, oldestPendingSeconds },
       payments: { reviewRequired },
+      diagnostics: [
+        { service: 'database', status: database, detail: database === 'up' ? 'Kết nối và truy vấn kiểm tra thành công.' : 'Không xác định được trạng thái; số liệu phụ thuộc database không được hiển thị.' },
+        { service: 'redis', status: redis, detail: redis === 'up' ? 'Ping thành công.' : 'Không thể ping Redis; không cung cấp chi tiết lỗi nội bộ.' },
+        { service: 'mail-worker', status: mailWorker.status === 'up' ? 'up' : mailWorker.status === 'disabled' ? 'unknown' : 'down', detail: mailWorker.status === 'up' ? 'Worker đang hoạt động.' : `Worker hiện ở trạng thái ${mailWorker.status}.` },
+      ],
       timestamp: new Date().toISOString(),
     };
   }

@@ -47,17 +47,19 @@ export function AdminPaymentsPage() {
   });
   const confirmMutation = useMutation({
     mutationFn: ({ id, force }: { id: string; force?: boolean }) => api.adminConfirmSepayTransaction(id, { force }),
-    onSuccess: () => {
+    onError: (cause, variables) => setPaymentWarning({ id: variables.id, force: Boolean(variables.force), message: `Không thể xác nhận giao dịch: ${cause instanceof Error ? cause.message : "vui lòng thử lại."}` }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-sepay-transactions"] });
       setPaymentWarning(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin-sepay-transactions"] });
     },
   });
   const refundMutation = useMutation({
     mutationFn: ({ bookingId, reason, adminNote }: { bookingId: string; reason: string; adminNote?: string }) =>
       api.adminRefundBooking(bookingId, { reason, adminNote }),
-    onSuccess: () => {
+    onError: () => undefined,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-sepay-transactions"] });
       setRefundConfirm(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin-sepay-transactions"] });
     },
   });
 
@@ -66,13 +68,14 @@ export function AdminPaymentsPage() {
   const booking = (tx: typeof transactions[number]) => tx.booking;
 
   const askConfirm = (tx: typeof transactions[number]) => {
+    if (confirmMutation.isPending || updateMutation.isPending || refundMutation.isPending) return;
     const b = booking(tx);
     const warn = b ? [] : ["Không tìm thấy đặt vé liên kết"];
     if (b && b.totalAmount && tx.transferAmount && b.totalAmount !== tx.transferAmount) warn.push("Lệch số tiền");
     if (b && new Date(b.showtimeStartsAt) < new Date()) warn.push("Suất chiếu đã diễn ra");
     if (b && b.status !== "PENDING") warn.push(`Trạng thái đặt vé: ${b.status === "CONFIRMED" ? "Đã xác nhận" : b.status === "CANCELLED" ? "Đã hủy" : "Đã hết hạn"}`);
     if (!warn.length) {
-      confirmMutation.mutate({ id: tx.id });
+      void confirmMutation.mutateAsync({ id: tx.id }).catch(() => undefined);
       return;
     }
     setPaymentWarning({ id: tx.id, force: true, message: `Cảnh báo: ${warn.join(", ")}. Vẫn xác nhận giao dịch?` });
@@ -103,8 +106,8 @@ export function AdminPaymentsPage() {
         </tbody></table></div>
       )}
       {meta && <div className="cursor-pagination"><button className="secondary" disabled={!meta.hasPreviousPage || txQuery.isFetching} onClick={() => move(meta.previousCursor, "before")}>← Trước</button><span>{meta.hasNextPage ? "Có thêm giao dịch" : "Cuối danh sách"}</span><button className="secondary" disabled={!meta.hasNextPage || txQuery.isFetching} onClick={() => move(meta.nextCursor, "after")}>Tiếp →</button></div>}
-      {paymentWarning && <ConfirmDialog state={{ title: "Xác nhận giao dịch có cảnh báo", message: paymentWarning.message, onConfirm: () => confirmMutation.mutate({ id: paymentWarning.id, force: paymentWarning.force }) }} loading={confirmMutation.isPending} error={confirmMutation.error ? "Không thể xác nhận giao dịch." : undefined} onClose={() => setPaymentWarning(null)} />}
-      {refundConfirm && <ReasonDialog state={{ title: "Xác nhận hoàn tiền", message: <>Đặt vé <strong>#{refundConfirm.bookingId}</strong> — {money(refundConfirm.amount)}. Ghế sẽ được giải phóng, vé bị hủy và email hoàn tiền sẽ gửi cho khách.</>, reasonLabel: "Lý do hoàn tiền", reasonPlaceholder: "Ví dụ: Khách yêu cầu do thay đổi lịch", noteLabel: "Ghi chú admin (tùy chọn)", notePlaceholder: "Thông tin bổ sung cho nội bộ", onSubmit: (reason, adminNote) => refundMutation.mutate({ bookingId: refundConfirm.bookingId, reason, adminNote }) }} loading={refundMutation.isPending} error={refundMutation.error ? "Không thể hoàn tiền." : undefined} onClose={() => setRefundConfirm(null)} />}
+      {paymentWarning && <ConfirmDialog state={{ title: "Xác nhận giao dịch có cảnh báo", message: paymentWarning.message, onConfirm: () => confirmMutation.mutateAsync({ id: paymentWarning.id, force: paymentWarning.force }) }} loading={confirmMutation.isPending} error={confirmMutation.error ? "Không thể xác nhận giao dịch." : undefined} onClose={() => setPaymentWarning(null)} />}
+      {refundConfirm && <ReasonDialog state={{ title: "Xác nhận hoàn tiền", message: <>Đặt vé <strong>#{refundConfirm.bookingId}</strong> — {money(refundConfirm.amount)}. Ghế sẽ được giải phóng, vé bị hủy và email hoàn tiền sẽ gửi cho khách.</>, reasonLabel: "Lý do hoàn tiền", reasonPlaceholder: "Ví dụ: Khách yêu cầu do thay đổi lịch", noteLabel: "Ghi chú admin (tùy chọn)", notePlaceholder: "Thông tin bổ sung cho nội bộ", onSubmit: (reason, adminNote) => refundMutation.mutateAsync({ bookingId: refundConfirm.bookingId, reason, adminNote }) }} loading={refundMutation.isPending} error={refundMutation.error ? "Không thể hoàn tiền." : undefined} onClose={() => setRefundConfirm(null)} />}
     </AdminPage>
   );
 }

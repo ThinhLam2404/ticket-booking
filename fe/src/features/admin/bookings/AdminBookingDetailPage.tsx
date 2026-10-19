@@ -31,19 +31,21 @@ export function AdminBookingDetailPage() {
 
   const refundMutation = useMutation({
     mutationFn: (dto: { reason: string; adminNote?: string }) => api.adminRefundBooking(id!, dto),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-booking", id] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-sepay-transactions"] }),
+      ]);
       setConfirm(null);
       setRefundReasonDialog(false);
-      void queryClient.invalidateQueries({ queryKey: ["admin-booking", id] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-sepay-transactions"] });
     },
   });
 
   const cancelMutation = useMutation({
     mutationFn: () => api.cancelBooking(id!),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-booking", id] });
       setConfirm(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin-booking", id] });
     },
   });
 
@@ -69,7 +71,11 @@ export function AdminBookingDetailPage() {
     setConfirm({
       title: "Hủy đặt vé",
       message: <>Hủy đặt vé <strong>#{booking.id}</strong>? Ghế sẽ được giải phóng.</>,
-      onConfirm: () => cancelMutation.mutate(),
+      onConfirm: () => {
+        if (!cancelMutation.isPending) {
+          void cancelMutation.mutateAsync().catch(() => undefined);
+        }
+      },
     });
   };
 
@@ -290,6 +296,7 @@ export function AdminBookingDetailPage() {
         <ConfirmDialog
           state={confirm}
           loading={cancelMutation.isPending}
+          error={cancelMutation.error instanceof Error ? cancelMutation.error.message : cancelMutation.error ? "Không thể hủy đặt vé." : undefined}
           onClose={() => setConfirm(null)}
         />
       )}
@@ -302,10 +309,10 @@ export function AdminBookingDetailPage() {
             reasonPlaceholder: "Ví dụ: Khách yêu cầu do thay đổi lịch",
             noteLabel: "Ghi chú admin (tùy chọn)",
             notePlaceholder: "Thông tin bổ sung cho nội bộ",
-            onSubmit: (reason, adminNote) => refundMutation.mutate({ reason, adminNote }),
+            onSubmit: (reason, adminNote) => refundMutation.mutateAsync({ reason, adminNote }),
           }}
           loading={refundMutation.isPending}
-          error={refundMutation.error ? "Không thể hoàn tiền." : undefined}
+          error={refundMutation.error instanceof Error ? refundMutation.error.message : refundMutation.error ? "Không thể hoàn tiền." : undefined}
           onClose={() => setRefundReasonDialog(false)}
         />
       )}

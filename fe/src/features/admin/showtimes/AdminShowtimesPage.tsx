@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../api";
@@ -143,14 +143,67 @@ function BulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onSubmit 
   const [freeSlots, setFreeSlots] = useState<FreeSlotsResponse | null>(null);
   const [freeLoading, setFreeLoading] = useState(false);
   const [freeError, setFreeError] = useState("");
+  const previewRequestRef = useRef(0);
+  const freeSlotsRequestRef = useRef(0);
   const selectedBulkMovie = movies.find((movie) => movie.id === movieId);
   const roomsQuery = useQuery({ queryKey: ["admin-bulk-showtime-rooms", cinemaId], queryFn: ({ signal }) => api.rooms(cinemaId, signal), enabled: Boolean(cinemaId) });
   const selectedBulkRoom = roomsQuery.data?.find((room) => room.id === roomId);
   const pricingQuote = useQuery({ queryKey: ["admin-bulk-pricing", selectedBulkRoom?.format, format, firstStartsAt, pricingOverridesEnabled, basePrice, vipMultiplier, coupleMultiplier], queryFn: () => api.quoteShowtimePricing({ roomFormat: selectedBulkRoom!.format, showtimeFormat: format, startsAt: vietnameseDateTime(firstStartsAt), ...(pricingOverridesEnabled && { basePrice, vipMultiplier, coupleMultiplier }) }), enabled: Boolean(selectedBulkRoom?.format && firstStartsAt.length >= 16) });
   const body: BulkShowtimeRequest = { movieId, roomId, firstStartsAt: firstStartsAt ? vietnameseDateTime(firstStartsAt) : "", format, count, turnaroundMinutes, ...(pricingOverridesEnabled && { basePrice, vipMultiplier, coupleMultiplier }) };
-  async function previewSlots() { setPreviewError(""); setPreview(null); setPreviewLoading(true); try { setPreview(await api.previewBulkShowtimes(body)); } catch (cause) { setPreviewError(mutationMessage(cause)); } finally { setPreviewLoading(false); } }
-  async function submit(event: FormEvent) { event.preventDefault(); if (!preview?.valid) { await previewSlots(); return; } await onSubmit(body); }
-  async function loadFreeSlots() { if (!roomId || !selectedBulkMovie) return; setFreeError(""); setFreeSlots(null); setFreeLoading(true); try { setFreeSlots(await api.roomFreeSlots(roomId, { date: freeDate, durationMinutes: selectedBulkMovie.duration, turnaroundMinutes })); } catch (cause) { setFreeError(errorMessage(cause, "Không thể tải khung giờ trống.")); } finally { setFreeLoading(false); } }
+  const bodyFingerprint = JSON.stringify(body);
+  const previewFingerprintRef = useRef("");
+  useEffect(() => {
+    previewRequestRef.current += 1;
+    previewFingerprintRef.current = "";
+    setPreview(null);
+  }, [bodyFingerprint]);
+  async function previewSlots() {
+    const requestId = ++previewRequestRef.current;
+    const requestedBody = body;
+    const requestedFingerprint = JSON.stringify(requestedBody);
+    previewFingerprintRef.current = "";
+    setPreviewError("");
+    setPreview(null);
+    setPreviewLoading(true);
+    try {
+      const result = await api.previewBulkShowtimes(requestedBody);
+      if (requestId === previewRequestRef.current) {
+        previewFingerprintRef.current = requestedFingerprint;
+        setPreview(result);
+      }
+    } catch (cause) {
+      if (requestId === previewRequestRef.current) setPreviewError(mutationMessage(cause));
+    } finally {
+      if (requestId === previewRequestRef.current) setPreviewLoading(false);
+    }
+  }
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!preview?.valid || previewFingerprintRef.current !== bodyFingerprint) {
+      await previewSlots();
+      return;
+    }
+    try {
+      await onSubmit(body);
+    } catch {
+      // The parent mutation owns the visible error; consume the event-handler rejection.
+    }
+  }
+  async function loadFreeSlots() {
+    if (!roomId || !selectedBulkMovie) return;
+    const requestId = ++freeSlotsRequestRef.current;
+    setFreeError("");
+    setFreeSlots(null);
+    setFreeLoading(true);
+    try {
+      const result = await api.roomFreeSlots(roomId, { date: freeDate, durationMinutes: selectedBulkMovie.duration, turnaroundMinutes });
+      if (requestId === freeSlotsRequestRef.current) setFreeSlots(result);
+    } catch (cause) {
+      if (requestId === freeSlotsRequestRef.current) setFreeError(errorMessage(cause, "Không thể tải khung giờ trống."));
+    } finally {
+      if (requestId === freeSlotsRequestRef.current) setFreeLoading(false);
+    }
+  }
   return <Modal eyebrow="LẬP LỊCH HÀNG LOẠT" title="Tạo nhiều suất chiếu" onClose={onCancel} className="bulk-showtime-modal"><form className="admin-form" onSubmit={(event) => void submit(event)}><div className="admin-form-grid"><Field label="Phim" wide><select required value={movieId} onChange={(event) => { setMovieId(event.target.value); setPreview(null); }}><option value="">Chọn phim đã phát hành</option>{movies.filter((movie) => movie.status === "PUBLISHED").map((movie) => <option key={movie.id} value={movie.id}>{movie.title} · {movie.duration} phút</option>)}</select></Field><Field label="Cụm rạp" wide><select required value={cinemaId} onChange={(event) => { setCinemaId(event.target.value); setRoomId(""); setPreview(null); }}><option value="">Chọn cụm rạp</option>{cinemas.map((cinema) => <option key={cinema.id} value={cinema.id}>{cinema.name}</option>)}</select></Field><Field label="Phòng chiếu" wide><select required disabled={!cinemaId || roomsQuery.isPending} value={roomId} onChange={(event) => { setRoomId(event.target.value); setPreview(null); setFreeSlots(null); }}><option value="">{roomsQuery.isPending ? "Đang tải phòng…" : "Chọn phòng"}</option>{(roomsQuery.data ?? []).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}</select></Field><Field label="Định dạng suất chiếu"><select value={format} onChange={(event) => { setFormat(event.target.value as typeof format); setPreview(null); }}>{showtimeFormats.map((value) => <option key={value} value={value}>{showtimeFormatText[value]}</option>)}</select></Field><label className="admin-field admin-field-wide admin-checkbox-field"><span>Giá vé</span><span className="admin-checkbox-control"><input type="checkbox" checked={pricingOverridesEnabled} onChange={(event) => setPricingOverridesEnabled(event.target.checked)} /> Ghi đè giá theo chính sách</span></label><Field label="Suất đầu tiên (giờ Việt Nam)"><input required type="datetime-local" value={firstStartsAt} onChange={(event) => { setFirstStartsAt(event.target.value); setPreview(null); }} /></Field><NumberField label="Số suất" min={1} max={100} value={count} onChange={(value) => { setCount(value); setPreview(null); }} /><NumberField label="Thời gian nghỉ (phút)" min={0} max={180} value={turnaroundMinutes} onChange={(value) => { setTurnaroundMinutes(value); setPreview(null); }} />{pricingOverridesEnabled && <><NumberField label="Giá cơ bản override" min={0} step={1000} value={basePrice} onChange={setBasePrice} /><NumberField label="Hệ số VIP override" min={0} step={0.01} value={vipMultiplier} onChange={setVipMultiplier} /><NumberField label="Hệ số ghế đôi override" min={0} step={0.01} value={coupleMultiplier} onChange={setCoupleMultiplier} /></>}</div>{pricingQuote.isPending && <p className="form-hint">Đang tính giá theo chính sách…</p>}{pricingQuote.data && <p className="form-hint">Giá áp dụng ({pricingQuote.data.pricingDayType === "WEEKEND" ? "cuối tuần" : "ngày thường"}): Tiêu chuẩn {money(pricingQuote.data.prices.standard)} · VIP {money(pricingQuote.data.prices.vip)} · Ghế đôi {money(pricingQuote.data.prices.couple)}. {pricingOverridesEnabled ? "Đang dùng giá override." : "Đang dùng policy theo phòng và định dạng."}</p>}{(roomsQuery.isError || previewError || error || pricingQuote.isError) && <p className="form-error">{previewError || error || (pricingQuote.isError ? "Không thể lấy báo giá chính sách." : "Không thể tải phòng chiếu.")}</p>}<div className="free-slots-box"><div className="free-slots-head"><strong>Khung giờ trống của phòng</strong><span>Rạp mở cửa 08:00 – 23:00 hằng ngày · Bấm vào khung giờ để dùng làm suất đầu tiên</span></div><div className="free-slots-controls"><input type="date" aria-label="Ngày xem khung trống" value={freeDate} onChange={(event) => { setFreeDate(event.target.value); setFreeSlots(null); }} /><button className="secondary" type="button" disabled={!roomId || !selectedBulkMovie || freeLoading} onClick={() => void loadFreeSlots()}>{freeLoading ? "Đang tìm…" : "Xem khung giờ trống"}</button></div>{freeError && <p className="form-error">{freeError}</p>}{freeSlots && (freeSlots.freeWindows.length ? <div className="free-slots-list">{freeSlots.freeWindows.map((window) => <button key={window.startsAt} type="button" className="free-slot-chip" onClick={() => { setFirstStartsAt(localDateTime(window.startsAt)); setPreview(null); }}>{formatTime(window.startsAt)} – {formatTime(window.endsAt)} · trống {window.minutes} phút</button>)}</div> : <p className="free-slots-empty">Phòng kín lịch trong ngày đã chọn.</p>)}{freeSlots && freeSlots.busy.length > 0 && <p className="free-slots-busy">Đang chiếu: {freeSlots.busy.map((busy) => `${formatTime(busy.startsAt)} – ${formatTime(busy.endsAt)}`).join(", ")}</p>}</div>{preview && <div className={`bulk-preview ${preview.valid ? "valid" : "invalid"}`}><strong>{preview.valid ? `Có thể tạo ${preview.slots.length} suất chiếu` : "Lịch có xung đột"}</strong><div className="bulk-preview-list">{preview.slots.map((slot) => <span key={slot.index} className={slot.available ? "available" : "conflict"}>Suất {slot.index}: {formatTime(slot.startsAt)} – {formatTime(slot.endsAt)}{slotConflictLabel(slot)}</span>)}</div></div>}<div className="form-actions"><button className="secondary" type="button" disabled={loading || previewLoading} onClick={onCancel}>Hủy</button><button className="secondary" type="button" disabled={loading || previewLoading} onClick={() => void previewSlots()}>{previewLoading ? "Đang kiểm tra…" : "Xem trước"}</button><button className="primary" disabled={loading || previewLoading || !preview?.valid}>{loading ? "Đang tạo…" : "Tạo toàn bộ suất"}</button></div></form></Modal>;
 }
 
@@ -169,11 +222,60 @@ function CinemaBulkShowtimeForm({ movies, cinemas, loading, error, onCancel, onS
   const [freeSlots, setFreeSlots] = useState<CinemaFreeSlotsResponse | null>(null);
   const [busy, setBusy] = useState<"preview" | "free" | null>(null);
   const [localError, setLocalError] = useState("");
+  const previewRequestRef = useRef(0);
+  const freeSlotsRequestRef = useRef(0);
   const selectedMovie = movies.find((movie) => movie.id === movieId);
   const body: CinemaBulkShowtimeRequest = { movieId, cinemaId, date, count, format, turnaroundMinutes, ...(pricingOverridesEnabled && { basePrice, vipMultiplier, coupleMultiplier }) };
-  async function previewSchedule() { setBusy("preview"); setLocalError(""); try { setPreview(await api.previewCinemaBulkShowtimes(body)); } catch (cause) { setLocalError(mutationMessage(cause)); setPreview(null); } finally { setBusy(null); } }
-  async function loadFreeSlots() { if (!cinemaId || !selectedMovie) return; setBusy("free"); setLocalError(""); try { setFreeSlots(await api.cinemaFreeSlots(cinemaId, { date, durationMinutes: selectedMovie.duration, turnaroundMinutes })); } catch (cause) { setLocalError(errorMessage(cause, "Không thể tải khung giờ trống của rạp.")); setFreeSlots(null); } finally { setBusy(null); } }
-  async function submit(event: FormEvent) { event.preventDefault(); if (!preview?.valid) { await previewSchedule(); return; } await onSubmit(body); }
+  const bodyFingerprint = JSON.stringify(body);
+  const previewFingerprintRef = useRef("");
+  useEffect(() => {
+    previewRequestRef.current += 1;
+    previewFingerprintRef.current = "";
+    setPreview(null);
+  }, [bodyFingerprint]);
+  useEffect(() => {
+    freeSlotsRequestRef.current += 1;
+    setFreeSlots(null);
+  }, [cinemaId, date, selectedMovie?.duration, turnaroundMinutes]);
+  async function previewSchedule() {
+    const requestId = ++previewRequestRef.current;
+    const requestedBody = body;
+    const requestedFingerprint = JSON.stringify(requestedBody);
+    previewFingerprintRef.current = "";
+    setBusy("preview");
+    setLocalError("");
+    try {
+      const result = await api.previewCinemaBulkShowtimes(requestedBody);
+      if (requestId === previewRequestRef.current) {
+        previewFingerprintRef.current = requestedFingerprint;
+        setPreview(result);
+      }
+    } catch (cause) {
+      if (requestId === previewRequestRef.current) { setLocalError(mutationMessage(cause)); setPreview(null); }
+    } finally {
+      if (requestId === previewRequestRef.current) setBusy(null);
+    }
+  }
+  async function loadFreeSlots() {
+    if (!cinemaId || !selectedMovie) return;
+    const requestId = ++freeSlotsRequestRef.current;
+    setBusy("free");
+    setLocalError("");
+    setFreeSlots(null);
+    try {
+      const result = await api.cinemaFreeSlots(cinemaId, { date, durationMinutes: selectedMovie.duration, turnaroundMinutes });
+      if (requestId === freeSlotsRequestRef.current) setFreeSlots(result);
+    } catch (cause) {
+      if (requestId === freeSlotsRequestRef.current) { setLocalError(errorMessage(cause, "Không thể tải khung giờ trống của rạp.")); setFreeSlots(null); }
+    } finally {
+      if (requestId === freeSlotsRequestRef.current) setBusy(null);
+    }
+  }
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!preview?.valid || previewFingerprintRef.current !== bodyFingerprint) { await previewSchedule(); return; }
+    try { await onSubmit(body); } catch { /* Parent mutation owns the visible error. */ }
+  }
   return <Modal eyebrow="LẬP LỊCH ĐA PHÒNG" title="Tạo suất chiếu trong toàn rạp" onClose={onCancel} className="bulk-showtime-modal"><form className="admin-form" onSubmit={(event) => void submit(event)}><div className="admin-form-grid"><Field label="Phim" wide><select required value={movieId} onChange={(event) => { setMovieId(event.target.value); setPreview(null); }}><option value="">Chọn phim đã phát hành</option>{movies.filter((movie) => movie.status === "PUBLISHED").map((movie) => <option key={movie.id} value={movie.id}>{movie.title} · {movie.duration} phút</option>)}</select></Field><Field label="Cụm rạp" wide><select required value={cinemaId} onChange={(event) => { setCinemaId(event.target.value); setPreview(null); setFreeSlots(null); }}><option value="">Chọn cụm rạp</option>{cinemas.map((cinema) => <option key={cinema.id} value={cinema.id}>{cinema.name}</option>)}</select></Field><Field label="Ngày chiếu"><input required type="date" value={date} onChange={(event) => { setDate(event.target.value); setPreview(null); setFreeSlots(null); }} /></Field><NumberField label="Tổng số suất" min={1} max={100} value={count} onChange={(value) => { setCount(value); setPreview(null); }} /><NumberField label="Thời gian nghỉ (phút)" min={0} max={180} value={turnaroundMinutes} onChange={(value) => { setTurnaroundMinutes(value); setPreview(null); setFreeSlots(null); }} /><Field label="Định dạng suất chiếu"><select value={format} onChange={(event) => { setFormat(event.target.value as typeof format); setPreview(null); }}>{showtimeFormats.map((value) => <option key={value} value={value}>{showtimeFormatText[value]}</option>)}</select></Field><label className="admin-field admin-field-wide admin-checkbox-field"><span>Giá vé</span><span className="admin-checkbox-control"><input type="checkbox" checked={pricingOverridesEnabled} onChange={(event) => { setPricingOverridesEnabled(event.target.checked); setPreview(null); }} /> Áp dụng một mức giá override cho toàn bộ phòng</span></label>{pricingOverridesEnabled && <><NumberField label="Giá cơ bản override" min={0} step={1000} value={basePrice} onChange={(value) => { setBasePrice(value); setPreview(null); }} /><NumberField label="Hệ số VIP override" min={0} step={0.01} value={vipMultiplier} onChange={(value) => { setVipMultiplier(value); setPreview(null); }} /><NumberField label="Hệ số ghế đôi override" min={0} step={0.01} value={coupleMultiplier} onChange={(value) => { setCoupleMultiplier(value); setPreview(null); }} /></>}</div><p className="form-hint">Mặc định dùng chính sách theo từng phòng và ngày chiếu. Bật override chỉ khi muốn áp dụng cùng một mức giá cho toàn bộ suất.</p>{(localError || error) && <p className="form-error">{localError || error}</p>}<div className="free-slots-box"><div className="free-slots-head"><strong>Khung giờ khả dụng theo phòng</strong><span>Các giờ bên dưới đã loại trừ suất bận và thời gian nghỉ; mỗi phòng chỉ hiện lịch có thể xếp liên tiếp.</span></div><div className="free-slots-controls"><button className="secondary" type="button" disabled={!cinemaId || !selectedMovie || busy !== null} onClick={() => void loadFreeSlots()}>{busy === "free" ? "Đang tìm…" : "Xem khung giờ từng phòng"}</button></div>{freeSlots && <div className="free-slots-list">{freeSlots.rooms.map((room) => <section className="free-room" key={room.roomId}><div className="free-room-heading"><strong>{room.roomName}</strong><span>{roomFormatText[room.roomFormat]} · {room.freeSlots.length} suất khả dụng</span></div>{room.freeSlots.length ? <div className="free-room-slots">{room.freeSlots.map((slot) => <span className="free-slot-chip" key={`${room.roomId}-${slot.startsAt}`}><strong>{formatTime(slot.startsAt)} – {formatTime(slot.endsAt)}</strong></span>)}</div> : <p className="free-slots-empty">Không còn khung giờ phù hợp.</p>}</section>)}</div>}{freeSlots && freeSlots.schedulableCount < count && <p className="form-error">Chỉ còn trống {freeSlots.schedulableCount} suất chiếu, không đủ {count} suất đã yêu cầu.</p>}</div>{preview && <div className={`bulk-preview ${preview.valid ? "valid" : "invalid"}`}><strong>{preview.valid ? `Sẵn sàng tạo ${preview.assignments.length} suất chiếu` : `Chỉ có thể tạo ${preview.assignments.length}/${preview.requestedCount} suất chiếu`}</strong><p className="bulk-preview-capacity">Tổng sức chứa theo lịch: {preview.schedulableCount} suất · Giá được tính theo từng phòng.</p><div className="bulk-preview-list">{preview.assignments.map((slot, index) => <span className="available" key={`${slot.roomId}-${slot.startsAt}`}><strong>Suất {index + 1} · {slot.roomName}</strong><span>{formatTime(slot.startsAt)} – {formatTime(slot.endsAt)} · {roomFormatText[slot.roomFormat]} · Standard {money(slot.prices.standard)} · VIP {money(slot.prices.vip)} · Đôi {money(slot.prices.couple)}</span></span>)}</div></div>}<div className="form-actions"><button className="secondary" type="button" disabled={loading || busy !== null} onClick={onCancel}>Hủy</button><button className="secondary" type="button" disabled={!movieId || !cinemaId || busy !== null} onClick={() => void previewSchedule()}>{busy === "preview" ? "Đang kiểm tra…" : "Xem trước"}</button><button className="primary" disabled={loading || busy !== null || !preview?.valid}>{loading ? "Đang tạo…" : "Tạo toàn bộ suất"}</button></div></form></Modal>;
 }
 
@@ -227,7 +329,7 @@ export function AdminShowtimesPage() {
   async function createCinemaBulk(body: CinemaBulkShowtimeRequest) { setMutationError(""); try { await cinemaBulkMutation.mutateAsync(body); } catch (cause) { setMutationError(mutationMessage(cause)); throw cause; } }
   async function createBulk(body: BulkShowtimeRequest) { setMutationError(""); try { await bulkMutation.mutateAsync(body); } catch (cause) { setMutationError(mutationMessage(cause)); throw cause; } }
   function edit(showtime: Showtime) { setMutationError(""); setDetailId(showtime.id); setModal({ mode: "edit", showtime }); }
-  function askDelete(showtime: Showtime) { setConfirm({ title: "Xóa suất chiếu?", message: `Suất ${formatTime(showtime.startsAt)} của “${showtime.movie.title}” sẽ bị xóa.`, onConfirm: () => deleteMutation.mutate(showtime.id) }); }
+  function askDelete(showtime: Showtime) { setConfirm({ title: "Xóa suất chiếu?", message: `Suất ${formatTime(showtime.startsAt)} của “${showtime.movie.title}” sẽ bị xóa.`, onConfirm: async () => { await deleteMutation.mutateAsync(showtime.id); } }); }
   return <AdminPage>
     <PageHeader eyebrow="LỊCH VẬN HÀNH" title="Suất chiếu"><div className="admin-page-actions"><button className="secondary" type="button" disabled={optionsPending} onClick={() => { setMutationError(""); setCinemaBulkModal(true); }}>+ Lập lịch đa phòng</button><button className="secondary" type="button" disabled={optionsPending} onClick={() => { setMutationError(""); setBulkModal(true); }}>+ Lập lịch một phòng</button><button className="primary" type="button" disabled={optionsPending} onClick={() => { setMutationError(""); setDetailId(""); setModal({ mode: "create" }); }}>+ Thêm suất chiếu</button></div></PageHeader>
     {successMessage && <Alert type="success" onClose={() => setSuccessMessage("")}>{successMessage}</Alert>}
@@ -243,6 +345,6 @@ export function AdminShowtimesPage() {
     {modal && modal.mode === "edit" && detailQuery.isPending && <Modal eyebrow="CHI TIẾT SUẤT CHIẾU" title="Đang tải suất chiếu" onClose={() => { setModal(null); setDetailId(""); }}><LoadingState label="Đang tải chi tiết suất chiếu…" /></Modal>}
     {modal && modal.mode === "edit" && detailQuery.isError && <Modal eyebrow="CHI TIẾT SUẤT CHIẾU" title="Không thể tải suất chiếu" onClose={() => { setModal(null); setDetailId(""); }}><ErrorState cause={detailQuery.error} fallback="Không thể tải chi tiết suất chiếu." onRetry={() => void detailQuery.refetch()} /></Modal>}
     {modal && modal.mode === "edit" && detail && <ShowtimeForm mode="edit" showtime={detail} movies={movies} cinemas={cinemas} loading={saveMutation.isPending} error={mutationError} onCancel={() => { setModal(null); setDetailId(""); }} onSubmit={save} />}
-    {confirm && <ConfirmDialog state={confirm} loading={deleteMutation.isPending} error={deleteMutation.error ? mutationMessage(deleteMutation.error) : undefined} onClose={() => setConfirm(null)} />}
+    {confirm && <ConfirmDialog state={confirm} loading={deleteMutation.isPending} error={deleteMutation.error ? mutationMessage(deleteMutation.error) : undefined} onClose={() => { if (!deleteMutation.isPending) setConfirm(null); }} />}
   </AdminPage>;
 }

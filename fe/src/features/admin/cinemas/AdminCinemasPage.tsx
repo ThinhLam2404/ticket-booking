@@ -73,6 +73,7 @@ export function AdminCinemasPage() {
   const [modal, setModal] = useState<{ mode: FormMode; cinema?: Cinema } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [mutationError, setMutationError] = useState("");
+  const [pendingCinemaActions, setPendingCinemaActions] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [provinceCode, setProvinceCode] = useState<number | "">("");
   const { provinces, isPending: provincesPending, isError: provincesError, refetch: refetchProvinces } = useLocationContext();
@@ -94,7 +95,13 @@ export function AdminCinemasPage() {
   }
 
   function askDelete(cinema: Cinema) {
-    setConfirm({ title: "Xóa cụm rạp?", message: `Thao tác này sẽ xóa “${cinema.name}” nếu cụm rạp chưa có dữ liệu liên quan.`, onConfirm: () => deleteMutation.mutate(cinema.id) });
+    setConfirm({ title: "Xóa cụm rạp?", message: `Thao tác này sẽ xóa “${cinema.name}” nếu cụm rạp chưa có dữ liệu liên quan.`, onConfirm: () => {
+      if (pendingCinemaActions.has(cinema.id)) return;
+      setPendingCinemaActions((current) => new Set(current).add(cinema.id));
+      void deleteMutation.mutateAsync(cinema.id).catch((cause) => setMutationError(mutationMessage(cause))).finally(() => {
+        setPendingCinemaActions((current) => { const next = new Set(current); next.delete(cinema.id); return next; });
+      });
+    } });
   }
 
   return <AdminPage>
@@ -105,7 +112,7 @@ export function AdminCinemasPage() {
     <div className="admin-toolbar admin-cinema-toolbar"><input aria-label="Tìm cụm rạp" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên cụm rạp hoặc địa chỉ…" /><select aria-label="Lọc tỉnh thành" value={provinceCode} disabled={provincesPending} onChange={(event) => setProvinceCode(event.target.value ? Number(event.target.value) : "")}><option value="">Tất cả tỉnh/thành</option>{provinces.map((province) => <option key={province.code} value={province.code}>{province.name}</option>)}</select><span className="admin-toolbar-result">{filteredCinemas.length} cụm rạp</span></div>
     {provincesError && <ErrorState cause={new Error("Province list unavailable")} fallback="Không thể tải bộ lọc tỉnh/thành." onRetry={() => void refetchProvinces()} />}
     {query.isSuccess && !filteredCinemas.length && <EmptyState>{search || provinceCode !== "" ? "Không tìm thấy cụm rạp phù hợp." : "Chưa có cụm rạp. Hãy tạo cụm rạp đầu tiên."}</EmptyState>}
-    {filteredCinemas.length > 0 && <div className="admin-card-grid">{filteredCinemas.map((cinema, index) => <article className="admin-entity-card" key={cinema.id}><div className="admin-card-mark">{cinema.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase()}</div><div className="admin-entity-content"><div className="admin-card-heading"><div><p className="eyebrow">CỤM RẠP {String(index + 1).padStart(2, "0")}</p><h2>{cinema.name}</h2></div><span className="admin-count">{cinema.roomCount ?? 0} phòng</span></div><div className="admin-card-tags"><span>{cinema.province?.name ?? `Mã tỉnh ${cinema.provinceCode}`}</span><span className="admin-card-status">Đang quản lý</span></div><p className="admin-address">⌖ {cinema.address}</p><div className="admin-card-footer"><Link className="primary" to={`/admin/cinemas/${cinema.id}/rooms`}>Quản lý phòng</Link><button className="secondary" type="button" onClick={() => { setMutationError(""); setModal({ mode: "edit", cinema }); }}>Sửa</button><button className="danger" type="button" disabled={deleteMutation.isPending} onClick={() => askDelete(cinema)}>Xóa</button></div></div></article>)}</div>}
+    {filteredCinemas.length > 0 && <div className="admin-card-grid">{filteredCinemas.map((cinema, index) => <article className="admin-entity-card" key={cinema.id}><div className="admin-card-mark">{cinema.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase()}</div><div className="admin-entity-content"><div className="admin-card-heading"><div><p className="eyebrow">CỤM RẠP {String(index + 1).padStart(2, "0")}</p><h2>{cinema.name}</h2></div><span className="admin-count">{cinema.roomCount ?? 0} phòng</span></div><div className="admin-card-tags"><span>{cinema.province?.name ?? `Mã tỉnh ${cinema.provinceCode}`}</span><span className="admin-card-status">Đang quản lý</span></div><p className="admin-address">⌖ {cinema.address}</p><div className="admin-card-footer"><Link className="primary" to={`/admin/cinemas/${cinema.id}/rooms`}>Quản lý phòng</Link><button className="secondary" type="button" onClick={() => { setMutationError(""); setModal({ mode: "edit", cinema }); }}>Sửa</button><button className="danger" type="button" disabled={deleteMutation.isPending && deleteMutation.variables === cinema.id} onClick={() => askDelete(cinema)}>Xóa</button></div></div></article>)}</div>}
     {modal && <CinemaForm mode={modal.mode} cinema={modal.cinema} loading={saveMutation.isPending} error={mutationError} onCancel={() => setModal(null)} onSubmit={save} />}
     {confirm && <ConfirmDialog state={confirm} loading={deleteMutation.isPending} error={deleteMutation.error ? mutationMessage(deleteMutation.error) : undefined} onClose={() => setConfirm(null)} />}
   </AdminPage>;
@@ -135,6 +142,7 @@ export function AdminRoomsPage() {
   const [modal, setModal] = useState<{ mode: FormMode; room?: RoomResponse } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [mutationError, setMutationError] = useState("");
+  const [pendingRoomActions, setPendingRoomActions] = useState<Set<string>>(new Set());
   const cinemaQuery = useQuery({ queryKey: ["admin-cinema", cinemaId], queryFn: ({ signal }) => api.cinema(cinemaId!, signal), enabled: Boolean(cinemaId) });
   const roomsQuery = useQuery({ queryKey: ["admin-rooms", cinemaId], queryFn: ({ signal }) => api.rooms(cinemaId!, signal), enabled: Boolean(cinemaId) });
   const roomDetailQuery = useQuery({ queryKey: ["admin-room", modal?.room?.id], queryFn: ({ signal }) => api.room(modal!.room!.id, signal), enabled: Boolean(modal?.room?.id) });
@@ -149,7 +157,13 @@ export function AdminRoomsPage() {
   const rooms = roomsQuery.data ?? [];
   const selectedRoom = roomDetailQuery.data ?? modal?.room;
   async function save(body: CreateRoomRequest) { setMutationError(""); try { await saveMutation.mutateAsync({ id: modal?.room?.id, body }); } catch (cause) { setMutationError(mutationMessage(cause)); } }
-  function askDelete(room: RoomResponse) { setConfirm({ title: "Xóa phòng chiếu?", message: `Phòng “${room.name}” chỉ có thể xóa khi chưa có suất chiếu liên quan.`, onConfirm: () => deleteMutation.mutate(room.id) }); }
+  function askDelete(room: RoomResponse) { setConfirm({ title: "Xóa phòng chiếu?", message: `Phòng “${room.name}” chỉ có thể xóa khi chưa có suất chiếu liên quan.`, onConfirm: () => {
+    if (pendingRoomActions.has(room.id)) return;
+    setPendingRoomActions((current) => new Set(current).add(room.id));
+    void deleteMutation.mutateAsync(room.id).catch((cause) => setMutationError(mutationMessage(cause))).finally(() => {
+      setPendingRoomActions((current) => { const next = new Set(current); next.delete(room.id); return next; });
+    });
+  } }); }
 
   if (!cinemaId) return <AdminPage><ErrorState cause={new Error("Thiếu cụm rạp")} fallback="Không xác định được cụm rạp." onRetry={() => navigate("/admin/cinemas")} /></AdminPage>;
   return <AdminPage>
@@ -160,7 +174,7 @@ export function AdminRoomsPage() {
     {roomsQuery.isError && <ErrorState cause={roomsQuery.error} fallback="Không thể tải danh sách phòng." onRetry={() => void roomsQuery.refetch()} />}
     {roomsQuery.isPending && <LoadingState label="Đang tải danh sách phòng…" />}
     {roomsQuery.isSuccess && !rooms.length && <EmptyState>Cụm rạp này chưa có phòng chiếu.</EmptyState>}
-    {rooms.length > 0 && <div className="admin-room-list">{rooms.map((room) => <article className="admin-room-row" key={room.id}><div><p className="eyebrow">PHÒNG CHIẾU</p><h2>{room.name}</h2><span className="admin-room-format">{roomFormatText[room.format]} · {room.seatCount ?? room.seats?.length ?? 0} ghế</span><span>Cập nhật {formatDate(room.updatedAt)}</span></div><div className="admin-actions"><Link className="primary compact-button" to={`/admin/rooms/${room.id}/seats`}>Sơ đồ ghế</Link><button className="secondary compact-button" type="button" onClick={() => { setMutationError(""); setModal({ mode: "edit", room }); }}>Sửa</button><button className="danger compact-button" type="button" disabled={deleteMutation.isPending} onClick={() => askDelete(room)}>Xóa</button></div></article>)}</div>}
+    {rooms.length > 0 && <div className="admin-room-list">{rooms.map((room) => <article className="admin-room-row" key={room.id}><div><p className="eyebrow">PHÒNG CHIẾU</p><h2>{room.name}</h2><span className="admin-room-format">{roomFormatText[room.format]} · {room.seatCount ?? room.seats?.length ?? 0} ghế</span><span>Cập nhật {formatDate(room.updatedAt)}</span></div><div className="admin-actions"><Link className="primary compact-button" to={`/admin/rooms/${room.id}/seats`}>Sơ đồ ghế</Link><button className="secondary compact-button" type="button" onClick={() => { setMutationError(""); setModal({ mode: "edit", room }); }}>Sửa</button><button className="danger compact-button" type="button" disabled={deleteMutation.isPending && deleteMutation.variables === room.id} onClick={() => askDelete(room)}>Xóa</button></div></article>)}</div>}
     {modal && modal.mode === "create" && <RoomForm mode="create" cinemaId={cinemaId} loading={saveMutation.isPending} error={mutationError} onCancel={() => setModal(null)} onSubmit={save} />}
     {modal && modal.mode === "edit" && roomDetailQuery.isPending && <Modal eyebrow="CHI TIẾT PHÒNG" title="Đang tải phòng chiếu" onClose={() => setModal(null)}><LoadingState label="Đang tải chi tiết phòng…" /></Modal>}
     {modal && modal.mode === "edit" && roomDetailQuery.isError && <Modal eyebrow="CHI TIẾT PHÒNG" title="Không thể tải phòng chiếu" onClose={() => setModal(null)}><ErrorState cause={roomDetailQuery.error} fallback="Không thể tải chi tiết phòng." onRetry={() => void roomDetailQuery.refetch()} /></Modal>}
@@ -191,15 +205,15 @@ export function AdminSeatsPage() {
   const roomQuery = useQuery({ queryKey: ["admin-room", roomId], queryFn: ({ signal }) => api.room(roomId!, signal), enabled: Boolean(roomId) });
   const seatsQuery = useQuery({ queryKey: ["admin-seats", roomId], queryFn: ({ signal }) => api.seats(roomId!, signal), enabled: Boolean(roomId) });
   const saveMutation = useMutation({ mutationFn: ({ id, body }: { id?: string; body: CreateSeatRequest }) => id ? api.updateSeat(id, { type: body.type }) : api.createSeat(roomId!, body), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["admin-seats", roomId] }); setEditing(null); setMutationError(""); } });
-  const deleteMutation = useMutation({ mutationFn: (id: string) => api.deleteSeat(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["admin-seats", roomId] }); setConfirm(null); } });
-  const layoutMutation = useMutation({ mutationFn: (layout: CreateSeatRequest[]) => api.replaceSeatLayout(roomId!, layout), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["admin-seats", roomId] }); setConfirm(null); } });
+  const deleteMutation = useMutation({ mutationFn: (id: string) => api.deleteSeat(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["admin-seats", roomId] }); setConfirm(null); }, onError: (cause) => setMutationError(mutationMessage(cause)) });
+  const layoutMutation = useMutation({ mutationFn: (layout: CreateSeatRequest[]) => api.replaceSeatLayout(roomId!, layout), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["admin-seats", roomId] }); setConfirm(null); setMutationError(""); }, onError: (cause) => setMutationError(mutationMessage(cause)) });
   const seats = seatsQuery.data ?? emptySeats;
   const completeLayout = isCompleteSeatLayout(seats);
   const groupedSeats = useMemo(() => seats.reduce<Record<string, Seat[]>>((groups, seat) => { groups[seat.row] = [...(groups[seat.row] ?? []), seat]; return groups; }, {}), [seats]);
   async function save(body: CreateSeatRequest) { setMutationError(""); try { await saveMutation.mutateAsync({ id: editing?.id, body }); } catch (cause) { setMutationError(mutationMessage(cause)); } }
   function makeLayout() { return buildSeatLayout({ rows, regularColumns, coupleColumns }); }
-  function askLayout() { const validationError = validateSeatPreset({ rows, regularColumns, coupleColumns }); if (validationError) { setMutationError(validationError); return; } setConfirm({ title: "Thay thế toàn bộ sơ đồ?", message: `Sơ đồ gồm ${rows} hàng; ${regularColumns} ghế Standard/VIP và ${coupleColumns} ghế Couple ở hàng cuối.`, onConfirm: () => layoutMutation.mutate(makeLayout()) }); }
-  function askDelete(seat: Seat) { if (completeLayout) { setMutationError('Layout hoàn chỉnh chỉ được thay đổi bằng chức năng bulk layout.'); return; } setConfirm({ title: "Xóa ghế?", message: `Ghế ${seat.row}${seat.number} sẽ được xóa khỏi phòng chiếu.`, onConfirm: () => deleteMutation.mutate(seat.id) }); }
+  function askLayout() { const validationError = validateSeatPreset({ rows, regularColumns, coupleColumns }); if (validationError) { setMutationError(validationError); return; } setConfirm({ title: "Thay thế toàn bộ sơ đồ?", message: `Sơ đồ gồm ${rows} hàng; ${regularColumns} ghế Standard/VIP và ${coupleColumns} ghế Couple ở hàng cuối.`, onConfirm: () => layoutMutation.mutateAsync(makeLayout()) }); }
+  function askDelete(seat: Seat) { if (completeLayout) { setMutationError('Layout hoàn chỉnh chỉ được thay đổi bằng chức năng bulk layout.'); return; } setConfirm({ title: "Xóa ghế?", message: `Ghế ${seat.row}${seat.number} sẽ được xóa khỏi phòng chiếu.`, onConfirm: () => deleteMutation.mutateAsync(seat.id) }); }
   if (!roomId) return <AdminPage><ErrorState cause={new Error("Thiếu phòng")} fallback="Không xác định được phòng chiếu." /></AdminPage>;
   return <AdminPage>
     <div className="admin-breadcrumb"><Link to="/admin/cinemas">Cụm rạp</Link><span>›</span><strong>{roomQuery.data?.name ?? "Sơ đồ ghế"}</strong></div>
@@ -211,7 +225,7 @@ export function AdminSeatsPage() {
       {seatsQuery.isSuccess && !seats.length && <EmptyState>Phòng chiếu chưa có ghế. Tạo nhanh một sơ đồ ở trên.</EmptyState>}
       {seats.length > 0 && <div className="admin-panel"><div className="admin-panel-heading"><div><p className="eyebrow">SEAT MAP</p><h2>Sơ đồ đang dùng</h2></div><span>Chọn một ghế để chỉnh sửa</span></div><div className="admin-seat-map">{Object.entries(groupedSeats).sort(([a], [b]) => a.localeCompare(b)).map(([row, rowSeats]) => <div className="admin-seat-row" key={row}><b>{row}</b>{rowSeats.sort((a, b) => a.number - b.number).map((seat) => <button className={`admin-seat admin-seat-${seat.type.toLowerCase()}`} type="button" key={seat.id} onClick={() => { if (completeLayout || seat.type === "COUPLE") return; setMutationError(""); setEditing(seat); }}>{seat.number}<span>{seat.type === "VIP" ? "V" : seat.type === "COUPLE" ? "Đ" : ""}</span></button>)}</div>)}</div></div>}
     </div>
-    {seats.length > 0 && <section className="admin-seat-actions"><div className="admin-seat-actions-heading"><div><p className="eyebrow">THAO TÁC GHẾ</p><h2>Danh sách ghế</h2><p>Chọn ghế trên sơ đồ để chỉnh sửa nhanh hoặc quản lý từng vị trí tại đây.</p></div><span className="admin-count">{seats.length} vị trí</span></div><div className="admin-seat-legend">{seatTypes.map((type) => <span key={type}><i className={`admin-seat-dot admin-seat-dot-${type.toLowerCase()}`} />{seatTypeText(type)}</span>)}</div><div className="admin-seat-delete-list">{seats.slice().sort((a, b) => `${a.row}${a.number}`.localeCompare(`${b.row}${b.number}`, undefined, { numeric: true })).map((seat) => <div key={seat.id} className="admin-seat-action-row"><span className={`admin-seat-token admin-seat-token-${seat.type.toLowerCase()}`}>{seat.row}{seat.number}</span><span className="admin-seat-action-copy"><strong>Ghế {seat.row}{seat.number}</strong><small>{seatTypeText(seat.type)}</small></span>{completeLayout || seat.type === "COUPLE" ? <span className="admin-seat-managed">Theo layout</span> : <><button className="secondary compact-button" type="button" onClick={() => { setMutationError(""); setEditing(seat); }}>Sửa</button><button className="danger compact-button" type="button" disabled={deleteMutation.isPending} onClick={() => askDelete(seat)}>Xóa</button></>}</div>)}</div></section>}
+    {seats.length > 0 && <section className="admin-seat-actions"><div className="admin-seat-actions-heading"><div><p className="eyebrow">THAO TÁC GHẾ</p><h2>Danh sách ghế</h2><p>Chọn ghế trên sơ đồ để chỉnh sửa nhanh hoặc quản lý từng vị trí tại đây.</p></div><span className="admin-count">{seats.length} vị trí</span></div><div className="admin-seat-legend">{seatTypes.map((type) => <span key={type}><i className={`admin-seat-dot admin-seat-dot-${type.toLowerCase()}`} />{seatTypeText(type)}</span>)}</div><div className="admin-seat-delete-list">{seats.slice().sort((a, b) => `${a.row}${a.number}`.localeCompare(`${b.row}${b.number}`, undefined, { numeric: true })).map((seat) => <div key={seat.id} className="admin-seat-action-row"><span className={`admin-seat-token admin-seat-token-${seat.type.toLowerCase()}`}>{seat.row}{seat.number}</span><span className="admin-seat-action-copy"><strong>Ghế {seat.row}{seat.number}</strong><small>{seatTypeText(seat.type)}</small></span>{completeLayout || seat.type === "COUPLE" ? <span className="admin-seat-managed">Theo layout</span> : <><button className="secondary compact-button" type="button" onClick={() => { setMutationError(""); setEditing(seat); }}>Sửa</button><button className="danger compact-button" type="button" disabled={deleteMutation.isPending && deleteMutation.variables === seat.id} onClick={() => askDelete(seat)}>Xóa</button></>}</div>)}</div></section>}
     {editing && <SeatForm seat={editing.id ? editing : undefined} loading={saveMutation.isPending} error={mutationError} onCancel={() => setEditing(null)} onSubmit={save} />}
     {confirm && <ConfirmDialog state={confirm} loading={deleteMutation.isPending || layoutMutation.isPending} error={deleteMutation.error ? mutationMessage(deleteMutation.error) : layoutMutation.error ? mutationMessage(layoutMutation.error) : undefined} onClose={() => setConfirm(null)} />}
   </AdminPage>;
