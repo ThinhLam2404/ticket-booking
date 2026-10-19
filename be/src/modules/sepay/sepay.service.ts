@@ -28,7 +28,12 @@ import { logOperationalEvent } from '../../common/logging/operational-logger.js'
 import { recordPaymentReviewRequired } from '../observability/metrics.service.js';
 import { RedisService } from '../redis/redis.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { assertCursorDirection, buildCursorMeta, cursorWhere, decodeCursor } from '../../common/http/cursor-pagination.js';
+import {
+  assertCursorDirection,
+  buildCursorMeta,
+  cursorWhere,
+  decodeCursor,
+} from '../../common/http/cursor-pagination.js';
 
 const PAYMENT_CODE_PREFIX = 'CB';
 const PAYMENT_CODE_LENGTH = 8;
@@ -101,21 +106,40 @@ export class SepayService {
     const paymentCode = this.generatePaymentCode();
     const expiresAt = booking.expiresAt;
 
-    const intent = await this.prisma.sepayPaymentIntent.upsert({
-      where: { bookingId },
-      create: {
-        paymentCode,
-        expectedAmount: booking.totalAmount,
-        expiresAt,
-        bookingId,
-        userId,
-      },
-      update: {
-        paymentCode,
-        expectedAmount: booking.totalAmount,
-        expiresAt,
-        status: SepayIntentStatus.PENDING,
-      },
+    const intent = await this.prisma.$transaction(async (transaction) => {
+      const intent = await transaction.sepayPaymentIntent.upsert({
+        where: { bookingId },
+        create: {
+          paymentCode,
+          expectedAmount: booking.totalAmount,
+          expiresAt,
+          bookingId,
+          userId,
+        },
+        update: {
+          paymentCode,
+          expectedAmount: booking.totalAmount,
+          expiresAt,
+          status: SepayIntentStatus.PENDING,
+        },
+      });
+      await this.audit.record(
+        {
+          actor: { id: userId },
+          action: 'PAYMENT_INTENT_CREATED',
+          resourceType: 'SepayPaymentIntent',
+          resourceId: intent.id,
+          after: {
+            id: intent.id,
+            bookingId,
+            status: intent.status,
+            expiresAt: intent.expiresAt,
+          },
+          metadata: { source: 'CUSTOMER' },
+        },
+        transaction,
+      );
+      return intent;
     });
 
     logOperationalEvent('info', 'payment_intent_created', {
@@ -187,19 +211,31 @@ export class SepayService {
         ? SepayTransactionStatus.MATCHED
         : SepayTransactionStatus.REVIEW_REQUIRED;
       try {
-        await this.prisma.sepayTransaction.create({
-          data: {
-            sepayId: dto.id,
-            gateway: dto.gateway,
-            accountNumber: dto.accountNumber,
-            transferAmount: amount,
-            content: dto.content ?? '',
-            referenceCode: dto.referenceCode ?? null,
-            transferType: dto.transferType,
-            transactionDate: new Date(dto.transactionDate),
-            status: txStatus,
-            paymentIntentId: intent?.id ?? null,
-          },
+        await this.prisma.$transaction(async (transaction) => {
+          const created = await transaction.sepayTransaction.create({
+            data: {
+              sepayId: dto.id,
+              gateway: dto.gateway,
+              accountNumber: dto.accountNumber,
+              transferAmount: amount,
+              content: dto.content ?? '',
+              referenceCode: dto.referenceCode ?? null,
+              transferType: dto.transferType,
+              transactionDate: new Date(dto.transactionDate),
+              status: txStatus,
+              paymentIntentId: intent?.id ?? null,
+            },
+          });
+          await this.audit.record(
+            {
+              action: 'PAYMENT_TRANSACTION_RECEIVED',
+              resourceType: 'SepayTransaction',
+              resourceId: created.id,
+              after: { status: txStatus },
+              metadata: { source: 'WEBHOOK' },
+            },
+            transaction,
+          );
         });
       } catch (error) {
         //NOTE - Nếu lỗi không phải duplicate thì vẫn throw lỗi thật.
@@ -233,10 +269,7 @@ export class SepayService {
     }
     //NOTE -  Nếu transaction là MATCHED nhưng không còn intent
     if (!intent) {
-      await this.prisma.sepayTransaction.updateMany({
-        where: { sepayId: dto.id, status: SepayTransactionStatus.MATCHED },
-        data: { status: SepayTransactionStatus.REVIEW_REQUIRED },
-      });
+      await this.markForReview(dto.id);
       recordPaymentReviewRequired();
       return { success: true };
     }
@@ -245,7 +278,14 @@ export class SepayService {
     return { success: true };
   }
 
-  async findTransactions(query?: { status?: SepayTransactionStatus; after?: string; before?: string; limit?: number; from?: string; to?: string }) {
+  async findTransactions(query?: {
+    status?: SepayTransactionStatus;
+    after?: string;
+    before?: string;
+    limit?: number;
+    from?: string;
+    to?: string;
+  }) {
     const limit = query?.limit ?? 20;
     assertCursorDirection(query?.after, query?.before);
     const direction = query?.before ? 'before' : 'after';
@@ -266,7 +306,10 @@ export class SepayService {
     };
     const transactions = await this.prisma.sepayTransaction.findMany({
       where,
-      orderBy: direction === 'before' ? [{ transactionDate: 'asc' }, { id: 'asc' }] : [{ transactionDate: 'desc' }, { id: 'desc' }],
+      orderBy:
+        direction === 'before'
+          ? [{ transactionDate: 'asc' }, { id: 'asc' }]
+          : [{ transactionDate: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       include: {
         paymentIntent: {
@@ -296,13 +339,26 @@ export class SepayService {
           userEmail: booking.user?.email ?? '',
           movieTitle: booking.showtime?.movie?.title ?? '',
           showtimeStartsAt: booking.showtime?.startsAt.toISOString() ?? '',
-          seatLabels: booking.items.map((item) => `${item.showtimeSeat?.seat?.row ?? ''}${item.showtimeSeat?.seat?.number ?? ''}`),
+          seatLabels: booking.items.map(
+            (item) =>
+              `${item.showtimeSeat?.seat?.row ?? ''}${item.showtimeSeat?.seat?.number ?? ''}`,
+          ),
         },
       };
     });
-    const result = buildCursorMeta(transactions, limit, scope, direction, (row) => row.transactionDate, Boolean(cursor));
+    const result = buildCursorMeta(
+      transactions,
+      limit,
+      scope,
+      direction,
+      (row) => row.transactionDate,
+      Boolean(cursor),
+    );
     const mappedById = new Map(mapped.map((item) => [item.id, item]));
-    return { ...result, data: result.data.map((item) => mappedById.get(item.id) ?? item) };
+    return {
+      ...result,
+      data: result.data.map((item) => mappedById.get(item.id) ?? item),
+    };
   }
 
   async manualConfirmTransaction(
@@ -352,18 +408,15 @@ export class SepayService {
       booking,
       intent,
       transaction.sepayId,
+      { adminId, adminNote: dto.adminNote },
     );
     if (!confirmed) {
       throw new ConflictException(
         'Booking could not be confirmed; transaction remains under review',
       );
     }
-    const updated = await this.prisma.sepayTransaction.update({
+    const updated = await this.prisma.sepayTransaction.findUniqueOrThrow({
       where: { id },
-      data: {
-        status: SepayTransactionStatus.CONFIRMED,
-        adminNote: dto.adminNote ?? null,
-      },
     });
     logOperationalEvent('info', 'payment_manually_confirmed', {
       transactionId: id,
@@ -377,24 +430,38 @@ export class SepayService {
     id: string,
     dto: { status: SepayTransactionStatus; adminNote?: string },
   ) {
-    const existing = await this.prisma.sepayTransaction.findUnique({
-      where: { id },
-    });
-    if (!existing) throw new NotFoundException('Transaction not found');
-    if (
-      dto.status === SepayTransactionStatus.REFUNDED ||
-      dto.status === SepayTransactionStatus.CONFIRMED
-    ) {
-      throw new ConflictException(
-        'Use the corresponding payment workflow to confirm or refund a transaction',
+    return this.prisma.$transaction(async (transaction) => {
+      const existing = await transaction.sepayTransaction.findUnique({
+        where: { id },
+      });
+      if (!existing) throw new NotFoundException('Transaction not found');
+      if (
+        dto.status === SepayTransactionStatus.REFUNDED ||
+        dto.status === SepayTransactionStatus.CONFIRMED
+      ) {
+        throw new ConflictException(
+          'Use the corresponding payment workflow to confirm or refund a transaction',
+        );
+      }
+      const updated = await transaction.sepayTransaction.update({
+        where: { id },
+        data: {
+          status: dto.status,
+          ...(dto.adminNote !== undefined && { adminNote: dto.adminNote }),
+        },
+      });
+      await this.audit.record(
+        {
+          action: 'PAYMENT_TRANSACTION_UPDATED',
+          resourceType: 'SepayTransaction',
+          resourceId: id,
+          before: { status: existing.status },
+          after: { status: updated.status },
+          metadata: { source: 'ADMIN' },
+        },
+        transaction,
       );
-    }
-    return this.prisma.sepayTransaction.update({
-      where: { id },
-      data: {
-        status: dto.status,
-        ...(dto.adminNote !== undefined && { adminNote: dto.adminNote }),
-      },
+      return updated;
     });
   }
   async refundBooking(
@@ -525,7 +592,21 @@ export class SepayService {
           dto.reason,
           tx,
         );
-        await this.audit.record({ actor: { id: adminId }, action: 'BOOKING_REFUNDED', resourceType: 'Booking', resourceId: bookingId, before: { id: bookingId, status: BookingStatus.CONFIRMED }, after: { id: bookingId, status: BookingStatus.CANCELLED, reason: dto.reason } }, tx);
+        await this.audit.record(
+          {
+            actor: { id: adminId },
+            action: 'BOOKING_REFUNDED',
+            resourceType: 'Booking',
+            resourceId: bookingId,
+            before: { id: bookingId, status: BookingStatus.CONFIRMED },
+            after: {
+              id: bookingId,
+              status: BookingStatus.CANCELLED,
+              reason: dto.reason,
+            },
+          },
+          tx,
+        );
         return created;
       });
       logOperationalEvent('info', 'booking_refunded', {
@@ -555,6 +636,7 @@ export class SepayService {
       booking: { user: { email: string } };
     },
     sepayId: number,
+    manual?: { adminId: string; adminNote?: string },
   ): Promise<boolean> {
     let confirmed: unknown = null;
     try {
@@ -641,11 +723,30 @@ export class SepayService {
 
         await tx.sepayTransaction.update({
           where: { sepayId },
-          data: { status: SepayTransactionStatus.CONFIRMED },
+          data: {
+            status: SepayTransactionStatus.CONFIRMED,
+            ...(manual && { adminNote: manual.adminNote ?? null }),
+          },
         });
         await this.mailService.queueTicketEmail(
           booking.id,
           intent.booking.user.email,
+          tx,
+        );
+
+        await this.audit.record(
+          {
+            actor: manual ? { id: manual.adminId } : undefined,
+            action: manual ? 'PAYMENT_MANUALLY_CONFIRMED' : 'PAYMENT_CONFIRMED',
+            resourceType: 'Booking',
+            resourceId: booking.id,
+            before: { status: BookingStatus.PENDING },
+            after: { status: BookingStatus.CONFIRMED },
+            metadata: {
+              source: manual ? 'ADMIN' : 'WEBHOOK',
+              bookingId: booking.id,
+            },
+          },
           tx,
         );
 
@@ -666,13 +767,7 @@ export class SepayService {
         });
         this.logger.log(`Booking ${booking.id} confirmed via SePay webhook`);
       } else {
-        await this.prisma.sepayTransaction.updateMany({
-          where: {
-            sepayId,
-            status: SepayTransactionStatus.MATCHED,
-          },
-          data: { status: SepayTransactionStatus.REVIEW_REQUIRED },
-        });
+        await this.markForReview(sepayId);
         recordPaymentReviewRequired();
         logOperationalEvent('warn', 'payment_review_required', {
           bookingId: booking.id,
@@ -688,6 +783,32 @@ export class SepayService {
       throw err;
     }
     return confirmed !== null;
+  }
+
+  private async markForReview(sepayId: number) {
+    await this.prisma.$transaction(async (transaction) => {
+      const current = await transaction.sepayTransaction.findUnique({
+        where: { sepayId },
+        select: { id: true },
+      });
+      if (!current) return;
+      const updated = await transaction.sepayTransaction.updateMany({
+        where: { sepayId, status: SepayTransactionStatus.MATCHED },
+        data: { status: SepayTransactionStatus.REVIEW_REQUIRED },
+      });
+      if (updated.count)
+        await this.audit.record(
+          {
+            action: 'PAYMENT_REVIEW_REQUIRED',
+            resourceType: 'SepayTransaction',
+            resourceId: current.id,
+            before: { status: SepayTransactionStatus.MATCHED },
+            after: { status: SepayTransactionStatus.REVIEW_REQUIRED },
+            metadata: { source: 'WEBHOOK' },
+          },
+          transaction,
+        );
+    });
   }
 
   private buildCheckoutResponse(intent: {

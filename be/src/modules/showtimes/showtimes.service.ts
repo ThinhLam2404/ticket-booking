@@ -519,6 +519,9 @@ export class ShowtimesService {
           }
           await transaction.showtimeSeat.createMany({ data: showtimeSeatData });
 
+          for (const showtime of inserted) {
+            await this.audit?.record({ action: 'SHOWTIME_CREATED', resourceType: 'Showtime', resourceId: showtime.id, after: showtime }, transaction);
+          }
           return transaction.showtime.findMany({
             where: { id: { in: ids } },
             include: {
@@ -903,6 +906,9 @@ export class ShowtimesService {
           );
           await transaction.showtimeSeat.createMany({ data: showtimeSeatData });
 
+          for (const showtime of inserted) {
+            await this.audit?.record({ action: 'SHOWTIME_CREATED', resourceType: 'Showtime', resourceId: showtime.id, after: showtime }, transaction);
+          }
           return transaction.showtime.findMany({
             where: { id: { in: showtimeIds } },
             include: {
@@ -1004,6 +1010,7 @@ export class ShowtimesService {
             showtimeSeats: { include: { seat: true } },
           },
         });
+        await this.audit?.record({ action: 'SHOWTIME_CREATED', resourceType: 'Showtime', resourceId: showtime.id, after: showtime }, transaction);
         return toPublicResponse(result);
       });
     } catch (error) {
@@ -1193,6 +1200,7 @@ export class ShowtimesService {
               showtimeSeats: { include: { seat: true } },
             },
           });
+          await this.audit?.record({ action: 'SHOWTIME_UPDATED', resourceType: 'Showtime', resourceId: id, before: current, after: result }, transaction);
           return toPublicResponse(result);
         },
         //NOTE - Mục đích là hạn chế hai request cập nhật cùng lúc tạo ra dữ liệu trùng hoặc không nhất quán
@@ -1361,7 +1369,9 @@ export class ShowtimesService {
           );
         }
 
-        return transaction.showtime.delete({ where: { id } });
+        const deleted = await transaction.showtime.delete({ where: { id } });
+        await this.audit?.record({ action: 'SHOWTIME_DELETED', resourceType: 'Showtime', resourceId: id, before: showtime }, transaction);
+        return deleted;
       });
       return toPublicResponse(deleted);
     } catch (error) {

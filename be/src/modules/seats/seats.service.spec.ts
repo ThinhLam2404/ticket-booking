@@ -4,14 +4,16 @@ import { SeatsService } from './seats.service.js';
 describe('SeatsService admin layout replacement', () => {
   it('rejects duplicate normalized coordinates before changing the room', async () => {
     const prisma = { $transaction: vi.fn() };
-    const service = new SeatsService(prisma as never);
+    const service = new SeatsService(withTransaction(prisma) as never);
 
     await expect(
       service.replaceLayout('room-1', [
         { row: 'a', number: 1, type: 'STANDARD' },
         { row: 'A', number: 1, type: 'VIP' },
       ]),
-    ).rejects.toEqual(new ConflictException('Duplicate seat coordinate in layout'));
+    ).rejects.toEqual(
+      new ConflictException('Duplicate seat coordinate in layout'),
+    );
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -30,7 +32,7 @@ describe('SeatsService admin layout replacement', () => {
         }),
       ),
     };
-    const service = new SeatsService(prisma as never);
+    const service = new SeatsService(withTransaction(prisma) as never);
 
     await expect(
       service.replaceLayout('room-1', [{ row: 'A', number: 1 }]),
@@ -44,7 +46,7 @@ describe('SeatsService admin layout replacement', () => {
 
   it('rejects creating a Couple seat outside bulk layout replacement', async () => {
     const prisma = { room: { findUnique: vi.fn() }, seat: { create: vi.fn() } };
-    const service = new SeatsService(prisma as never);
+    const service = new SeatsService(withTransaction(prisma) as never);
 
     await expect(
       service.create('room-1', { row: 'A', number: 1, type: 'COUPLE' }),
@@ -74,7 +76,7 @@ describe('SeatsService admin layout replacement', () => {
       },
       seat: { create: seatCreate },
     };
-    const service = new SeatsService(prisma as never);
+    const service = new SeatsService(withTransaction(prisma) as never);
 
     await expect(
       service.create('room-1', { row: 'a', number: 1, type: 'VIP' }),
@@ -112,11 +114,9 @@ describe('SeatsService admin layout replacement', () => {
         }),
       },
     };
-    const service = new SeatsService(prisma as never);
+    const service = new SeatsService(withTransaction(prisma) as never);
 
-    await expect(
-      service.update('seat-1', { type: 'VIP' }),
-    ).rejects.toEqual(
+    await expect(service.update('seat-1', { type: 'VIP' })).rejects.toEqual(
       new ConflictException('Complete seat layouts must be managed in bulk'),
     );
     expect(prisma.seat.update).not.toHaveBeenCalled();
@@ -142,7 +142,7 @@ describe('SeatsService admin layout replacement', () => {
         }),
       },
     };
-    const service = new SeatsService(prisma as never);
+    const service = new SeatsService(withTransaction(prisma) as never);
 
     await expect(service.remove('seat-1')).rejects.toEqual(
       new ConflictException(
@@ -151,3 +151,10 @@ describe('SeatsService admin layout replacement', () => {
     );
   });
 });
+
+function withTransaction<T extends object>(prisma: T) {
+  return {
+    $transaction: async (callback: (client: T) => unknown) => callback(prisma),
+    ...prisma,
+  };
+}

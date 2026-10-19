@@ -15,11 +15,17 @@ import { PROVINCES } from '../locations/provinces.js';
 
 @Injectable()
 export class CinemasService {
-  constructor(private readonly prisma: PrismaService, @Optional() private readonly audit: AuditService = null as unknown as AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly audit: AuditService = null as unknown as AuditService,
+  ) {}
 
   async findAll(query: ListCinemasDto = {}) {
     const cinemas = await this.prisma.cinema.findMany({
-      where: query.provinceCode ? { provinceCode: query.provinceCode } : undefined,
+      where: query.provinceCode
+        ? { provinceCode: query.provinceCode }
+        : undefined,
       include: {
         _count: { select: { rooms: true } },
         rooms: {
@@ -36,15 +42,24 @@ export class CinemasService {
       },
       orderBy: { name: 'asc' },
     });
-    return toPublicResponse(cinemas.map((cinema) => {
-      const prices = (cinema.rooms ?? []).flatMap((room) => (room.showtimes ?? []).map((showtime) => showtime.basePrice.toNumber()));
-      const { rooms: _rooms, ...cinemaData } = cinema;
-      return {
-        ...cinemaData,
-        province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
-        startingPrice: prices.length ? Math.min(...prices) : null,
-      };
-    }));
+    return toPublicResponse(
+      cinemas.map((cinema) => {
+        const prices = (cinema.rooms ?? []).flatMap((room) =>
+          (room.showtimes ?? []).map((showtime) =>
+            showtime.basePrice.toNumber(),
+          ),
+        );
+        const { rooms: _rooms, ...cinemaData } = cinema;
+        return {
+          ...cinemaData,
+          province:
+            PROVINCES.find(
+              (province) => province.code === cinema.provinceCode,
+            ) ?? null,
+          startingPrice: prices.length ? Math.min(...prices) : null,
+        };
+      }),
+    );
   }
 
   async findOne(id: string) {
@@ -66,7 +81,9 @@ export class CinemasService {
 
     return toPublicResponse({
       ...cinema,
-      province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
+      province:
+        PROVINCES.find((province) => province.code === cinema.provinceCode) ??
+        null,
     });
   }
 
@@ -80,12 +97,23 @@ export class CinemasService {
             provinceCode: dto.provinceCode,
           },
         });
-        if (this.audit) await this.audit.record({ action: 'CINEMA_CREATED', resourceType: 'Cinema', resourceId: cinema.id, after: { id: cinema.id } }, transaction);
+        if (this.audit)
+          await this.audit.record(
+            {
+              action: 'CINEMA_CREATED',
+              resourceType: 'Cinema',
+              resourceId: cinema.id,
+              after: cinema,
+            },
+            transaction,
+          );
         return cinema;
       });
       return toPublicResponse({
         ...result,
-        province: PROVINCES.find((province) => province.code === result.provinceCode) ?? null,
+        province:
+          PROVINCES.find((province) => province.code === result.provinceCode) ??
+          null,
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
@@ -96,30 +124,61 @@ export class CinemasService {
   }
 
   async update(id: string, dto: UpdateCinemaDto) {
-    await this.getById(id);
-
-    const cinema = await this.prisma.cinema.update({
-      where: { id },
-      data: {
-        ...(dto.name !== undefined && { name: dto.name.trim() }),
-        ...(dto.address !== undefined && { address: dto.address.trim() }),
-        ...(dto.provinceCode !== undefined && { provinceCode: dto.provinceCode }),
-      },
+    const cinema = await this.prisma.$transaction(async (transaction) => {
+      const current = await transaction.cinema.findUnique({ where: { id } });
+      if (!current) throw new NotFoundException('Cinema not found');
+      const updated = await transaction.cinema.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined && { name: dto.name.trim() }),
+          ...(dto.address !== undefined && { address: dto.address.trim() }),
+          ...(dto.provinceCode !== undefined && {
+            provinceCode: dto.provinceCode,
+          }),
+        },
+      });
+      await this.audit?.record(
+        {
+          action: 'CINEMA_UPDATED',
+          resourceType: 'Cinema',
+          resourceId: id,
+          before: current,
+          after: updated,
+        },
+        transaction,
+      );
+      return updated;
     });
     return toPublicResponse({
       ...cinema,
-      province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
+      province:
+        PROVINCES.find((province) => province.code === cinema.provinceCode) ??
+        null,
     });
   }
 
   async remove(id: string) {
-    await this.getById(id);
-
     try {
-      const cinema = await this.prisma.cinema.delete({ where: { id } });
+      const cinema = await this.prisma.$transaction(async (transaction) => {
+        const current = await transaction.cinema.findUnique({ where: { id } });
+        if (!current) throw new NotFoundException('Cinema not found');
+        const deleted = await transaction.cinema.delete({ where: { id } });
+        await this.audit?.record(
+          {
+            action: 'CINEMA_DELETED',
+            resourceType: 'Cinema',
+            resourceId: id,
+            before: current,
+          },
+          transaction,
+        );
+        return deleted;
+      });
       return toPublicResponse({
         ...cinema,
-        province: PROVINCES.find((province) => province.code === cinema.provinceCode) ?? null,
+        province:
+          PROVINCES.find((province) => province.code === cinema.provinceCode) ??
+          null,
       });
     } catch (error) {
       if (
@@ -132,13 +191,5 @@ export class CinemasService {
       }
       throw error;
     }
-  }
-
-  private async getById(id: string) {
-    const cinema = await this.prisma.cinema.findUnique({ where: { id } });
-    if (!cinema) {
-      throw new NotFoundException('Cinema not found');
-    }
-    return cinema;
   }
 }

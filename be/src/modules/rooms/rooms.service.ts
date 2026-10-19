@@ -13,7 +13,11 @@ import { CreateRoomDto, UpdateRoomDto } from './dto/room.dto.js';
 
 @Injectable()
 export class RoomsService {
-  constructor(private readonly prisma: PrismaService, @Optional() private readonly audit: AuditService = null as unknown as AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly audit: AuditService = null as unknown as AuditService,
+  ) {}
 
   async findByCinema(cinemaId: string) {
     const rooms = await this.prisma.room.findMany({
@@ -40,12 +44,24 @@ export class RoomsService {
 
   async create(dto: CreateRoomDto) {
     try {
-      const room = await this.prisma.room.create({
-        data: {
-          name: dto.name.trim(),
-          cinemaId: dto.cinemaId,
-          format: dto.format,
-        },
+      const room = await this.prisma.$transaction(async (transaction) => {
+        const created = await transaction.room.create({
+          data: {
+            name: dto.name.trim(),
+            cinemaId: dto.cinemaId,
+            format: dto.format,
+          },
+        });
+        await this.audit?.record(
+          {
+            action: 'ROOM_CREATED',
+            resourceType: 'Room',
+            resourceId: created.id,
+            after: created,
+          },
+          transaction,
+        );
+        return created;
       });
       return toPublicResponse(room);
     } catch (error) {
@@ -63,21 +79,40 @@ export class RoomsService {
   }
 
   async update(id: string, dto: UpdateRoomDto) {
-    const current = await this.prisma.room.findUnique({
-      where: { id },
-      include: { _count: { select: { showtimes: true } } },
-    });
-    if (!current) throw new NotFoundException('Room not found');
-    if (dto.format !== undefined && dto.format !== current.format && current._count.showtimes > 0) {
-      throw new ConflictException('Room format cannot be changed while it has showtimes');
-    }
     try {
-      const room = await this.prisma.room.update({
-        where: { id },
-        data: {
-          ...(dto.name !== undefined && { name: dto.name.trim() }),
-          ...(dto.format !== undefined && { format: dto.format }),
-        },
+      const room = await this.prisma.$transaction(async (transaction) => {
+        const current = await transaction.room.findUnique({
+          where: { id },
+          include: { _count: { select: { showtimes: true } } },
+        });
+        if (!current) throw new NotFoundException('Room not found');
+        if (
+          dto.format !== undefined &&
+          dto.format !== current.format &&
+          current._count.showtimes > 0
+        ) {
+          throw new ConflictException(
+            'Room format cannot be changed while it has showtimes',
+          );
+        }
+        const room = await transaction.room.update({
+          where: { id },
+          data: {
+            ...(dto.name !== undefined && { name: dto.name.trim() }),
+            ...(dto.format !== undefined && { format: dto.format }),
+          },
+        });
+        await this.audit?.record(
+          {
+            action: 'ROOM_UPDATED',
+            resourceType: 'Room',
+            resourceId: id,
+            before: current,
+            after: room,
+          },
+          transaction,
+        );
+        return room;
       });
       return toPublicResponse(room);
     } catch (error) {
@@ -89,9 +124,22 @@ export class RoomsService {
   }
 
   async remove(id: string) {
-    await this.getById(id);
     try {
-      const room = await this.prisma.room.delete({ where: { id } });
+      const room = await this.prisma.$transaction(async (transaction) => {
+        const current = await transaction.room.findUnique({ where: { id } });
+        if (!current) throw new NotFoundException('Room not found');
+        const deleted = await transaction.room.delete({ where: { id } });
+        await this.audit?.record(
+          {
+            action: 'ROOM_DELETED',
+            resourceType: 'Room',
+            resourceId: id,
+            before: current,
+          },
+          transaction,
+        );
+        return deleted;
+      });
       return toPublicResponse(room);
     } catch (error) {
       if (
@@ -104,13 +152,5 @@ export class RoomsService {
       }
       throw error;
     }
-  }
-
-  private async getById(id: string) {
-    const room = await this.prisma.room.findUnique({ where: { id } });
-    if (!room) {
-      throw new NotFoundException('Room not found');
-    }
-    return room;
   }
 }

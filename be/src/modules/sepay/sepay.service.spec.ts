@@ -1,5 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
-import { Prisma, SepayIntentStatus, SepayTransactionStatus } from '@prisma/client';
+import {
+  Prisma,
+  SepayIntentStatus,
+  SepayTransactionStatus,
+} from '@prisma/client';
 import { SepayService } from './sepay.service.js';
 
 describe('SepayService', () => {
@@ -40,7 +44,7 @@ describe('SepayService', () => {
       },
       sepayTransaction: {
         findUnique: vi.fn(),
-        create: vi.fn(),
+        create: vi.fn().mockResolvedValue({ id: 'transaction-1' }),
         update: vi.fn(),
         updateMany: vi.fn(),
         findMany: vi.fn(),
@@ -58,11 +62,18 @@ describe('SepayService', () => {
       $transaction: vi.fn(),
     };
 
+    prisma.$transaction.mockImplementation(
+      async (callback: (client: typeof prisma) => unknown) => callback(prisma),
+    );
     const service = new SepayService(
       prisma as never,
       bookingsService as never,
       config as never,
-      { queueTicketEmail: vi.fn(), queueRefundEmail: vi.fn(), wakeWorker: vi.fn() } as never,
+      {
+        queueTicketEmail: vi.fn(),
+        queueRefundEmail: vi.fn(),
+        wakeWorker: vi.fn(),
+      } as never,
       redis as never,
       { record: vi.fn() } as never,
     );
@@ -162,7 +173,10 @@ describe('SepayService', () => {
     it('ignores duplicate transaction id', async () => {
       const { service, prisma } = createService();
 
-      prisma.sepayTransaction.findUnique.mockResolvedValue({ id: 'tx-1' });
+      prisma.sepayTransaction.findUnique.mockResolvedValue({
+        id: 'tx-1',
+        status: SepayTransactionStatus.CONFIRMED,
+      });
 
       const result = await service.handleWebhook({
         id: 100,

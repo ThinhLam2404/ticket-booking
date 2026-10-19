@@ -1,4 +1,6 @@
+import { AuditService } from '../audit/audit.service.js';
 import {
+  Optional,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -13,7 +15,12 @@ import {
 } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { toPublicResponse } from '../../common/http/response.mapper.js';
-import { assertCursorDirection, buildCursorMeta, cursorWhere, decodeCursor } from '../../common/http/cursor-pagination.js';
+import {
+  assertCursorDirection,
+  buildCursorMeta,
+  cursorWhere,
+  decodeCursor,
+} from '../../common/http/cursor-pagination.js';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { RedisService } from '../redis/redis.service.js';
@@ -33,9 +40,18 @@ export class BookingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    @Optional() private readonly audit?: AuditService,
   ) {}
 
-  async findAllAdmin(query: { search?: string; status?: BookingStatus; after?: string; before?: string; limit?: number; from?: string; to?: string }) {
+  async findAllAdmin(query: {
+    search?: string;
+    status?: BookingStatus;
+    after?: string;
+    before?: string;
+    limit?: number;
+    from?: string;
+    to?: string;
+  }) {
     const limit = query.limit ?? 20;
     assertCursorDirection(query.after, query.before);
     const direction = query.before ? 'before' : 'after';
@@ -53,17 +69,45 @@ export class BookingsService {
             },
           }
         : {}),
-      ...(search ? { OR: [{ id: { contains: search, mode: 'insensitive' } }, { user: { email: { contains: search, mode: 'insensitive' } } }] } : {}),
+      ...(search
+        ? {
+            OR: [
+              { id: { contains: search, mode: 'insensitive' } },
+              { user: { email: { contains: search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
       ...(payload ? cursorWhere(payload, 'createdAt') : {}),
     };
     const data = await this.prisma.booking.findMany({
       where,
-      include: { user: true, showtime: { include: { movie: true, room: { include: { cinema: true } } } }, items: { include: { showtimeSeat: { include: { seat: true } } } }, payment: true, refunds: true },
-      orderBy: direction === 'before' ? [{ createdAt: 'asc' }, { id: 'asc' }] : [{ createdAt: 'desc' }, { id: 'desc' }],
+      include: {
+        user: true,
+        showtime: {
+          include: { movie: true, room: { include: { cinema: true } } },
+        },
+        items: { include: { showtimeSeat: { include: { seat: true } } } },
+        payment: true,
+        refunds: true,
+      },
+      orderBy:
+        direction === 'before'
+          ? [{ createdAt: 'asc' }, { id: 'asc' }]
+          : [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
     });
-    const result = buildCursorMeta(data, limit, scope, direction, (row) => row.createdAt, Boolean(cursor));
-    return { ...result, data: result.data.map((booking) => toPublicResponse(booking)) };
+    const result = buildCursorMeta(
+      data,
+      limit,
+      scope,
+      direction,
+      (row) => row.createdAt,
+      Boolean(cursor),
+    );
+    return {
+      ...result,
+      data: result.data.map((booking) => toPublicResponse(booking)),
+    };
   }
 
   async findOneAdmin(id: string) {
@@ -213,82 +257,93 @@ export class BookingsService {
       const expiresAt = new Date(Date.now() + holdTtl * 1000);
       const bookingId = await this.prisma.$transaction(
         async (transaction) => {
-        const now = new Date();
-        //NOTE - update trạng thái ghế held -> available nếu đã hết hạn
-        await transaction.showtimeSeat.updateMany({
-          where: {
-            id: { in: canonicalSeatIds },
-            status: ShowtimeSeatStatus.HELD,
-            heldUntil: { lte: now },
-          },
-          data: {
-            status: ShowtimeSeatStatus.AVAILABLE,
-            heldUntil: null,
-            heldByBookingId: null,
-          },
-        });
-        //NOTE - kiểm tra xem còn đủ ghế trống k
-        const availableSeats = await transaction.showtimeSeat.findMany({
-          where: {
-            id: { in: canonicalSeatIds },
-            showtimeId: dto.showtimeId,
-            status: ShowtimeSeatStatus.AVAILABLE,
-          },
-          include: { seat: true },
-        });
-        if (availableSeats.length !== canonicalSeatIds.length) {
-          recordHoldConflict();
-          throw new ConflictException(
-            'One or more seats are no longer available',
-          );
-        }
-
-        const totalAmount = availableSeats.reduce(
-          (total, seat) => total.plus(seat.price),
-          new Prisma.Decimal(0),
-        );
-        const createdBooking = await transaction.booking.create({
-          data: {
-            userId,
-            showtimeId: dto.showtimeId,
-            totalAmount,
-            expiresAt,
-            holdToken,
-            requestHash,
-            ...(normalizedIdempotencyKey && {
-              idempotencyKey: normalizedIdempotencyKey,
-            }),
-            items: {
-              create: availableSeats.map((seat) => ({
-                showtimeSeatId: seat.id,
-                price: seat.price,
-              })),
+          const now = new Date();
+          //NOTE - update trạng thái ghế held -> available nếu đã hết hạn
+          await transaction.showtimeSeat.updateMany({
+            where: {
+              id: { in: canonicalSeatIds },
+              status: ShowtimeSeatStatus.HELD,
+              heldUntil: { lte: now },
             },
-          },
-        });
-        //NOTE - update hold
-        const claimedSeats = await transaction.showtimeSeat.updateMany({
-          where: {
-            id: { in: canonicalSeatIds },
-            status: ShowtimeSeatStatus.AVAILABLE,
-          },
-          data: {
-            status: ShowtimeSeatStatus.HELD,
-            heldUntil: expiresAt,
-            heldByBookingId: createdBooking.id,
-          },
-        });
-        if (claimedSeats.count !== canonicalSeatIds.length) {
-          recordHoldConflict();
-          throw new ConflictException(
-            'One or more seats are no longer available',
-          );
-        }
+            data: {
+              status: ShowtimeSeatStatus.AVAILABLE,
+              heldUntil: null,
+              heldByBookingId: null,
+            },
+          });
+          //NOTE - kiểm tra xem còn đủ ghế trống k
+          const availableSeats = await transaction.showtimeSeat.findMany({
+            where: {
+              id: { in: canonicalSeatIds },
+              showtimeId: dto.showtimeId,
+              status: ShowtimeSeatStatus.AVAILABLE,
+            },
+            include: { seat: true },
+          });
+          if (availableSeats.length !== canonicalSeatIds.length) {
+            recordHoldConflict();
+            throw new ConflictException(
+              'One or more seats are no longer available',
+            );
+          }
 
-        return createdBooking.id;
-      },
-      { maxWait: 15_000, timeout: 15_000 },
-    );
+          const totalAmount = availableSeats.reduce(
+            (total, seat) => total.plus(seat.price),
+            new Prisma.Decimal(0),
+          );
+          const createdBooking = await transaction.booking.create({
+            data: {
+              userId,
+              showtimeId: dto.showtimeId,
+              totalAmount,
+              expiresAt,
+              holdToken,
+              requestHash,
+              ...(normalizedIdempotencyKey && {
+                idempotencyKey: normalizedIdempotencyKey,
+              }),
+              items: {
+                create: availableSeats.map((seat) => ({
+                  showtimeSeatId: seat.id,
+                  price: seat.price,
+                })),
+              },
+            },
+          });
+          //NOTE - update hold
+          const claimedSeats = await transaction.showtimeSeat.updateMany({
+            where: {
+              id: { in: canonicalSeatIds },
+              status: ShowtimeSeatStatus.AVAILABLE,
+            },
+            data: {
+              status: ShowtimeSeatStatus.HELD,
+              heldUntil: expiresAt,
+              heldByBookingId: createdBooking.id,
+            },
+          });
+          if (claimedSeats.count !== canonicalSeatIds.length) {
+            recordHoldConflict();
+            throw new ConflictException(
+              'One or more seats are no longer available',
+            );
+          }
+
+          await this.audit?.record(
+            {
+              actor: { id: userId },
+              action: 'BOOKING_HELD',
+              resourceType: 'Booking',
+              resourceId: createdBooking.id,
+              after: createdBooking,
+              metadata: { count: canonicalSeatIds.length, source: 'CUSTOMER' },
+            },
+            transaction,
+          );
+          return createdBooking.id;
+        },
+        { maxWait: 15_000, timeout: 15_000 },
+      );
 
       const booking = await this.prisma.booking.findUniqueOrThrow({
         where: { id: bookingId },
@@ -319,7 +374,18 @@ export class BookingsService {
     }
   }
 
-  async findMine(userId: string, query: { status?: BookingStatus; search?: string; after?: string; before?: string; limit?: number; from?: string; to?: string } = {}) {
+  async findMine(
+    userId: string,
+    query: {
+      status?: BookingStatus;
+      search?: string;
+      after?: string;
+      before?: string;
+      limit?: number;
+      from?: string;
+      to?: string;
+    } = {},
+  ) {
     const limit = query.limit ?? 20;
     assertCursorDirection(query.after, query.before);
     const direction = query.before ? 'before' : 'after';
@@ -338,17 +404,48 @@ export class BookingsService {
             },
           }
         : {}),
-      ...(search ? { OR: [{ id: { contains: search, mode: 'insensitive' } }, { showtime: { movie: { title: { contains: search, mode: 'insensitive' } } } }, { showtime: { room: { cinema: { name: { contains: search, mode: 'insensitive' } } } } }] } : {}),
+      ...(search
+        ? {
+            OR: [
+              { id: { contains: search, mode: 'insensitive' } },
+              {
+                showtime: {
+                  movie: { title: { contains: search, mode: 'insensitive' } },
+                },
+              },
+              {
+                showtime: {
+                  room: {
+                    cinema: { name: { contains: search, mode: 'insensitive' } },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
       ...(payload ? cursorWhere(payload, 'createdAt') : {}),
     };
     const bookings = await this.prisma.booking.findMany({
       where,
       include: this.bookingInclude,
-      orderBy: direction === 'before' ? [{ createdAt: 'asc' }, { id: 'asc' }] : [{ createdAt: 'desc' }, { id: 'desc' }],
+      orderBy:
+        direction === 'before'
+          ? [{ createdAt: 'asc' }, { id: 'asc' }]
+          : [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
     });
-    const result = buildCursorMeta(bookings, limit, scope, direction, (row) => row.createdAt, Boolean(cursor));
-    return { ...result, data: result.data.map((booking) => toPublicResponse(booking)) };
+    const result = buildCursorMeta(
+      bookings,
+      limit,
+      scope,
+      direction,
+      (row) => row.createdAt,
+      Boolean(cursor),
+    );
+    return {
+      ...result,
+      data: result.data.map((booking) => toPublicResponse(booking)),
+    };
   }
 
   async findOne(userId: string, id: string) {
@@ -428,6 +525,18 @@ export class BookingsService {
         },
       });
 
+      await this.audit?.record(
+        {
+          actor: { id: userId },
+          action: 'BOOKING_CANCELLED',
+          resourceType: 'Booking',
+          resourceId: id,
+          before: { status: BookingStatus.PENDING },
+          after: { status: BookingStatus.CANCELLED },
+          metadata: { source: 'CUSTOMER' },
+        },
+        transaction,
+      );
       return transaction.booking.findUniqueOrThrow({
         where: { id },
         include: this.bookingInclude,
@@ -452,7 +561,10 @@ export class BookingsService {
 
     while (true) {
       const expiredBookings = await this.prisma.booking.findMany({
-        where: { status: BookingStatus.PENDING, expiresAt: { lte: new Date() } },
+        where: {
+          status: BookingStatus.PENDING,
+          expiresAt: { lte: new Date() },
+        },
         select: { id: true },
         orderBy: { expiresAt: 'asc' },
         take: BOOKING_EXPIRY_BATCH_SIZE,
@@ -529,6 +641,17 @@ export class BookingsService {
           heldByBookingId: null,
         },
       });
+      await this.audit?.record(
+        {
+          action: 'BOOKING_EXPIRED',
+          resourceType: 'Booking',
+          resourceId: id,
+          before: { status: BookingStatus.PENDING },
+          after: { status: BookingStatus.EXPIRED },
+          metadata: { source: 'EXPIRY' },
+        },
+        transaction,
+      );
       return true;
     });
 

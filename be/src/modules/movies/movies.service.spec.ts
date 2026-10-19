@@ -2,6 +2,13 @@ import { MovieStatus } from '@prisma/client';
 import { MoviesService } from './movies.service.js';
 import { TmdbClient } from './tmdb.client.js';
 
+function withTransaction<T extends object>(prisma: T) {
+  return {
+    $transaction: async (callback: (client: T) => unknown) => callback(prisma),
+    ...prisma,
+  };
+}
+
 describe('MoviesService TMDB import', () => {
   it('normalizes TMDB results and marks imported movies', async () => {
     const prisma = {
@@ -26,22 +33,29 @@ describe('MoviesService TMDB import', () => {
         total_pages: 1,
         total_results: 1,
       }),
-      image: vi.fn((path: string | null, size: string) => path ? `${size}${path}` : null),
+      image: vi.fn((path: string | null, size: string) =>
+        path ? `${size}${path}` : null,
+      ),
     };
-    const service = new MoviesService(prisma as never, tmdb as never);
+    const service = new MoviesService(
+      withTransaction(prisma) as never,
+      tmdb as never,
+    );
 
     await expect(service.findTmdb({ page: 1 })).resolves.toEqual({
-      data: [{
-        tmdbId: 10,
-        title: 'Dune: Part Two',
-        description: 'A desert story',
-        posterUrl: 'w500/poster.jpg',
-        backdropUrl: 'w1280/backdrop.jpg',
-        releaseDate: '2024-02-27',
-        rating: 8.7,
-        imported: true,
-        importedMovieId: 'movie-1',
-      }],
+      data: [
+        {
+          tmdbId: 10,
+          title: 'Dune: Part Two',
+          description: 'A desert story',
+          posterUrl: 'w500/poster.jpg',
+          backdropUrl: 'w1280/backdrop.jpg',
+          releaseDate: '2024-02-27',
+          rating: 8.7,
+          imported: true,
+          importedMovieId: 'movie-1',
+        },
+      ],
       meta: { page: 1, pageSize: 1, total: 1, totalPages: 1 },
     });
   });
@@ -96,15 +110,30 @@ describe('MoviesService TMDB import', () => {
         title: 'Dune: Part Two',
         videos: {
           results: [
-            { key: 'en-official', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'en' },
-            { key: 'vi-official', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'vi' },
+            {
+              key: 'en-official',
+              site: 'YouTube',
+              type: 'Trailer',
+              official: true,
+              iso_639_1: 'en',
+            },
+            {
+              key: 'vi-official',
+              site: 'YouTube',
+              type: 'Trailer',
+              official: true,
+              iso_639_1: 'vi',
+            },
           ],
         },
       }),
       image: vi.fn().mockReturnValue(null),
       trailerKey: TmdbClient.prototype.trailerKey,
     };
-    const service = new MoviesService(prisma as never, tmdb as never);
+    const service = new MoviesService(
+      withTransaction(prisma) as never,
+      tmdb as never,
+    );
 
     await expect(service.importTmdbMovie(20)).resolves.toMatchObject({
       imported: true,
@@ -135,7 +164,10 @@ describe('MoviesService TMDB import', () => {
       },
     };
     const tmdb = { movie: vi.fn() };
-    const service = new MoviesService(prisma as never, tmdb as never);
+    const service = new MoviesService(
+      withTransaction(prisma) as never,
+      tmdb as never,
+    );
 
     await expect(service.importTmdbMovie(10)).resolves.toMatchObject({
       imported: false,
@@ -175,12 +207,27 @@ describe('MoviesService TMDB import', () => {
         id: 10,
         poster_path: '/new-poster.jpg',
         backdrop_path: null,
-        videos: { results: [{ key: 'newTrailer', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'vi' }] },
+        videos: {
+          results: [
+            {
+              key: 'newTrailer',
+              site: 'YouTube',
+              type: 'Trailer',
+              official: true,
+              iso_639_1: 'vi',
+            },
+          ],
+        },
       }),
-      image: vi.fn((path: string | null, size: string) => path ? `${size}${path}` : null),
+      image: vi.fn((path: string | null, size: string) =>
+        path ? `${size}${path}` : null,
+      ),
       trailerKey: TmdbClient.prototype.trailerKey,
     };
-    const service = new MoviesService(prisma as never, tmdb as never);
+    const service = new MoviesService(
+      withTransaction(prisma) as never,
+      tmdb as never,
+    );
 
     await expect(service.resyncTmdbMovie(10)).resolves.toMatchObject({
       title: 'Tên phim đã biên tập',
@@ -212,7 +259,14 @@ describe('MoviesService TMDB import', () => {
       },
     };
     const tmdb = {
-      movie: vi.fn().mockResolvedValue({ id: 10, poster_path: null, backdrop_path: null, videos: { results: [] } }),
+      movie: vi
+        .fn()
+        .mockResolvedValue({
+          id: 10,
+          poster_path: null,
+          backdrop_path: null,
+          videos: { results: [] },
+        }),
       image: vi.fn().mockReturnValue(null),
       trailerKey: vi.fn().mockReturnValue(null),
     };
