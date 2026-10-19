@@ -6419,6 +6419,14 @@
           "invitedById": {
             "type": "string"
           },
+          "invitedByEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "invitedByName": {
+            "type": "string",
+            "nullable": true
+          },
           "acceptedById": {
             "type": "string",
             "nullable": true
@@ -6465,6 +6473,8 @@
           "email",
           "permissions",
           "invitedById",
+          "invitedByEmail",
+          "invitedByName",
           "acceptedById",
           "status",
           "emailStatus",
@@ -6534,6 +6544,14 @@
           "invitedById": {
             "type": "string"
           },
+          "invitedByEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "invitedByName": {
+            "type": "string",
+            "nullable": true
+          },
           "acceptedById": {
             "type": "string",
             "nullable": true
@@ -6580,6 +6598,8 @@
           "email",
           "permissions",
           "invitedById",
+          "invitedByEmail",
+          "invitedByName",
           "acceptedById",
           "status",
           "emailStatus",

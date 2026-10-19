@@ -298,6 +298,8 @@ Definition of done:
 
 #### Invitation audit follow-up
 
+- Invitation UI follow-up: show inviter name/email and separate SMTP delivery status; normalize PROCESSING to PENDING, poll visible list every 10 seconds, and allow expired invitations to be resent/revoked. Add focus trap/Escape/focus restoration, native email validation, review-step error alerts and keyboard/browser regressions. Browser resend-success uses a mocked response; real cooldown/revoke use the isolated API and real resend token rotation remains covered by integration.
+
 - 2026-10-18 browser verification: added `tests/browser/admin-invitations.spec.ts` and ran the isolated Mailpit/full-stack suite successfully (14/14). The test creates the invitation through UI, extracts the full URL from SMTP-delivered email, checks its origin against configured frontend URL, accepts and logs in through UI, checks allowed `VIEW_SYSTEM` (200), denied user management (403), and consumed token rejection (401). `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` supports an existing local Chromium installation without changing CI defaults.
 - Source coverage review still finds missing audit writes in room/seat/showtime mutations and partial movie/cinema/payment coverage. Browser invitation success does not close these gaps or complete Sprint 7.
 

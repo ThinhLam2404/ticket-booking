@@ -37,6 +37,12 @@ export class AdminInvitationResponseDto {
   invitedById!: string;
 
   @ApiProperty({ type: String, nullable: true })
+  invitedByEmail!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  invitedByName!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
   acceptedById!: string | null;
 
   @ApiProperty({ enum: ['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED'] })

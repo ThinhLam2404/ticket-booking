@@ -347,6 +347,9 @@ textarea { min-height: 110px; line-height: 1.55; resize: vertical; }
 .admin-invitation-row > div:first-child { display: grid; gap: 5px; min-width: 0; }
 .admin-invitation-row strong { color: var(--text); overflow-wrap: anywhere; }
 .admin-invitation-row small { color: var(--muted); font-size: .7rem; line-height: 1.4; }
+.admin-invitation-row small { overflow-wrap: anywhere; }
+.admin-invitation-row .email-failed { color: var(--danger-text); }
+.admin-invitation-row .email-sent { color: var(--success-text); }
 .admin-invitation-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 7px; }
 .invitation-permission-field { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; }
 .invitation-permission-field legend { padding: 0 5px; color: var(--secondary); font-size: .72rem; font-weight: 700; }

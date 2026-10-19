@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useDialogFocus } from '../../../components/useDialogFocus';
 import { api } from '../../../api';
 import type { AdminInvitation } from '../../../types';
 import { EmptyState, ErrorState, LoadingState } from '../../../components/ui';
@@ -25,7 +26,7 @@ export function AdminUsersPage() {
   const [invitationsVisible, setInvitationsVisible] = useState(false);
   const [invitationSearch, setInvitationSearch] = useState('');
   const client = useQueryClient();
-  const invitations = useQuery({ queryKey: ['admin-invitations', invitationSearch], queryFn: () => api.adminInvitations(invitationSearch), enabled: invitationsVisible });
+  const invitations = useQuery({ queryKey: ['admin-invitations', invitationSearch], queryFn: () => api.adminInvitations(invitationSearch), enabled: invitationsVisible, refetchInterval: invitationsVisible ? 10000 : false });
   const invitationMutation = useMutation({
     mutationFn: (body: { email: string; permissions: Permission[] }) => api.createAdminInvitation(body),
     onSuccess: () => { setInvitationOpen(false); setNotice('Đã tạo lời mời quản trị. Email đang được gửi.'); void client.invalidateQueries({ queryKey: ['admin-invitations'] }); },
@@ -68,7 +69,7 @@ export function AdminUsersPage() {
   }
 
   return <AdminPage>
-    <div className="admin-page-header"><div><p className="eyebrow">ACCESS CONTROL</p><h1>Người dùng & quyền truy cập</h1><p className="admin-page-lede">Thay đổi chỉ được gửi lên máy chủ sau khi bạn xác nhận.</p></div><button className="primary" type="button" onClick={() => { setError(''); setNotice(''); setInvitationOpen(true); }}>Mời quản trị viên</button></div>
+    <div className="admin-page-header"><div><p className="eyebrow">ACCESS CONTROL</p><h1>Người dùng & quyền truy cập</h1><p className="admin-page-lede">Thay đổi chỉ được gửi lên máy chủ sau khi bạn xác nhận.</p></div><button className="primary" type="button" onClick={() => { invitationMutation.reset(); setError(''); setNotice(''); setInvitationOpen(true); }}>Mời quản trị viên</button></div>
     <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo email hoặc họ tên…" aria-label="Tìm người dùng" />
     {notice && <p className="form-success" role="status" aria-live="polite">{notice}</p>}
     {error && !confirm && <p className="form-error" role="alert">{error}</p>}
@@ -95,14 +96,35 @@ export function AdminUsersPage() {
 }
 
 function InvitationRow({ invitation, busy, onAction }: { invitation: AdminInvitation; busy: boolean; onAction: (action: 'resend' | 'revoke') => void }) {
-  return <article className="admin-invitation-row"><div><strong>{invitation.email}</strong><small>{invitation.permissions.map((permission) => permissionText[permission] ?? permission).join(' · ')}</small><small>Tạo: {formatDate(invitation.createdAt)} · Hết hạn: {formatDate(invitation.expiresAt)}</small></div><div className="admin-invitation-actions"><span className={`status-chip invitation-${invitation.status.toLowerCase()}`}>{invitation.status === 'PENDING' ? 'Chờ chấp nhận' : invitation.status === 'ACCEPTED' ? 'Đã chấp nhận' : invitation.status === 'REVOKED' ? 'Đã thu hồi' : 'Đã hết hạn'}</span>{invitation.status === 'PENDING' && <><button className="secondary btn-sm" type="button" disabled={busy} onClick={() => onAction('resend')}>Gửi lại</button><button className="danger btn-sm" type="button" disabled={busy} onClick={() => onAction('revoke')}>Thu hồi</button></>}</div></article>;
+  const emailLabels = { PENDING: 'Đang chờ gửi', SENT: 'Đã gửi', FAILED: 'Gửi thất bại', UNKNOWN: 'Chưa có thông tin' };
+  return <article className="admin-invitation-row" aria-label={`Lời mời ${invitation.email}`}><div><strong>{invitation.email}</strong><small>{invitation.permissions.map((permission) => permissionText[permission] ?? permission).join(' · ')}</small><small>Người mời: {invitation.invitedByName ?? 'Quản trị viên'} · {invitation.invitedByEmail ?? invitation.invitedById}</small><small>Tạo: {formatDate(invitation.createdAt)} · Hết hạn: {formatDate(invitation.expiresAt)}</small><small className={`invitation-email-status email-${invitation.emailStatus.toLowerCase()}`}>Email: {emailLabels[invitation.emailStatus]}</small></div><div className="admin-invitation-actions"><span className={`status-chip invitation-${invitation.status.toLowerCase()}`}>{invitation.status === 'PENDING' ? 'Chờ chấp nhận' : invitation.status === 'ACCEPTED' ? 'Đã chấp nhận' : invitation.status === 'REVOKED' ? 'Đã thu hồi' : 'Đã hết hạn'}</span>{(invitation.status === 'PENDING' || invitation.status === 'EXPIRED') && <><button className="secondary btn-sm" type="button" disabled={busy} onClick={() => onAction('resend')}>Gửi lại</button><button className="danger btn-sm" type="button" disabled={busy} onClick={() => onAction('revoke')}>Thu hồi</button></>}</div></article>;
 }
 
 function InvitationDialog({ loading, error, onClose, onSubmit }: { loading: boolean; error?: string; onClose: () => void; onSubmit: (body: { email: string; permissions: Permission[] }) => void }) {
   const [email, setEmail] = useState('');
   const [selected, setSelected] = useState<Permission[]>([]);
   const [review, setReview] = useState(false);
-  return <div className="modal-backdrop" role="presentation"><div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="invitation-dialog-title"><button className="modal-close" type="button" aria-label="Đóng" onClick={onClose}>×</button><p className="eyebrow">MỜI THÀNH VIÊN</p><h2 id="invitation-dialog-title">{review ? 'Xác nhận lời mời' : 'Mời quản trị viên'}</h2>{review ? <div className="admin-copy"><p>Bạn sắp gửi lời mời quản trị đến <strong>{email}</strong>.</p><ul className="admin-confirm-list">{selected.map((permission) => <li key={permission}>{permissionText[permission]}</li>)}</ul><p>Liên kết trong email có hiệu lực 24 giờ và chỉ sử dụng được một lần.</p><div className="form-actions"><button className="secondary" type="button" disabled={loading} onClick={() => setReview(false)}>Quay lại</button><button className="primary" type="button" disabled={loading} onClick={() => onSubmit({ email: email.trim(), permissions: selected })}>{loading ? 'Đang gửi…' : 'Xác nhận và gửi'}</button></div></div> : <div className="admin-form"><label className="admin-field admin-field-wide"><span>Email</span><input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="new-admin@example.com" /></label><fieldset className="invitation-permission-field"><legend>Quyền được cấp</legend>{permissions.map((permission) => <label className="admin-checkbox" key={permission}><input type="checkbox" checked={selected.includes(permission)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, permission] : current.filter((item) => item !== permission))} />{permissionText[permission]}</label>)}</fieldset>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary" type="button" disabled={loading} onClick={onClose}>Hủy</button><button className="primary" type="button" disabled={loading || !email.trim() || !selected.length} onClick={() => setReview(true)}>Xem lại lời mời</button></div></div>}</div></div>;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(true, dialogRef, () => { if (!loading) onClose(); });
+  useEffect(() => { dialogRef.current?.querySelector<HTMLButtonElement>('.modal-close')?.focus(); }, [review]);
+  return <div className="modal-backdrop" role="presentation">
+    <div ref={dialogRef} tabIndex={-1} aria-busy={loading} className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="invitation-dialog-title">
+      <button className="modal-close" type="button" aria-label="Đóng" disabled={loading} onClick={onClose}>×</button>
+      <p className="eyebrow">MỜI THÀNH VIÊN</p>
+      <h2 id="invitation-dialog-title">{review ? 'Xác nhận lời mời' : 'Mời quản trị viên'}</h2>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {review ? <div className="admin-copy">
+        <p>Bạn sắp gửi lời mời quản trị đến <strong>{email}</strong>.</p>
+        <ul className="admin-confirm-list">{selected.map((permission) => <li key={permission}>{permissionText[permission]}</li>)}</ul>
+        <p>Liên kết trong email có hiệu lực 24 giờ và chỉ sử dụng được một lần.</p>
+        <div className="form-actions"><button className="secondary" type="button" disabled={loading} onClick={() => setReview(false)}>Quay lại</button><button className="primary" type="button" disabled={loading} onClick={() => onSubmit({ email: email.trim(), permissions: selected })}>{loading ? 'Đang gửi…' : 'Xác nhận và gửi'}</button></div>
+      </div> : <form className="admin-form" onSubmit={(event) => { event.preventDefault(); setReview(true); }}>
+        <label className="admin-field admin-field-wide"><span>Email</span><input required maxLength={255} type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="new-admin@example.com" /></label>
+        <fieldset className="invitation-permission-field"><legend>Quyền được cấp</legend>{permissions.map((permission) => <label className="admin-checkbox" key={permission}><input type="checkbox" checked={selected.includes(permission)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, permission] : current.filter((item) => item !== permission))} />{permissionText[permission]}</label>)}</fieldset>
+        <div className="form-actions"><button className="secondary" type="button" disabled={loading} onClick={onClose}>Hủy</button><button className="primary" type="submit" disabled={loading || !email.trim() || !selected.length}>Xem lại lời mời</button></div>
+      </form>}
+    </div>
+  </div>;
 }
 
 function UserRow({ user, busy, onSave }: { user: Awaited<ReturnType<typeof api.adminUsers>>[number]; busy: boolean; onSave: (draft: UserDraft) => void }) {

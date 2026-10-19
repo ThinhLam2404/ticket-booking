@@ -1,5 +1,70 @@
 import { expect, test } from '@playwright/test';
 
+test('invitation list, keyboard focus, resend errors and revoke confirmation @mobile', async ({ page, request }) => {
+  test.skip(!process.env.PLAYWRIGHT_FULL_STACK, 'Requires isolated full-stack runner');
+  const api = process.env.PLAYWRIGHT_API_URL!;
+  const login = await request.post(`${api}/auth/login`, { data: { email: 'browser.admin@example.com', password: 'Password123!' } });
+  const auth = await login.json();
+  const email = `actions-${Date.now()}@example.com`;
+  const created = await request.post(`${api}/users/admin/invitations`, { headers: { Authorization: `Bearer ${auth.accessToken}` }, data: { email, permissions: ['VIEW_SYSTEM'] } });
+  expect(created.status()).toBe(201);
+  const invitation = await created.json();
+  await page.addInitScript((value) => { localStorage.setItem('ticket_booking_refresh_token', value.refreshToken); localStorage.setItem('ticket_booking_user', JSON.stringify(value.user)); }, auth);
+  await page.goto('/admin/users');
+  const opener = page.getByRole('button', { name: 'Mời quản trị viên', exact: true });
+  await opener.click();
+  const dialog = page.getByRole('dialog');
+  const close = dialog.getByRole('button', { name: 'Đóng', exact: true });
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: 'Hủy', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  await page.route('**/users/admin/invitations', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    await route.fulfill({ status: 500, json: { statusCode: 500, code: 'INTERNAL_ERROR', message: 'Test failure' } });
+  });
+  await opener.click();
+  await dialog.getByLabel('Email', { exact: true }).fill('error@example.com');
+  await dialog.getByLabel('Xem hệ thống', { exact: true }).check();
+  await dialog.getByRole('button', { name: 'Xem lại lời mời' }).click();
+  await dialog.getByRole('button', { name: 'Xác nhận và gửi' }).click();
+  await expect(dialog.getByRole('alert')).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Xác nhận lời mời' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.unroute('**/users/admin/invitations');
+  await page.getByRole('button', { name: 'Xem lời mời', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  const row = page.getByRole('article', { name: `Lời mời ${email}`, exact: true });
+  await expect(row).toContainText('browser.admin@example.com');
+  await expect(row).toContainText('Email:');
+  await row.getByRole('button', { name: 'Gửi lại' }).click();
+  const confirm = page.getByRole('alertdialog');
+  await confirm.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(confirm).toContainText('Dữ liệu đang có xung đột. Vui lòng kiểm tra lại.');
+  await confirm.getByRole('button', { name: 'Hủy', exact: true }).click();
+  await page.route(`**/users/admin/invitations/${invitation.id}/resend`, (route) => route.fulfill({ status: 201, json: invitation }));
+  await row.getByRole('button', { name: 'Gửi lại' }).click();
+  await confirm.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(confirm).toHaveCount(0);
+  await row.getByRole('button', { name: 'Thu hồi', exact: true }).click();
+  await confirm.getByRole('button', { name: 'Hủy', exact: true }).click();
+  await expect(row).toContainText('Chờ chấp nhận');
+  await row.getByRole('button', { name: 'Thu hồi', exact: true }).click();
+  await confirm.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  await expect(row).toContainText('Đã thu hồi');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('invalid invitation shows a recoverable navigation action', async ({ page }) => {
+  await page.goto('/admin/accept-invitation');
+  await expect(page.getByRole('heading', { name: 'Không thể tiếp tục' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Đến trang đăng nhập' })).toHaveAttribute('href', '/admin/login');
+});
+
 test('invites admin through Mailpit, accepts, logs in and enforces permissions', async ({ page, request, browser }) => {
   test.skip(!process.env.PLAYWRIGHT_FULL_STACK, 'Requires isolated full-stack runner');
   test.setTimeout(60000);

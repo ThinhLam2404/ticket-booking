@@ -37,6 +37,7 @@ export class InvitationsService {
         : {},
       orderBy: { createdAt: 'desc' },
       take: 100,
+      include: { invitedBy: { select: { email: true, fullName: true } } },
     });
     const outbox =
       invitations.length === 0
@@ -376,6 +377,7 @@ export class InvitationsService {
       email: string;
       permissions: AdminPermission[];
       invitedById: string;
+      invitedBy?: { email: string; fullName: string };
       acceptedById: string | null;
       acceptedAt: Date | null;
       revokedAt: Date | null;
@@ -396,10 +398,12 @@ export class InvitationsService {
       email: invitation.email,
       permissions: invitation.permissions,
       invitedById: invitation.invitedById,
+      invitedByEmail: invitation.invitedBy?.email ?? null,
+      invitedByName: invitation.invitedBy?.fullName ?? null,
       acceptedById: invitation.acceptedById,
       status,
       emailStatus:
-        mail?.status ?? (status === 'PENDING' ? 'PENDING' : 'UNKNOWN'),
+        mail?.status === 'PROCESSING' ? 'PENDING' : mail?.status ?? 'UNKNOWN',
       expiresAt: invitation.expiresAt,
       acceptedAt: invitation.acceptedAt,
       revokedAt: invitation.revokedAt,

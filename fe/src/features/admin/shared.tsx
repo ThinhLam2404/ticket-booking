@@ -129,7 +129,7 @@ export function ConfirmDialog({
         <p className="eyebrow">XÁC NHẬN THAO TÁC</p>
         <h2 id="confirm-title">{state.title}</h2>
         <div className="admin-copy">{state.message}</div>
-        {error && <p className="form-error">{error}</p>}
+        {error && <p className="form-error" role="alert">{error}</p>}
         <div className="form-actions">
           <button
             className="secondary"

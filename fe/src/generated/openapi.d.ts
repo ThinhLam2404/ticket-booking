@@ -1348,6 +1348,8 @@ export interface components {
             email: string;
             permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
             invitedById: string;
+            invitedByEmail: string | null;
+            invitedByName: string | null;
             acceptedById: string | null;
             /** @enum {string} */
             status: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
@@ -1376,6 +1378,8 @@ export interface components {
             email: string;
             permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
             invitedById: string;
+            invitedByEmail: string | null;
+            invitedByName: string | null;
             acceptedById: string | null;
             /** @enum {string} */
             status: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
