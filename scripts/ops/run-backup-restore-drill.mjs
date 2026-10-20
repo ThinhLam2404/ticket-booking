@@ -85,8 +85,8 @@ INSERT INTO "Showtime" ("id", "startsAt", "endsAt", "movieId", "roomId", "format
 VALUES ('ops-showtime', NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours', 'ops-movie', 'ops-room', 'TWO_D_SUBTITLED', 100000, 1.10, 1.20, NOW(), NOW());
 INSERT INTO "ShowtimeSeat" ("id", "price", "status", "showtimeId", "seatId")
 VALUES ('ops-showtime-seat', 100000, 'AVAILABLE', 'ops-showtime', 'ops-seat');
-INSERT INTO "Booking" ("id", "status", "totalAmount", "expiresAt", "holdToken", "userId", "showtimeId", "createdAt", "updatedAt")
-VALUES ('ops-booking', 'PENDING', 100000, NOW() + INTERVAL '10 minutes', 'ops-hold-token', 'ops-user', 'ops-showtime', NOW(), NOW());
+INSERT INTO "Booking" ("id", "status", "totalAmount", "ticketSubtotal", "expiresAt", "holdToken", "userId", "showtimeId", "createdAt", "updatedAt")
+VALUES ('ops-booking', 'PENDING', 100000, 100000, NOW() + INTERVAL '10 minutes', 'ops-hold-token', 'ops-user', 'ops-showtime', NOW(), NOW());
 UPDATE "ShowtimeSeat" SET "status" = 'HELD', "heldByBookingId" = 'ops-booking', "heldUntil" = NOW() + INTERVAL '10 minutes' WHERE "id" = 'ops-showtime-seat';
 INSERT INTO "Payment" ("id", "provider", "reference", "status", "amount", "bookingId", "createdAt", "updatedAt")
 VALUES ('ops-payment', 'SEPAY', 'OPS-DRILL', 'PENDING', 100000, 'ops-booking', NOW(), NOW());
@@ -99,7 +99,7 @@ SELECT concat(
   (SELECT count(*) FROM "Booking" WHERE "id" = 'ops-booking'), ':',
   (SELECT count(*) FROM "Payment" WHERE "bookingId" = 'ops-booking'), ':',
   (SELECT count(*) FROM "MailOutbox" WHERE "dedupeKey" = 'OPS-DRILL'), ':',
-  (SELECT "totalAmount"::text FROM "Booking" WHERE "id" = 'ops-booking')
+  (SELECT concat("totalAmount"::text, ':', "ticketSubtotal"::text, ':', "comboSubtotal"::text, ':', "discountAmount"::text, ':', "pricingVersion") FROM "Booking" WHERE "id" = 'ops-booking')
 );
 `;
 
@@ -206,7 +206,7 @@ try {
   );
   if (
     sourceChecksum !== targetChecksum ||
-    targetChecksum !== "1:1:1:100000.00"
+    targetChecksum !== "1:1:1:100000.00:100000.00:0.00:0.00:1"
   ) {
     throw new Error(
       `Restore verification failed: source=${sourceChecksum} target=${targetChecksum}`,
