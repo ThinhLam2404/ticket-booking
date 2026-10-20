@@ -531,6 +531,18 @@ export class BookingResponseDto {
   @ApiProperty({ example: '200000.00' })
   totalAmount!: string;
 
+  @ApiProperty({ example: '200000.00' })
+  ticketSubtotal!: string;
+
+  @ApiProperty({ example: '0.00' })
+  comboSubtotal!: string;
+
+  @ApiProperty({ example: '0.00' })
+  discountAmount!: string;
+
+  @ApiProperty({ example: 1, minimum: 1 })
+  pricingVersion!: number;
+
   @ApiProperty({ example: '2026-09-07T10:10:00.000Z', format: 'date-time' })
   expiresAt!: string;
 

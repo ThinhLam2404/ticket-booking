@@ -57,6 +57,12 @@ Query dùng `limit` từ `1` đến `100` (mặc định `20`) và một trong h
 
 Booking và ticket sort theo `createdAt DESC, id DESC`. SePay sort theo `transactionDate DESC, id DESC`; mọi query dùng `limit + 1` để xác định trang kế tiếp. Filter/search chạy trong backend trước keyset predicate. Migration `20261015090000_sprint5_cursor_indexes` thêm composite indexes cho ownership/status và keyset sort; chạy `npm run prisma:deploy` trước khi release. Movies/showtimes vẫn giữ offset pagination ở Sprint 5.
 
+## Voucher và combo — nền tảng tính tiền (đang triển khai)
+
+- Giai đoạn A bổ sung `Booking.ticketSubtotal`, `comboSubtotal`, `discountAmount`, `pricingVersion`; `totalAmount` vẫn là số tiền thực thanh toán. Migration `20261019100000_booking_price_breakdown` backfill tiền vé bằng tổng tiền lịch sử, combo/giảm giá bằng 0 và version bằng 1, không tính lại từ giá ghế hiện tại. Chạy `npm run prisma:generate` và `npm run prisma:deploy` trước khi dùng backend mới. Không chạy đồng thời backend cũ trong lúc rollout: phiên bản cũ chưa ghi trường ticketSubtotal bắt buộc.
+- Database kiểm tra tổng tiền cân bằng, các thành phần không âm, giảm giá không vượt tạm tính và version dương. `booking-pricing.ts` tính bằng Decimal, hỗ trợ arithmetic cho giá combo và fixed/percent theo phần vé/combo/toàn đơn; giảm giá làm tròn xuống đến đồng, giới hạn theo phần được giảm và mức tối đa. Đây chỉ là nền tính toán nội bộ, chưa phải API voucher, chưa giữ quota và chưa mở đơn miễn phí qua SePay.
+- Hold mới lưu snapshot vé cùng các thành phần tiền; API booking trả các trường mới, checkout tiếp tục thu `totalAmount`. Test migration/backfill và constraint qua `npm run test:integration`, test arithmetic qua `npm test`. Các bước tiếp theo: catalog combo theo rạp, chọn combo và khóa nội dung sau checkout, voucher reservation/consumption, UI/admin/email. Hiện chưa có combo/voucher cho người dùng thao tác.
+
 ## Sprint 7 — Session, RBAC, audit và lời mời quản trị (đang triển khai)
 
 ### Phạm vi audit đã rà soát

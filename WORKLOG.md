@@ -294,6 +294,10 @@ Definition of done:
 - Regression quan trọng không phụ thuộc dữ liệu development thủ công.
 - CI chặn merge khi test/API artifact/security check thất bại.
 
+### Voucher/combo — giai đoạn A: nền tính tiền
+
+- Added persisted booking ticket/combo/discount subtotals and pricingVersion, SQL historical backfill and balance/non-negative/version constraints. Hold uses a Decimal-based pricing calculator; payment still uses the unchanged payable total. Generated booking API fields. Unit coverage covers scopes, caps, rounding and invalid money/quantities; integration covers historical migration and persisted constraints/payment parity. No voucher/combo endpoints or UI yet; subsequent phases remain open. Deploy migration before new backend; old backend cannot write the new required subtotal and must not run concurrently during rollout.
+
 ### Sprint 7 — Account, RBAC và audit log
 
 #### Invitation audit follow-up

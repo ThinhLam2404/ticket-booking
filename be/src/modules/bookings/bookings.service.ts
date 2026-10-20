@@ -1,4 +1,5 @@
 import { AuditService } from '../audit/audit.service.js';
+import { calculateBookingPrice } from './booking-pricing.js';
 import {
   Optional,
   ConflictException,
@@ -287,15 +288,14 @@ export class BookingsService {
             );
           }
 
-          const totalAmount = availableSeats.reduce(
-            (total, seat) => total.plus(seat.price),
-            new Prisma.Decimal(0),
-          );
+          const pricing = calculateBookingPrice({
+            ticketPrices: availableSeats.map((seat) => seat.price),
+          });
           const createdBooking = await transaction.booking.create({
             data: {
               userId,
               showtimeId: dto.showtimeId,
-              totalAmount,
+              ...pricing,
               expiresAt,
               holdToken,
               requestHash,

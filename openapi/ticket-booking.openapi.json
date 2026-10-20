@@ -8908,6 +8908,23 @@
             "type": "string",
             "example": "200000.00"
           },
+          "ticketSubtotal": {
+            "type": "string",
+            "example": "200000.00"
+          },
+          "comboSubtotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "discountAmount": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "pricingVersion": {
+            "type": "number",
+            "example": 1,
+            "minimum": 1
+          },
           "expiresAt": {
             "type": "string",
             "example": "2026-09-07T10:10:00.000Z",
@@ -8954,6 +8971,10 @@
           "id",
           "status",
           "totalAmount",
+          "ticketSubtotal",
+          "comboSubtotal",
+          "discountAmount",
+          "pricingVersion",
           "expiresAt",
           "userId",
           "showtimeId",

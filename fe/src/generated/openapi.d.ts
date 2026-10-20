@@ -2459,6 +2459,14 @@ export interface components {
             status: "PENDING" | "CONFIRMED" | "CANCELLED" | "EXPIRED";
             /** @example 200000.00 */
             totalAmount: string;
+            /** @example 200000.00 */
+            ticketSubtotal: string;
+            /** @example 0.00 */
+            comboSubtotal: string;
+            /** @example 0.00 */
+            discountAmount: string;
+            /** @example 1 */
+            pricingVersion: number;
             /**
              * Format: date-time
              * @example 2026-09-07T10:10:00.000Z
