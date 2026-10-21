@@ -1,0 +1,1 @@
+{"statusCode":401,"code":"AUTH_INVALID_CREDENTIALS","message":"Invalid email or password","details":[],"path":"/api/v1/auth/login","requestId":"req_8926393c-3b69-445b-8d22-24f75b6765fb","timestamp":"2026-10-21T11:10:08.092Z"}

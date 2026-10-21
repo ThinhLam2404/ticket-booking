@@ -20,14 +20,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/locations/provinces": {
+    "/api/v1/combos/cinemas/{cinemaId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["Locations_listProvinces"];
+        get: operations["Combos_menu"];
         put?: never;
         post?: never;
         delete?: never;
@@ -36,14 +36,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/health": {
+    "/api/v1/combos/admin/cinemas/{cinemaId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["Health_liveness"];
+        get: operations["Combos_adminMenu"];
         put?: never;
         post?: never;
         delete?: never;
@@ -52,15 +52,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/health/ready": {
+    "/api/v1/combos/admin": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["Health_readiness"];
+        get: operations["Combos_list"];
         put?: never;
+        post: operations["Combos_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/combos/admin/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Combos_update"];
+        trace?: never;
+    };
+    "/api/v1/combos/admin/cinemas/{cinemaId}/{comboId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Combos_setMenu"];
         post?: never;
         delete?: never;
         options?: never;
@@ -366,6 +398,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["Invitations_revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/provinces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Locations_listProvinces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Health_liveness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Health_readiness"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1128,36 +1208,49 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        ProvinceResponseDto: {
-            /** @example 79 */
-            code: number;
-            /** @example Thành phố Hồ Chí Minh */
+        ComboResponseDto: {
+            id: string;
             name: string;
-            /** @example ho_chi_minh */
-            codename: string;
+            description: string;
+            imageUrl: string | null;
+            active: boolean;
         };
-        HealthResponseDto: {
-            /**
-             * @example ok
-             * @enum {string}
-             */
-            status: "ok" | "degraded";
-            /** @example ticket-booking-api */
-            service?: string;
-            /** @example 123.45 */
-            uptime?: number;
-            /**
-             * @example {
-             *       "database": "up",
-             *       "redis": "up"
-             *     }
-             */
-            checks?: Record<string, never>;
-            /**
-             * Format: date-time
-             * @example 2026-09-07T10:00:00.000Z
-             */
-            timestamp: string;
+        CinemaComboResponseDto: {
+            id: string;
+            cinemaId: string;
+            comboId: string;
+            /** @example 99000.00 */
+            price: string;
+            active: boolean;
+            combo: components["schemas"]["ComboResponseDto"];
+        };
+        CreateComboDto: {
+            name: string;
+            description: string;
+            imageUrl?: string;
+            active?: boolean;
+        };
+        UpdateComboDto: {
+            name?: string;
+            description?: string;
+            imageUrl?: string;
+            active?: boolean;
+        };
+        CinemaComboDto: {
+            /** @example 99000 */
+            price: number;
+            active?: boolean;
+        };
+        PreviewAdminInvitationDto: {
+            /** @example invitation-token */
+            token: string;
+        };
+        AdminInvitationPreviewResponseDto: {
+            /** Format: email */
+            email: string;
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
+            /** Format: date-time */
+            expiresAt: string;
         };
         ApiErrorResponseDto: {
             /** @example 409 */
@@ -1177,17 +1270,6 @@ export interface components {
              * @example 2026-09-07T10:00:00.000Z
              */
             timestamp: string;
-        };
-        PreviewAdminInvitationDto: {
-            /** @example invitation-token */
-            token: string;
-        };
-        AdminInvitationPreviewResponseDto: {
-            /** Format: email */
-            email: string;
-            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
-            /** Format: date-time */
-            expiresAt: string;
         };
         AcceptAdminInvitationDto: {
             /** @example invitation-token */
@@ -1346,7 +1428,7 @@ export interface components {
             id: string;
             /** Format: email */
             email: string;
-            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
             invitedById: string;
             invitedByEmail: string | null;
             invitedByName: string | null;
@@ -1370,13 +1452,13 @@ export interface components {
              * @example new-admin@example.com
              */
             email: string;
-            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
         };
         AdminInvitationMutationResponseDto: {
             id: string;
             /** Format: email */
             email: string;
-            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
             invitedById: string;
             invitedByEmail: string | null;
             invitedByName: string | null;
@@ -1394,6 +1476,37 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        ProvinceResponseDto: {
+            /** @example 79 */
+            code: number;
+            /** @example Thành phố Hồ Chí Minh */
+            name: string;
+            /** @example ho_chi_minh */
+            codename: string;
+        };
+        HealthResponseDto: {
+            /**
+             * @example ok
+             * @enum {string}
+             */
+            status: "ok" | "degraded";
+            /** @example ticket-booking-api */
+            service?: string;
+            /** @example 123.45 */
+            uptime?: number;
+            /**
+             * @example {
+             *       "database": "up",
+             *       "redis": "up"
+             *     }
+             */
+            checks?: Record<string, never>;
+            /**
+             * Format: date-time
+             * @example 2026-09-07T10:00:00.000Z
+             */
+            timestamp: string;
+        };
         AdminUserResponseDto: {
             id: string;
             email: string;
@@ -1402,7 +1515,7 @@ export interface components {
             role: "CUSTOMER" | "ADMIN";
             /** Format: date-time */
             disabledAt: Record<string, never> | null;
-            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
             activeSessionCount: number;
             /** Format: date-time */
             createdAt: string;
@@ -1429,7 +1542,7 @@ export interface components {
             role?: "CUSTOMER" | "ADMIN";
             /** @example false */
             disabled?: boolean;
-            permissions?: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS")[];
+            permissions?: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
         };
         MovieResponseDto: {
             /** @example clx-movie-id */
@@ -2374,7 +2487,12 @@ export interface components {
              */
             coupleMultiplier?: number;
         };
+        ComboSelectionDto: {
+            cinemaComboId: string;
+            quantity: number;
+        };
         CreateBookingDto: {
+            combos?: components["schemas"]["ComboSelectionDto"][];
             /** @example clx123showtime */
             showtimeId: string;
             /**
@@ -2384,6 +2502,15 @@ export interface components {
              *     ]
              */
             showtimeSeatIds: string[];
+        };
+        BookingComboItemResponseDto: {
+            id: string;
+            cinemaComboId: string;
+            name: string;
+            description: string;
+            /** @example 99000.00 */
+            unitPrice: string;
+            quantity: number;
         };
         TicketSummaryResponseDto: {
             /** @example clx-ticket-id */
@@ -2467,6 +2594,7 @@ export interface components {
             discountAmount: string;
             /** @example 1 */
             pricingVersion: number;
+            comboItems: components["schemas"]["BookingComboItemResponseDto"][];
             /**
              * Format: date-time
              * @example 2026-09-07T10:10:00.000Z
@@ -2736,11 +2864,13 @@ export interface operations {
             };
         };
     };
-    Locations_listProvinces: {
+    Combos_menu: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                cinemaId: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -2750,16 +2880,18 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProvinceResponseDto"][];
+                    "application/json": components["schemas"]["CinemaComboResponseDto"][];
                 };
             };
         };
     };
-    Health_liveness: {
+    Combos_adminMenu: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                cinemaId: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -2769,12 +2901,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HealthResponseDto"];
+                    "application/json": components["schemas"]["CinemaComboResponseDto"][];
                 };
             };
         };
     };
-    Health_readiness: {
+    Combos_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -2788,15 +2920,81 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HealthResponseDto"];
+                    "application/json": components["schemas"]["ComboResponseDto"][];
                 };
             };
-            503: {
+        };
+    };
+    Combos_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateComboDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                    "application/json": components["schemas"]["ComboResponseDto"];
+                };
+            };
+        };
+    };
+    Combos_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateComboDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboResponseDto"];
+                };
+            };
+        };
+    };
+    Combos_setMenu: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cinemaId: string;
+                comboId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CinemaComboDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CinemaComboResponseDto"];
                 };
             };
         };
@@ -3558,6 +3756,71 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Locations_listProvinces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvinceResponseDto"][];
+                };
+            };
+        };
+    };
+    Health_liveness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponseDto"];
+                };
+            };
+        };
+    };
+    Health_readiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponseDto"];
+                };
+            };
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

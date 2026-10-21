@@ -227,6 +227,7 @@ async function renderOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
         include: { showtimeSeat: { include: { seat: true } }, ticket: true },
       },
       tickets: true,
+      comboItems: true,
     },
   });
   if (!booking || booking.status !== 'CONFIRMED')
@@ -251,6 +252,7 @@ async function renderOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
     appUrl: data.publicAppUrl,
     bookingId: booking.id,
     totalAmount: booking.totalAmount.toString(),
+    combos: booking.comboItems.map((item) => ({ name: item.name, quantity: item.quantity, unitPrice: item.unitPrice.toString() })),
     movieTitle: booking.showtime.movie.title,
     cinemaName: booking.showtime.room.cinema.name,
     cinemaAddress: booking.showtime.room.cinema.address,

@@ -296,6 +296,12 @@ Definition of done:
 
 ### Voucher/combo — giai đoạn A: nền tính tiền
 
+- Payment scope correction: removed combo-related checkout/refund row locks and their test mock; SepayService is unchanged from the pre-combo implementation. Booking computes the immutable total, payment consumes that total. Existing transactional payment audit and refund safeguards remain intact.
+
+- CI follow-up: GitHub Actions run #30 (`39427530868`) quality/integration passed but backup/restore drill failed. Reproduced locally: raw SQL fixture omitted required ticketSubtotal. Updated fixture and restore checksum to verify full booking price breakdown/version; isolated drill now passes. No remote rerun/push performed.
+
+- B1 corrected scope: catalog and cinema-specific offers with MANAGE_COMBOS; combo selection is submitted only with initial booking hold. Booking/ticket contents are immutable thereafter. Removed replaceSelection/update endpoint, fulfillment endpoint, FULFILL_COMBOS and comboFulfilledAt from the unshipped B1 migration/schema/contracts. Counter staff handle delivery outside the app; no delivery-based refund guard is claimed. Booking creation snapshots combo price/name/contents with seats and audit atomically; idempotency includes canonical combo IDs/quantities while preserving old ticket-only hashes. Tests cover initial purchase, snapshots, invalid selections, rollback, retry/content conflicts, canonical ordering, removed routes and combined-payment refund. No FE combo screens, standalone combo orders or browser combo journey yet; B2 remains open.
+
 - Added persisted booking ticket/combo/discount subtotals and pricingVersion, SQL historical backfill and balance/non-negative/version constraints. Hold uses a Decimal-based pricing calculator; payment still uses the unchanged payable total. Generated booking API fields. Unit coverage covers scopes, caps, rounding and invalid money/quantities; integration covers historical migration and persisted constraints/payment parity. No voucher/combo endpoints or UI yet; subsequent phases remain open. Deploy migration before new backend; old backend cannot write the new required subtotal and must not run concurrently during rollout.
 
 ### Sprint 7 — Account, RBAC và audit log

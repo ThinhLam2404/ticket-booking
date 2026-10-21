@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CombosModule } from './modules/combos/combos.module.js';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller.js';
@@ -27,6 +28,7 @@ import { AuditModule } from './modules/audit/audit.module.js';
 
 @Module({
   imports: [
+    CombosModule,
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnvironment,

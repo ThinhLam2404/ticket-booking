@@ -1,0 +1,158 @@
+{"version":10,"type":"context-options","origin":"library","browserName":"","playwrightVersion":"1.64.1","options":{},"platform":"linux","wallTime":1792581008273,"monotonicTime":139356.404,"sdkLanguage":"javascript","title":"admin-invitations.spec.ts:163 › invites admin through Mailpit, accepts, logs in and enforces permissions"}
+{"type":"before","callId":"owau@616","startTime":140598.527,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:58025/api/v1/search","params":[{"name":"query","value":"to:invited-1792581008274@example.com"}],"method":"GET"}}
+{"type":"log","callId":"owau@616","time":140599.302,"message":"→ GET http://127.0.0.1:58025/api/v1/search?query=to%3Ainvited-1792581008274%40example.com"}
+{"type":"log","callId":"owau@616","time":140599.316,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"owau@616","time":140599.32,"message":"  accept: */*"}
+{"type":"log","callId":"owau@616","time":140599.323,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"owau@616","time":140602.163,"message":"← 200 OK"}
+{"type":"log","callId":"owau@616","time":140602.187,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"owau@616","time":140602.192,"message":"  content-security-policy: default-src 'self'; script-src 'nonce-SCx4ATA8bMLxKgtUEDcaDh'; style-src * 'unsafe-inline'; frame-src 'self'; img-src * data: blob:; font-src * data:; media-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self';"}
+{"type":"log","callId":"owau@616","time":140602.196,"message":"  content-type: application/json"}
+{"type":"log","callId":"owau@616","time":140602.2,"message":"  referrer-policy: no-referrer"}
+{"type":"log","callId":"owau@616","time":140602.204,"message":"  date: Wed, 21 Oct 2026 11:10:09 GMT"}
+{"type":"log","callId":"owau@616","time":140602.207,"message":"  content-length: 84"}
+{"type":"after","callId":"owau@616","endTime":140602.907,"result":{"response":{"url":"http://127.0.0.1:58025/api/v1/search?query=to%3Ainvited-1792581008274%40example.com","status":200,"statusText":"OK","headers":[{"name":"Content-Encoding","value":"gzip"},{"name":"Content-Security-Policy","value":"default-src 'self'; script-src 'nonce-SCx4ATA8bMLxKgtUEDcaDh'; style-src * 'unsafe-inline'; frame-src 'self'; img-src * data: blob:; font-src * data:; media-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self';"},{"name":"Content-Type","value":"application/json"},{"name":"Referrer-Policy","value":"no-referrer"},{"name":"Date","value":"Wed, 21 Oct 2026 11:10:09 GMT"},{"name":"Content-Length","value":"84"}],"serverAddr":{"ipAddress":"127.0.0.1","port":58025},"timing":{"startTime":1792581009516,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":0,"secureConnectionStart":-1,"connectEnd":0.8230000000039581,"requestStart":0.8230000000039581,"responseStart":2.24199999999837},"responseEndTiming":3.5830000000132713,"fetchUid":"afc8a56a661e4da795b2121bc781c3ac"}}}
+{"type":"before","callId":"owau@620","startTime":140704.823,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:58025/api/v1/search","params":[{"name":"query","value":"to:invited-1792581008274@example.com"}],"method":"GET"}}
+{"type":"log","callId":"owau@620","time":140705.165,"message":"→ GET http://127.0.0.1:58025/api/v1/search?query=to%3Ainvited-1792581008274%40example.com"}
+{"type":"log","callId":"owau@620","time":140705.174,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"owau@620","time":140705.177,"message":"  accept: */*"}
+{"type":"log","callId":"owau@620","time":140705.178,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"owau@620","time":140706.695,"message":"← 200 OK"}
+{"type":"log","callId":"owau@620","time":140706.704,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"owau@620","time":140706.707,"message":"  content-security-policy: default-src 'self'; script-src 'nonce-2wbeDkWoZNGWdiNfppVzYH'; style-src * 'unsafe-inline'; frame-src 'self'; img-src * data: blob:; font-src * data:; media-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self';"}
+{"type":"log","callId":"owau@620","time":140706.709,"message":"  content-type: application/json"}
+{"type":"log","callId":"owau@620","time":140706.711,"message":"  referrer-policy: no-referrer"}
+{"type":"log","callId":"owau@620","time":140706.713,"message":"  date: Wed, 21 Oct 2026 11:10:09 GMT"}
+{"type":"log","callId":"owau@620","time":140706.715,"message":"  content-length: 473"}
+{"type":"after","callId":"owau@620","endTime":140707.017,"result":{"response":{"url":"http://127.0.0.1:58025/api/v1/search?query=to%3Ainvited-1792581008274%40example.com","status":200,"statusText":"OK","headers":[{"name":"Content-Encoding","value":"gzip"},{"name":"Content-Security-Policy","value":"default-src 'self'; script-src 'nonce-2wbeDkWoZNGWdiNfppVzYH'; style-src * 'unsafe-inline'; frame-src 'self'; img-src * data: blob:; font-src * data:; media-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self';"},{"name":"Content-Type","value":"application/json"},{"name":"Referrer-Policy","value":"no-referrer"},{"name":"Date","value":"Wed, 21 Oct 2026 11:10:09 GMT"},{"name":"Content-Length","value":"473"}],"serverAddr":{"ipAddress":"127.0.0.1","port":58025},"timing":{"startTime":1792581009622,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.20799999998416752,"responseStart":1.400999999983469},"responseEndTiming":1.830999999976484,"fetchUid":"d0996d06c058d69788bfbf207b1fa612"}}}
+{"type":"before","callId":"owau@624","startTime":140708.752,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:58025/api/v1/message/K8Q2NNwPPCChfQTqw5jzNp","method":"GET"}}
+{"type":"log","callId":"owau@624","time":140709.087,"message":"→ GET http://127.0.0.1:58025/api/v1/message/K8Q2NNwPPCChfQTqw5jzNp"}
+{"type":"log","callId":"owau@624","time":140709.097,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"owau@624","time":140709.101,"message":"  accept: */*"}
+{"type":"log","callId":"owau@624","time":140709.104,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"owau@624","time":140711.574,"message":"← 200 OK"}
+{"type":"log","callId":"owau@624","time":140711.59,"message":"  content-encoding: gzip"}
+{"type":"log","callId":"owau@624","time":140711.593,"message":"  content-security-policy: default-src 'self'; script-src 'nonce-X4oSRMZdShGRERCmvez3nE'; style-src * 'unsafe-inline'; frame-src 'self'; img-src * data: blob:; font-src * data:; media-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self';"}
+{"type":"log","callId":"owau@624","time":140711.595,"message":"  content-type: application/json"}
+{"type":"log","callId":"owau@624","time":140711.597,"message":"  referrer-policy: no-referrer"}
+{"type":"log","callId":"owau@624","time":140711.6,"message":"  date: Wed, 21 Oct 2026 11:10:09 GMT"}
+{"type":"log","callId":"owau@624","time":140711.602,"message":"  content-length: 1659"}
+{"type":"after","callId":"owau@624","endTime":140711.922,"result":{"response":{"url":"http://127.0.0.1:58025/api/v1/message/K8Q2NNwPPCChfQTqw5jzNp","status":200,"statusText":"OK","headers":[{"name":"Content-Encoding","value":"gzip"},{"name":"Content-Security-Policy","value":"default-src 'self'; script-src 'nonce-X4oSRMZdShGRERCmvez3nE'; style-src * 'unsafe-inline'; frame-src 'self'; img-src * data: blob:; font-src * data:; media-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self';"},{"name":"Content-Type","value":"application/json"},{"name":"Referrer-Policy","value":"no-referrer"},{"name":"Date","value":"Wed, 21 Oct 2026 11:10:09 GMT"},{"name":"Content-Length","value":"1659"}],"serverAddr":{"ipAddress":"127.0.0.1","port":58025},"timing":{"startTime":1792581009626,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.21500000002561137,"responseStart":2.1570000000065193},"responseEndTiming":2.7890000000188593,"fetchUid":"5c3aadea726b141f0a865ce0a7ef2fa1"}}}
+{"type":"before","callId":"owau@663","startTime":141563.096,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3301/api/v1/auth/login","method":"POST","jsonData":"{\"email\":\"invited-1792581008274@example.com\",\"password\":\"Password123!\"}"}}
+{"type":"log","callId":"owau@663","time":141563.729,"message":"→ POST http://127.0.0.1:3301/api/v1/auth/login"}
+{"type":"log","callId":"owau@663","time":141563.743,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"owau@663","time":141563.745,"message":"  accept: */*"}
+{"type":"log","callId":"owau@663","time":141563.747,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"owau@663","time":141563.75,"message":"  content-type: application/json"}
+{"type":"log","callId":"owau@663","time":141563.752,"message":"  content-length: 71"}
+{"type":"log","callId":"owau@663","time":141653.693,"message":"← 200 OK"}
+{"type":"log","callId":"owau@663","time":141653.7,"message":"  x-request-id: req_4df316fe-7c9c-4462-af65-393e6d47f98e"}
+{"type":"log","callId":"owau@663","time":141653.703,"message":"  content-security-policy: default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests"}
+{"type":"log","callId":"owau@663","time":141653.705,"message":"  cross-origin-opener-policy: same-origin"}
+{"type":"log","callId":"owau@663","time":141653.708,"message":"  cross-origin-resource-policy: same-origin"}
+{"type":"log","callId":"owau@663","time":141653.709,"message":"  origin-agent-cluster: ?1"}
+{"type":"log","callId":"owau@663","time":141653.711,"message":"  referrer-policy: no-referrer"}
+{"type":"log","callId":"owau@663","time":141653.713,"message":"  strict-transport-security: max-age=31536000; includeSubDomains"}
+{"type":"log","callId":"owau@663","time":141653.715,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"owau@663","time":141653.717,"message":"  x-dns-prefetch-control: off"}
+{"type":"log","callId":"owau@663","time":141653.719,"message":"  x-download-options: noopen"}
+{"type":"log","callId":"owau@663","time":141653.721,"message":"  x-frame-options: SAMEORIGIN"}
+{"type":"log","callId":"owau@663","time":141653.723,"message":"  x-permitted-cross-domain-policies: none"}
+{"type":"log","callId":"owau@663","time":141653.725,"message":"  x-xss-protection: 0"}
+{"type":"log","callId":"owau@663","time":141653.727,"message":"  vary: Origin"}
+{"type":"log","callId":"owau@663","time":141653.729,"message":"  access-control-allow-credentials: true"}
+{"type":"log","callId":"owau@663","time":141653.731,"message":"  content-type: application/json; charset=utf-8"}
+{"type":"log","callId":"owau@663","time":141653.733,"message":"  content-length: 1027"}
+{"type":"log","callId":"owau@663","time":141653.736,"message":"  etag: W/\"403-gPmIXwXYysP/B2GpIRSE0F69Ba8\""}
+{"type":"log","callId":"owau@663","time":141653.738,"message":"  date: Wed, 21 Oct 2026 11:10:10 GMT"}
+{"type":"log","callId":"owau@663","time":141653.74,"message":"  connection: keep-alive"}
+{"type":"log","callId":"owau@663","time":141653.742,"message":"  keep-alive: timeout=5"}
+{"type":"after","callId":"owau@663","endTime":141653.88,"result":{"response":{"url":"http://127.0.0.1:3301/api/v1/auth/login","status":200,"statusText":"OK","headers":[{"name":"X-Request-Id","value":"req_4df316fe-7c9c-4462-af65-393e6d47f98e"},{"name":"Content-Security-Policy","value":"default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests"},{"name":"Cross-Origin-Opener-Policy","value":"same-origin"},{"name":"Cross-Origin-Resource-Policy","value":"same-origin"},{"name":"Origin-Agent-Cluster","value":"?1"},{"name":"Referrer-Policy","value":"no-referrer"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-DNS-Prefetch-Control","value":"off"},{"name":"X-Download-Options","value":"noopen"},{"name":"X-Frame-Options","value":"SAMEORIGIN"},{"name":"X-Permitted-Cross-Domain-Policies","value":"none"},{"name":"X-XSS-Protection","value":"0"},{"name":"Vary","value":"Origin"},{"name":"Access-Control-Allow-Credentials","value":"true"},{"name":"Content-Type","value":"application/json; charset=utf-8"},{"name":"Content-Length","value":"1027"},{"name":"ETag","value":"W/\"403-gPmIXwXYysP/B2GpIRSE0F69Ba8\""},{"name":"Date","value":"Wed, 21 Oct 2026 11:10:10 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3301},"timing":{"startTime":1792581010480,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":0,"secureConnectionStart":-1,"connectEnd":0.8399999999965075,"requestStart":0.8399999999965075,"responseStart":89.69699999998556},"responseEndTiming":89.99400000000605,"fetchUid":"3ffbe11d8d05ea6e5038f5bb007ac966"}}}
+{"type":"before","callId":"owau@667","startTime":141655.936,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3301/api/v1/admin/operations/status","method":"GET","headers":[{"name":"Authorization","value":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXZpMGc3bjAwMDB4b3hxYWZ1MGpncDNoIiwiZW1haWwiOiJpbnZpdGVkLTE3OTI1ODEwMDgyNzRAZXhhbXBsZS5jb20iLCJmdWxsTmFtZSI6Ikludml0ZWQgQnJvd3NlciBBZG1pbiIsInJvbGUiOiJBRE1JTiIsInNpZCI6ImUxNDhlMTI5LTg5MjktNGU5YS04ZWQwLTFlMjgyZmM5ZGMzZiIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3OTI1ODEwMTAsImV4cCI6MTc5MjU4MTkxMCwiYXVkIjoidGlja2V0LWJvb2tpbmctY2xpZW50IiwiaXNzIjoidGlja2V0LWJvb2tpbmctYXBpIn0.rAIfpfV9fhyKhQss6KA9YqbThcEjGKHRKyf4z5cMnjc"}]}}
+{"type":"log","callId":"owau@667","time":141656.199,"message":"→ GET http://127.0.0.1:3301/api/v1/admin/operations/status"}
+{"type":"log","callId":"owau@667","time":141656.207,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"owau@667","time":141656.209,"message":"  accept: */*"}
+{"type":"log","callId":"owau@667","time":141656.211,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"owau@667","time":141656.213,"message":"  Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXZpMGc3bjAwMDB4b3hxYWZ1MGpncDNoIiwiZW1haWwiOiJpbnZpdGVkLTE3OTI1ODEwMDgyNzRAZXhhbXBsZS5jb20iLCJmdWxsTmFtZSI6Ikludml0ZWQgQnJvd3NlciBBZG1pbiIsInJvbGUiOiJBRE1JTiIsInNpZCI6ImUxNDhlMTI5LTg5MjktNGU5YS04ZWQwLTFlMjgyZmM5ZGMzZiIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3OTI1ODEwMTAsImV4cCI6MTc5MjU4MTkxMCwiYXVkIjoidGlja2V0LWJvb2tpbmctY2xpZW50IiwiaXNzIjoidGlja2V0LWJvb2tpbmctYXBpIn0.rAIfpfV9fhyKhQss6KA9YqbThcEjGKHRKyf4z5cMnjc"}
+{"type":"log","callId":"owau@667","time":141663.615,"message":"← 200 OK"}
+{"type":"log","callId":"owau@667","time":141663.641,"message":"  x-request-id: req_09dd39b7-078c-4d94-9cdc-b10ab7860801"}
+{"type":"log","callId":"owau@667","time":141663.648,"message":"  content-security-policy: default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests"}
+{"type":"log","callId":"owau@667","time":141663.654,"message":"  cross-origin-opener-policy: same-origin"}
+{"type":"log","callId":"owau@667","time":141663.661,"message":"  cross-origin-resource-policy: same-origin"}
+{"type":"log","callId":"owau@667","time":141663.666,"message":"  origin-agent-cluster: ?1"}
+{"type":"log","callId":"owau@667","time":141663.672,"message":"  referrer-policy: no-referrer"}
+{"type":"log","callId":"owau@667","time":141663.678,"message":"  strict-transport-security: max-age=31536000; includeSubDomains"}
+{"type":"log","callId":"owau@667","time":141663.683,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"owau@667","time":141663.687,"message":"  x-dns-prefetch-control: off"}
+{"type":"log","callId":"owau@667","time":141663.69,"message":"  x-download-options: noopen"}
+{"type":"log","callId":"owau@667","time":141663.692,"message":"  x-frame-options: SAMEORIGIN"}
+{"type":"log","callId":"owau@667","time":141663.695,"message":"  x-permitted-cross-domain-policies: none"}
+{"type":"log","callId":"owau@667","time":141663.698,"message":"  x-xss-protection: 0"}
+{"type":"log","callId":"owau@667","time":141663.701,"message":"  vary: Origin"}
+{"type":"log","callId":"owau@667","time":141663.704,"message":"  access-control-allow-credentials: true"}
+{"type":"log","callId":"owau@667","time":141663.707,"message":"  content-type: application/json; charset=utf-8"}
+{"type":"log","callId":"owau@667","time":141663.711,"message":"  content-length: 478"}
+{"type":"log","callId":"owau@667","time":141663.714,"message":"  etag: W/\"1de-dGxi3oLlZ/OJ7or8kSEShCjHY1I\""}
+{"type":"log","callId":"owau@667","time":141663.718,"message":"  date: Wed, 21 Oct 2026 11:10:10 GMT"}
+{"type":"log","callId":"owau@667","time":141663.721,"message":"  connection: keep-alive"}
+{"type":"log","callId":"owau@667","time":141663.724,"message":"  keep-alive: timeout=5"}
+{"type":"after","callId":"owau@667","endTime":141663.904,"result":{"response":{"url":"http://127.0.0.1:3301/api/v1/admin/operations/status","status":200,"statusText":"OK","headers":[{"name":"X-Request-Id","value":"req_09dd39b7-078c-4d94-9cdc-b10ab7860801"},{"name":"Content-Security-Policy","value":"default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests"},{"name":"Cross-Origin-Opener-Policy","value":"same-origin"},{"name":"Cross-Origin-Resource-Policy","value":"same-origin"},{"name":"Origin-Agent-Cluster","value":"?1"},{"name":"Referrer-Policy","value":"no-referrer"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-DNS-Prefetch-Control","value":"off"},{"name":"X-Download-Options","value":"noopen"},{"name":"X-Frame-Options","value":"SAMEORIGIN"},{"name":"X-Permitted-Cross-Domain-Policies","value":"none"},{"name":"X-XSS-Protection","value":"0"},{"name":"Vary","value":"Origin"},{"name":"Access-Control-Allow-Credentials","value":"true"},{"name":"Content-Type","value":"application/json; charset=utf-8"},{"name":"Content-Length","value":"478"},{"name":"ETag","value":"W/\"1de-dGxi3oLlZ/OJ7or8kSEShCjHY1I\""},{"name":"Date","value":"Wed, 21 Oct 2026 11:10:10 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3301},"timing":{"startTime":1792581010573,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.1810000000114087,"responseStart":6.5600000000267755},"responseEndTiming":7.0310000000172295,"fetchUid":"735d4ba8bcf42dfacd66fdc7b248f21e"}}}
+{"type":"before","callId":"owau@670","startTime":141665.278,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3301/api/v1/users/admin","method":"GET","headers":[{"name":"Authorization","value":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXZpMGc3bjAwMDB4b3hxYWZ1MGpncDNoIiwiZW1haWwiOiJpbnZpdGVkLTE3OTI1ODEwMDgyNzRAZXhhbXBsZS5jb20iLCJmdWxsTmFtZSI6Ikludml0ZWQgQnJvd3NlciBBZG1pbiIsInJvbGUiOiJBRE1JTiIsInNpZCI6ImUxNDhlMTI5LTg5MjktNGU5YS04ZWQwLTFlMjgyZmM5ZGMzZiIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3OTI1ODEwMTAsImV4cCI6MTc5MjU4MTkxMCwiYXVkIjoidGlja2V0LWJvb2tpbmctY2xpZW50IiwiaXNzIjoidGlja2V0LWJvb2tpbmctYXBpIn0.rAIfpfV9fhyKhQss6KA9YqbThcEjGKHRKyf4z5cMnjc"}]}}
+{"type":"log","callId":"owau@670","time":141665.55,"message":"→ GET http://127.0.0.1:3301/api/v1/users/admin"}
+{"type":"log","callId":"owau@670","time":141665.559,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"owau@670","time":141665.563,"message":"  accept: */*"}
+{"type":"log","callId":"owau@670","time":141665.565,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"owau@670","time":141665.568,"message":"  Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXZpMGc3bjAwMDB4b3hxYWZ1MGpncDNoIiwiZW1haWwiOiJpbnZpdGVkLTE3OTI1ODEwMDgyNzRAZXhhbXBsZS5jb20iLCJmdWxsTmFtZSI6Ikludml0ZWQgQnJvd3NlciBBZG1pbiIsInJvbGUiOiJBRE1JTiIsInNpZCI6ImUxNDhlMTI5LTg5MjktNGU5YS04ZWQwLTFlMjgyZmM5ZGMzZiIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3OTI1ODEwMTAsImV4cCI6MTc5MjU4MTkxMCwiYXVkIjoidGlja2V0LWJvb2tpbmctY2xpZW50IiwiaXNzIjoidGlja2V0LWJvb2tpbmctYXBpIn0.rAIfpfV9fhyKhQss6KA9YqbThcEjGKHRKyf4z5cMnjc"}
+{"type":"log","callId":"owau@670","time":141670.845,"message":"← 403 Forbidden"}
+{"type":"log","callId":"owau@670","time":141670.854,"message":"  x-request-id: req_9128efb6-4cde-4b67-9def-3a8ddf61ca39"}
+{"type":"log","callId":"owau@670","time":141670.858,"message":"  content-security-policy: default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests"}
+{"type":"log","callId":"owau@670","time":141670.862,"message":"  cross-origin-opener-policy: same-origin"}
+{"type":"log","callId":"owau@670","time":141670.865,"message":"  cross-origin-resource-policy: same-origin"}
+{"type":"log","callId":"owau@670","time":141670.868,"message":"  origin-agent-cluster: ?1"}
+{"type":"log","callId":"owau@670","time":141670.871,"message":"  referrer-policy: no-referrer"}
+{"type":"log","callId":"owau@670","time":141670.874,"message":"  strict-transport-security: max-age=31536000; includeSubDomains"}
+{"type":"log","callId":"owau@670","time":141670.877,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"owau@670","time":141670.881,"message":"  x-dns-prefetch-control: off"}
+{"type":"log","callId":"owau@670","time":141670.884,"message":"  x-download-options: noopen"}
+{"type":"log","callId":"owau@670","time":141670.887,"message":"  x-frame-options: SAMEORIGIN"}
+{"type":"log","callId":"owau@670","time":141670.89,"message":"  x-permitted-cross-domain-policies: none"}
+{"type":"log","callId":"owau@670","time":141670.893,"message":"  x-xss-protection: 0"}
+{"type":"log","callId":"owau@670","time":141670.896,"message":"  vary: Origin"}
+{"type":"log","callId":"owau@670","time":141670.899,"message":"  access-control-allow-credentials: true"}
+{"type":"log","callId":"owau@670","time":141670.902,"message":"  content-type: application/json; charset=utf-8"}
+{"type":"log","callId":"owau@670","time":141670.905,"message":"  content-length: 210"}
+{"type":"log","callId":"owau@670","time":141670.908,"message":"  etag: W/\"d2-VbctV3C0HH/T0DPoWemQzB7otYw\""}
+{"type":"log","callId":"owau@670","time":141670.911,"message":"  date: Wed, 21 Oct 2026 11:10:10 GMT"}
+{"type":"log","callId":"owau@670","time":141670.913,"message":"  connection: keep-alive"}
+{"type":"log","callId":"owau@670","time":141670.916,"message":"  keep-alive: timeout=5"}
+{"type":"after","callId":"owau@670","endTime":141671.055,"result":{"response":{"url":"http://127.0.0.1:3301/api/v1/users/admin","status":403,"statusText":"Forbidden","headers":[{"name":"X-Request-Id","value":"req_9128efb6-4cde-4b67-9def-3a8ddf61ca39"},{"name":"Content-Security-Policy","value":"default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests"},{"name":"Cross-Origin-Opener-Policy","value":"same-origin"},{"name":"Cross-Origin-Resource-Policy","value":"same-origin"},{"name":"Origin-Agent-Cluster","value":"?1"},{"name":"Referrer-Policy","value":"no-referrer"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-DNS-Prefetch-Control","value":"off"},{"name":"X-Download-Options","value":"noopen"},{"name":"X-Frame-Options","value":"SAMEORIGIN"},{"name":"X-Permitted-Cross-Domain-Policies","value":"none"},{"name":"X-XSS-Protection","value":"0"},{"name":"Vary","value":"Origin"},{"name":"Access-Control-Allow-Credentials","value":"true"},{"name":"Content-Type","value":"application/json; charset=utf-8"},{"name":"Content-Length","value":"210"},{"name":"ETag","value":"W/\"d2-VbctV3C0HH/T0DPoWemQzB7otYw\""},{"name":"Date","value":"Wed, 21 Oct 2026 11:10:10 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3301},"timing":{"startTime":1792581010582,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.2089999999734573,"responseStart":4.967999999993481},"responseEndTiming":5.1749999999883585,"fetchUid":"fdda877e72ddbf3219f48f6098b48924"}}}
+{"type":"before","callId":"owau@673","startTime":141672.618,"class":"APIRequestContext","method":"fetch","params":{"url":"http://127.0.0.1:3301/api/v1/auth/admin-invitations/preview","method":"POST","jsonData":"{\"token\":\"e7b83988e2e09ba1de4f147ff1a753f4e4a76f433ba72c44a68c01d1526ada1a\"}"}}
+{"type":"log","callId":"owau@673","time":141673.094,"message":"→ POST http://127.0.0.1:3301/api/v1/auth/admin-invitations/preview"}
+{"type":"log","callId":"owau@673","time":141673.106,"message":"  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36"}
+{"type":"log","callId":"owau@673","time":141673.11,"message":"  accept: */*"}
+{"type":"log","callId":"owau@673","time":141673.113,"message":"  accept-encoding: gzip,deflate,br"}
+{"type":"log","callId":"owau@673","time":141673.116,"message":"  content-type: application/json"}
+{"type":"log","callId":"owau@673","time":141673.119,"message":"  content-length: 76"}
+{"type":"log","callId":"owau@673","time":141676.822,"message":"← 401 Unauthorized"}
+{"type":"log","callId":"owau@673","time":141676.83,"message":"  x-request-id: req_9f793377-9a41-4854-bf21-71fb6f25ffee"}
+{"type":"log","callId":"owau@673","time":141676.833,"message":"  content-security-policy: default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests"}
+{"type":"log","callId":"owau@673","time":141676.836,"message":"  cross-origin-opener-policy: same-origin"}
+{"type":"log","callId":"owau@673","time":141676.838,"message":"  cross-origin-resource-policy: same-origin"}
+{"type":"log","callId":"owau@673","time":141676.839,"message":"  origin-agent-cluster: ?1"}
+{"type":"log","callId":"owau@673","time":141676.841,"message":"  referrer-policy: no-referrer"}
+{"type":"log","callId":"owau@673","time":141676.843,"message":"  strict-transport-security: max-age=31536000; includeSubDomains"}
+{"type":"log","callId":"owau@673","time":141676.846,"message":"  x-content-type-options: nosniff"}
+{"type":"log","callId":"owau@673","time":141676.848,"message":"  x-dns-prefetch-control: off"}
+{"type":"log","callId":"owau@673","time":141676.85,"message":"  x-download-options: noopen"}
+{"type":"log","callId":"owau@673","time":141676.852,"message":"  x-frame-options: SAMEORIGIN"}
+{"type":"log","callId":"owau@673","time":141676.854,"message":"  x-permitted-cross-domain-policies: none"}
+{"type":"log","callId":"owau@673","time":141676.856,"message":"  x-xss-protection: 0"}
+{"type":"log","callId":"owau@673","time":141676.858,"message":"  vary: Origin"}
+{"type":"log","callId":"owau@673","time":141676.86,"message":"  access-control-allow-credentials: true"}
+{"type":"log","callId":"owau@673","time":141676.861,"message":"  content-type: application/json; charset=utf-8"}
+{"type":"log","callId":"owau@673","time":141676.863,"message":"  content-length: 240"}
+{"type":"log","callId":"owau@673","time":141676.865,"message":"  etag: W/\"f0-YEwWJVej4GsCy/w7AQWNZ/Bu2xU\""}
+{"type":"log","callId":"owau@673","time":141676.869,"message":"  date: Wed, 21 Oct 2026 11:10:10 GMT"}
+{"type":"log","callId":"owau@673","time":141676.871,"message":"  connection: keep-alive"}
+{"type":"log","callId":"owau@673","time":141676.874,"message":"  keep-alive: timeout=5"}
+{"type":"after","callId":"owau@673","endTime":141676.975,"result":{"response":{"url":"http://127.0.0.1:3301/api/v1/auth/admin-invitations/preview","status":401,"statusText":"Unauthorized","headers":[{"name":"X-Request-Id","value":"req_9f793377-9a41-4854-bf21-71fb6f25ffee"},{"name":"Content-Security-Policy","value":"default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests"},{"name":"Cross-Origin-Opener-Policy","value":"same-origin"},{"name":"Cross-Origin-Resource-Policy","value":"same-origin"},{"name":"Origin-Agent-Cluster","value":"?1"},{"name":"Referrer-Policy","value":"no-referrer"},{"name":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains"},{"name":"X-Content-Type-Options","value":"nosniff"},{"name":"X-DNS-Prefetch-Control","value":"off"},{"name":"X-Download-Options","value":"noopen"},{"name":"X-Frame-Options","value":"SAMEORIGIN"},{"name":"X-Permitted-Cross-Domain-Policies","value":"none"},{"name":"X-XSS-Protection","value":"0"},{"name":"Vary","value":"Origin"},{"name":"Access-Control-Allow-Credentials","value":"true"},{"name":"Content-Type","value":"application/json; charset=utf-8"},{"name":"Content-Length","value":"240"},{"name":"ETag","value":"W/\"f0-YEwWJVej4GsCy/w7AQWNZ/Bu2xU\""},{"name":"Date","value":"Wed, 21 Oct 2026 11:10:10 GMT"},{"name":"Connection","value":"keep-alive"},{"name":"Keep-Alive","value":"timeout=5"}],"serverAddr":{"ipAddress":"127.0.0.1","port":3301},"timing":{"startTime":1792581010590,"domainLookupStart":-1,"domainLookupEnd":-1,"connectStart":-1,"secureConnectionStart":-1,"connectEnd":-1,"requestStart":0.3099999999976717,"responseStart":3.4640000000072177},"responseEndTiming":3.736000000004424,"fetchUid":"f58076e96251095ca866d26a135db1e5"}}}

@@ -22,6 +22,7 @@ enum AdminPermission {
   VIEW_SYSTEM
   MANAGE_USERS
   VIEW_AUDIT_LOGS
+  MANAGE_COMBOS
 }
 
 enum MovieStatus {
@@ -174,6 +175,7 @@ model Movie {
 }
 
 model Cinema {
+  combos       CinemaCombo[]
   id           String   @id @default(cuid())
   name         String
   address      String
@@ -355,6 +357,7 @@ model Booking {
   comboSubtotal  Decimal             @default(0) @db.Decimal(10, 2)
   discountAmount Decimal             @default(0) @db.Decimal(10, 2)
   pricingVersion Int                 @default(1)
+  comboItems     BookingComboItem[]
   expiresAt      DateTime
   holdToken      String
   idempotencyKey String?
@@ -377,6 +380,40 @@ model Booking {
   @@index([userId, createdAt, id])
   @@index([status, createdAt, id])
   @@index([status, expiresAt])
+}
+
+model Combo {
+  id String @id @default(cuid())
+  name String @db.VarChar(120)
+  description String @db.VarChar(1000)
+  imageUrl String? @db.VarChar(2048)
+  active Boolean @default(true)
+  cinemas CinemaCombo[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CinemaCombo {
+  id String @id @default(cuid())
+  cinemaId String
+  cinema Cinema @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
+  comboId String
+  combo Combo @relation(fields: [comboId], references: [id], onDelete: Restrict)
+  price Decimal @db.Decimal(10,2)
+  active Boolean @default(true)
+  @@unique([cinemaId, comboId])
+}
+
+model BookingComboItem {
+  id String @id @default(cuid())
+  bookingId String
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  cinemaComboId String
+  name String @db.VarChar(120)
+  description String @db.VarChar(1000)
+  unitPrice Decimal @db.Decimal(10,2)
+  quantity Int
+  @@unique([bookingId, cinemaComboId])
 }
 
 model BookingItem {

@@ -66,6 +66,9 @@ export async function resetIntegrationState() {
 
   await adminPrisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      "Combo",
+      "CinemaCombo",
+      "BookingComboItem",
       "AdminInvitation",
       "RefreshToken",
       "AuthSession",

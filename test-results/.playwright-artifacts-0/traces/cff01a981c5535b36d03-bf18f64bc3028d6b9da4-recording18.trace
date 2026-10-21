@@ -1,0 +1,1 @@
+{"version":10,"type":"context-options","origin":"library","browserName":"","playwrightVersion":"1.64.1","options":{},"platform":"linux","wallTime":1792581011623,"monotonicTime":142706.245,"sdkLanguage":"javascript","title":"app-smoke.spec.ts:53 › CineBook browser smoke › protects customer booking routes when signed out"}

@@ -1,0 +1,1 @@
+{"version":10,"type":"context-options","origin":"library","browserName":"","playwrightVersion":"1.64.1","options":{},"platform":"linux","wallTime":1792580870449,"monotonicTime":1532.06,"sdkLanguage":"javascript","title":"admin-invitations.spec.ts:23 › resends through real email, invalidates old token and accepts replacement"}

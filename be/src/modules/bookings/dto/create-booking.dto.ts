@@ -1,4 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { ComboSelectionDto } from '../../combos/combo.dto.js';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -6,9 +8,19 @@ import {
   IsArray,
   IsNotEmpty,
   IsString,
+  IsOptional,
+  ValidateNested,
 } from 'class-validator';
 
 export class CreateBookingDto {
+  @ApiPropertyOptional({ type: [ComboSelectionDto], maxItems: 10 })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ArrayUnique((item: ComboSelectionDto) => item.cinemaComboId)
+  @ValidateNested({ each: true })
+  @Type(() => ComboSelectionDto)
+  combos?: ComboSelectionDto[];
   @ApiProperty({ example: 'clx123showtime' })
   @IsString()
   @IsNotEmpty()

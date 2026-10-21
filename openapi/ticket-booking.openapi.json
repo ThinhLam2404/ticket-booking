@@ -23,9 +23,80 @@
         ]
       }
     },
-    "/api/v1/locations/provinces": {
+    "/api/v1/combos/cinemas/{cinemaId}": {
       "get": {
-        "operationId": "Locations_listProvinces",
+        "operationId": "Combos_menu",
+        "parameters": [
+          {
+            "name": "cinemaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CinemaComboResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "combos"
+        ]
+      }
+    },
+    "/api/v1/combos/admin/cinemas/{cinemaId}": {
+      "get": {
+        "operationId": "Combos_adminMenu",
+        "parameters": [
+          {
+            "name": "cinemaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CinemaComboResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "combos"
+        ]
+      }
+    },
+    "/api/v1/combos/admin": {
+      "get": {
+        "operationId": "Combos_list",
         "parameters": [],
         "responses": {
           "200": {
@@ -35,67 +106,152 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ProvinceResponseDto"
+                    "$ref": "#/components/schemas/ComboResponseDto"
                   }
                 }
               }
             }
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
-          "locations"
+          "combos"
         ]
-      }
-    },
-    "/api/v1/health": {
-      "get": {
-        "operationId": "Health_liveness",
+      },
+      "post": {
+        "operationId": "Combos_create",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateComboDto"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
+          "201": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthResponseDto"
+                  "$ref": "#/components/schemas/ComboResponseDto"
                 }
               }
             }
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
-          "health"
+          "combos"
         ]
       }
     },
-    "/api/v1/health/ready": {
-      "get": {
-        "operationId": "Health_readiness",
-        "parameters": [],
+    "/api/v1/combos/admin/{id}": {
+      "patch": {
+        "operationId": "Combos_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateComboDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthResponseDto"
+                  "$ref": "#/components/schemas/ComboResponseDto"
                 }
               }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "combos"
+        ]
+      }
+    },
+    "/api/v1/combos/admin/cinemas/{cinemaId}/{comboId}": {
+      "put": {
+        "operationId": "Combos_setMenu",
+        "parameters": [
+          {
+            "name": "cinemaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
             }
           },
-          "503": {
+          {
+            "name": "comboId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CinemaComboDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                  "$ref": "#/components/schemas/CinemaComboResponseDto"
                 }
               }
             }
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
-          "health"
+          "combos"
         ]
       }
     },
@@ -1120,6 +1276,82 @@
         ],
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/v1/locations/provinces": {
+      "get": {
+        "operationId": "Locations_listProvinces",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProvinceResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "locations"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "Health_liveness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "operationId": "Health_readiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
         ]
       }
     },
@@ -5911,63 +6143,164 @@
       }
     },
     "schemas": {
-      "ProvinceResponseDto": {
+      "ComboResponseDto": {
         "type": "object",
         "properties": {
-          "code": {
-            "type": "number",
-            "example": 79
+          "id": {
+            "type": "string"
           },
           "name": {
-            "type": "string",
-            "example": "Thành phố Hồ Chí Minh"
+            "type": "string"
           },
-          "codename": {
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
             "type": "string",
-            "example": "ho_chi_minh"
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
           }
         },
         "required": [
-          "code",
+          "id",
           "name",
-          "codename"
+          "description",
+          "imageUrl",
+          "active"
         ]
       },
-      "HealthResponseDto": {
+      "CinemaComboResponseDto": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "degraded"
-            ],
-            "example": "ok"
+          "id": {
+            "type": "string"
           },
-          "service": {
-            "type": "string",
-            "example": "ticket-booking-api"
+          "cinemaId": {
+            "type": "string"
           },
-          "uptime": {
+          "comboId": {
+            "type": "string"
+          },
+          "price": {
+            "type": "string",
+            "example": "99000.00"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "combo": {
+            "$ref": "#/components/schemas/ComboResponseDto"
+          }
+        },
+        "required": [
+          "id",
+          "cinemaId",
+          "comboId",
+          "price",
+          "active",
+          "combo"
+        ]
+      },
+      "CreateComboDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "description"
+        ]
+      },
+      "UpdateComboDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CinemaComboDto": {
+        "type": "object",
+        "properties": {
+          "price": {
             "type": "number",
-            "example": 123.45
+            "example": 99000
           },
-          "checks": {
-            "type": "object",
-            "example": {
-              "database": "up",
-              "redis": "up"
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "price"
+        ]
+      },
+      "PreviewAdminInvitationDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "invitation-token"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "AdminInvitationPreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "MANAGE_MOVIES",
+                "MANAGE_CINEMAS",
+                "MANAGE_SHOWTIMES",
+                "VIEW_BOOKINGS",
+                "MANAGE_PAYMENTS",
+                "VIEW_SYSTEM",
+                "MANAGE_USERS",
+                "VIEW_AUDIT_LOGS",
+                "MANAGE_COMBOS"
+              ]
             }
           },
-          "timestamp": {
+          "expiresAt": {
             "type": "string",
-            "example": "2026-09-07T10:00:00.000Z",
             "format": "date-time"
           }
         },
         "required": [
-          "status",
-          "timestamp"
+          "email",
+          "permissions",
+          "expiresAt"
         ]
       },
       "ApiErrorResponseDto": {
@@ -6014,52 +6347,6 @@
           "path",
           "requestId",
           "timestamp"
-        ]
-      },
-      "PreviewAdminInvitationDto": {
-        "type": "object",
-        "properties": {
-          "token": {
-            "type": "string",
-            "example": "invitation-token"
-          }
-        },
-        "required": [
-          "token"
-        ]
-      },
-      "AdminInvitationPreviewResponseDto": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "permissions": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "MANAGE_MOVIES",
-                "MANAGE_CINEMAS",
-                "MANAGE_SHOWTIMES",
-                "VIEW_BOOKINGS",
-                "MANAGE_PAYMENTS",
-                "VIEW_SYSTEM",
-                "MANAGE_USERS",
-                "VIEW_AUDIT_LOGS"
-              ]
-            }
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "email",
-          "permissions",
-          "expiresAt"
         ]
       },
       "AcceptAdminInvitationDto": {
@@ -6412,7 +6699,8 @@
                 "MANAGE_PAYMENTS",
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
-                "VIEW_AUDIT_LOGS"
+                "VIEW_AUDIT_LOGS",
+                "MANAGE_COMBOS"
               ]
             }
           },
@@ -6505,7 +6793,8 @@
                 "MANAGE_PAYMENTS",
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
-                "VIEW_AUDIT_LOGS"
+                "VIEW_AUDIT_LOGS",
+                "MANAGE_COMBOS"
               ]
             }
           }
@@ -6537,7 +6826,8 @@
                 "MANAGE_PAYMENTS",
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
-                "VIEW_AUDIT_LOGS"
+                "VIEW_AUDIT_LOGS",
+                "MANAGE_COMBOS"
               ]
             }
           },
@@ -6609,6 +6899,65 @@
           "createdAt"
         ]
       },
+      "ProvinceResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "number",
+            "example": 79
+          },
+          "name": {
+            "type": "string",
+            "example": "Thành phố Hồ Chí Minh"
+          },
+          "codename": {
+            "type": "string",
+            "example": "ho_chi_minh"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "codename"
+        ]
+      },
+      "HealthResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "example": "ok"
+          },
+          "service": {
+            "type": "string",
+            "example": "ticket-booking-api"
+          },
+          "uptime": {
+            "type": "number",
+            "example": 123.45
+          },
+          "checks": {
+            "type": "object",
+            "example": {
+              "database": "up",
+              "redis": "up"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-09-07T10:00:00.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "status",
+          "timestamp"
+        ]
+      },
       "AdminUserResponseDto": {
         "type": "object",
         "properties": {
@@ -6645,7 +6994,8 @@
                 "MANAGE_PAYMENTS",
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
-                "VIEW_AUDIT_LOGS"
+                "VIEW_AUDIT_LOGS",
+                "MANAGE_COMBOS"
               ]
             }
           },
@@ -6727,7 +7077,8 @@
                 "MANAGE_PAYMENTS",
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
-                "VIEW_AUDIT_LOGS"
+                "VIEW_AUDIT_LOGS",
+                "MANAGE_COMBOS"
               ]
             }
           }
@@ -8725,9 +9076,33 @@
           }
         }
       },
+      "ComboSelectionDto": {
+        "type": "object",
+        "properties": {
+          "cinemaComboId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "cinemaComboId",
+          "quantity"
+        ]
+      },
       "CreateBookingDto": {
         "type": "object",
         "properties": {
+          "combos": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComboSelectionDto"
+            }
+          },
           "showtimeId": {
             "type": "string",
             "example": "clx123showtime"
@@ -8748,6 +9123,38 @@
         "required": [
           "showtimeId",
           "showtimeSeatIds"
+        ]
+      },
+      "BookingComboItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cinemaComboId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string",
+            "example": "99000.00"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "cinemaComboId",
+          "name",
+          "description",
+          "unitPrice",
+          "quantity"
         ]
       },
       "TicketSummaryResponseDto": {
@@ -8925,6 +9332,12 @@
             "example": 1,
             "minimum": 1
           },
+          "comboItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingComboItemResponseDto"
+            }
+          },
           "expiresAt": {
             "type": "string",
             "example": "2026-09-07T10:10:00.000Z",
@@ -8975,6 +9388,7 @@
           "comboSubtotal",
           "discountAmount",
           "pricingVersion",
+          "comboItems",
           "expiresAt",
           "userId",
           "showtimeId",

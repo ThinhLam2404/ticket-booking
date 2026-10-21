@@ -41,6 +41,7 @@ for (const key of [
   'basePrice',
   'vipMultiplier',
   'coupleMultiplier',
+  'active', 'price', 'comboId', 'comboSubtotal', 'ticketSubtotal', 'discountAmount', 'pricingVersion',
   'title',
   'tmdbId',
   'duration',

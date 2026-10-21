@@ -521,6 +521,15 @@ export class BookingItemResponseDto {
   ticket?: TicketSummaryResponseDto | null;
 }
 
+export class BookingComboItemResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() cinemaComboId!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty() description!: string;
+  @ApiProperty({ example: '99000.00' }) unitPrice!: string;
+  @ApiProperty() quantity!: number;
+}
+
 export class BookingResponseDto {
   @ApiProperty({ example: 'clx-booking-id' })
   id!: string;
@@ -542,6 +551,9 @@ export class BookingResponseDto {
 
   @ApiProperty({ example: 1, minimum: 1 })
   pricingVersion!: number;
+
+  @ApiProperty({ type: [BookingComboItemResponseDto] })
+  comboItems!: BookingComboItemResponseDto[];
 
   @ApiProperty({ example: '2026-09-07T10:10:00.000Z', format: 'date-time' })
   expiresAt!: string;
