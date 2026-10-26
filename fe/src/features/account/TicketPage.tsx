@@ -4,6 +4,7 @@ import { api } from '../../api';
 import { EmptyState, ErrorState, LoadingState, PageHeader, StatusBadge } from '../../components/ui';
 import { formatDate, formatTime, money } from '../../utils/format';
 import { QrCode, TicketPoster } from './components';
+import { TicketCombos } from './TicketCombos';
 
 export function TicketPage() {
   const { ticketId } = useParams();
@@ -26,5 +27,6 @@ export function TicketPage() {
       </section>
       <section className="ticket-information"><PageHeader eyebrow="CHI TIẾT VÉ" title={title}><StatusBadge status={ticket.status} /></PageHeader><p className="ticket-intro">Xuất trình mã QR tại cổng kiểm soát vé để vào phòng chiếu.</p><dl><div><dt>Ngày chiếu</dt><dd>{formatDate(ticket.booking.showtime.startsAt)}</dd></div><div><dt>Thời lượng</dt><dd>{formatTime(ticket.booking.showtime.startsAt)} — {formatTime(ticket.booking.showtime.endsAt)}</dd></div><div><dt>Rạp / phòng</dt><dd>{ticket.booking.showtime.room?.cinema?.name} · {ticket.booking.showtime.room?.name}</dd></div><div><dt>Ghế</dt><dd>{seat}</dd></div><div><dt>Giá vé</dt><dd>{money(ticket.bookingItem.price)}</dd></div><div><dt>Mã booking</dt><dd>#{ticket.bookingId.slice(-8)}</dd></div></dl><div className="ticket-detail-actions"><button className="secondary" type="button" onClick={() => document.getElementById('ticket-checkin')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>Xem mã soát vé</button><button className="secondary" type="button" onClick={() => window.print()}>In / lưu vé</button></div></section>
     </div>
+    <TicketCombos bookingId={ticket.bookingId} />
   </section>;
 }

@@ -1,4 +1,17 @@
 #root { min-height: 100vh; }
+.combo-panel { padding: 16px; margin-block: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); }
+.combo-panel h3 small, .combo-panel p, .combo-panel small { color: var(--text-muted); font-size: .82rem; line-height: 1.5; }
+.combo-row { display: flex; align-items: center; gap: 12px; padding-block: 12px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.combo-row > div { flex: 1; min-width: 0; }
+.combo-row img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
+.combo-row label { display: grid; gap: 4px; font-size: .75rem; }
+.combo-admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.combo-panel input:not([type="checkbox"]), .combo-panel select, .combo-panel textarea { max-width: 100%; padding: 10px; background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; }
+.combo-panel form, form.combo-panel { display: grid; gap: 12px; }
+.combo-panel form label, form.combo-panel label { display: grid; gap: 6px; }
+.combo-panel label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; }
+.combo-panel input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; accent-color: var(--accent); }
+@media (max-width: 720px) { .combo-admin-grid { grid-template-columns: 1fr; gap: 0; } .combo-row { flex-wrap: wrap; } }
 :root { --display-font: "Space Grotesk Variable", Inter, ui-sans-serif, system-ui, sans-serif; --body-font: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif; }
 :root, [data-theme="light"] {
   --canvas: #f6f8fb; --canvas-raised: #edf2f7; --surface-1: #ffffff; --surface-2: #eef3f8; --surface-3: #e4ebf3;

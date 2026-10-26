@@ -1,1 +1,0 @@
-{"statusCode":403,"code":"FORBIDDEN","message":"Insufficient permissions","details":[],"path":"/api/v1/movies/admin?page=1&pageSize=100","requestId":"req_b86c55ab-67cf-4f10-ab82-7ff8bbd54ee5","timestamp":"2026-10-21T11:10:10.442Z"}

@@ -1,1 +1,0 @@
-{"statusCode":401,"code":"UNAUTHORIZED","message":"Invitation is invalid or expired","details":[],"path":"/api/v1/auth/admin-invitations/accept","requestId":"req_11ba8100-b3e4-47d6-86b8-3f4cc9a8d7d1","timestamp":"2026-10-21T11:08:53.037Z"}

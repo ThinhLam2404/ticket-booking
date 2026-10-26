@@ -242,6 +242,7 @@ export function AdminLayout() {
         <Link className={location.pathname === '/admin' ? 'active' : ''} to="/admin" onClick={closeSidebar}><span>⌂</span><span>Tổng quan</span></Link>
         <Link className={navClass(location.pathname, '/admin/movies')} to="/admin/movies" onClick={closeSidebar}><span>▣</span><span>Phim</span></Link>
         <Link className={navClass(location.pathname, '/admin/cinemas')} to="/admin/cinemas" onClick={closeSidebar}><span>▤</span><span>Rạp & phòng</span></Link>
+        <Link className={navClass(location.pathname, '/admin/combos')} to="/admin/combos" onClick={closeSidebar}><span>▧</span><span>Combo bắp nước</span></Link>
         <Link className={navClass(location.pathname, '/admin/showtimes')} to="/admin/showtimes" onClick={closeSidebar}><span>◷</span><span>Suất chiếu</span></Link>
         <Link className={navClass(location.pathname, '/admin/payments')} to="/admin/payments" onClick={closeSidebar}><span>💳</span><span>Thanh toán</span></Link><Link className={navClass(location.pathname, '/admin/users')} to="/admin/users" onClick={closeSidebar}><span>♙</span><span>Người dùng</span></Link><Link className={navClass(location.pathname, '/admin/audit-logs')} to="/admin/audit-logs" onClick={closeSidebar}><span>≡</span><span>Nhật ký</span></Link>
       </nav>

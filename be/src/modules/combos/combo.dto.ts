@@ -19,11 +19,11 @@ export class CreateComboDto {
   @IsNotEmpty()
   @MaxLength(1000)
   description!: string;
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsUrl({ protocols: ['https'], require_protocol: true })
   @MaxLength(2048)
-  imageUrl?: string;
+  imageUrl?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() active?: boolean;
 }
 export class UpdateComboDto extends PartialType(CreateComboDto) {}

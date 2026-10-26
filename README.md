@@ -61,6 +61,14 @@ Booking và ticket sort theo `createdAt DESC, id DESC`. SePay sort theo `transac
 
 ### Giai đoạn B1 — API combo (chưa có UI)
 
+### Giai đoạn B2 — giao diện combo
+
+- Review fixes: chi tiết vé tải snapshot combo của toàn booking và ghi rõ không phải combo cho từng vé. Đổi rạp reset draft giá; xác nhận giá hiển thị rạp và trạng thái. Xóa ảnh gửi `imageUrl: null` (contract nullable). Hold chưa rõ kết quả giữ snapshot request/key riêng và không bỏ khi retry gặp 429/auth/timeout; vẫn cho retry khi suất đã gần giờ chiếu. Combo đã chọn biến mất khỏi menu có nút bỏ lựa chọn, chặn tạo booking mới cho đến khi hợp lệ; không tự sửa payload đang retry.
+
+- `/admin/combos` quản lý danh mục và giá/trạng thái theo rạp, có bước xác nhận và lỗi API. Giao diện cấp quyền có `MANAGE_COMBOS`. Khách chọn số lượng combo trực tiếp tại trang chọn ghế, gửi toàn bộ lựa chọn trong request hold; không thêm route sửa booking hoặc fulfill, không sửa SePay.
+- Trang thanh toán và chi tiết booking admin hiển thị snapshot combo, tiền vé/combo và thông báo không thay đổi được sau khi tạo. Khi lỗi mạng/5xx chưa rõ kết quả hold, frontend giữ key và lựa chọn, khóa chỉnh sửa để retry cùng nội dung; lỗi xác định từ API cho phép chọn lại. Giá ở bước chọn là tạm tính, backend xác nhận giá khi tạo booking.
+- `tests/browser/combos.spec.ts` kiểm tra admin tạo catalog/offer, mobile mua vé+combo, không còn control sửa sau hold, tổng tiền, webhook và email Mailpit thật. Test giữ rate limit production, chờ cửa sổ login dùng chung IP. Reference: Inspo `standardhotels-com` (catalogue/index composition), nhưng source tokens DESIGN.md hiện tại ưu tiên. Stitch project `5412677534890310186` trả not found nên chưa tạo reference screen; cần đồng bộ reference khi có quyền truy cập. Không có seed menu mặc định hay standalone combo order.
+
 - CI backup/restore drill cũng phải chạy sau schema changes (`npm run ops:backup-restore-drill`), ngoài `check:ci`: fixture booking ghi `ticketSubtotal`, checksum restore đối chiếu cả tổng tiền, các subtotal/discount và pricingVersion. CI run #30 chỉ lỗi drill do fixture thiếu subtotal bắt buộc; đã tái hiện local và sửa fixture, không nới constraint.
 
 - Migration `20261020100000_combos` thêm `Combo`, `CinemaCombo`, `BookingComboItem` và quyền `MANAGE_COMBOS`. Chạy generate/deploy trước backend mới; cấp quyền mới rõ ràng cho admin hoặc chạy seed trên môi trường dev theo quy trình hiện tại. Không tự cấp quyền mới cho mọi admin trong migration. Migration combo chưa phát hành được chỉnh ngay trong B1; không áp dụng lại bản cũ nếu đã tự deploy ở môi trường riêng.

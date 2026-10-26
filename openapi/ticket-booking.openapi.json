@@ -6213,7 +6213,8 @@
             "type": "string"
           },
           "imageUrl": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "active": {
             "type": "boolean"
@@ -6234,7 +6235,8 @@
             "type": "string"
           },
           "imageUrl": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "active": {
             "type": "boolean"

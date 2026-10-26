@@ -1,1 +1,0 @@
-{"statusCode":403,"code":"FORBIDDEN","message":"Insufficient permissions","details":[],"path":"/api/v1/showtimes/admin?page=1&pageSize=100&includePast=true","requestId":"req_580f4bcb-f88c-47c3-aa8a-9108fb09e8e0","timestamp":"2026-10-21T11:10:10.444Z"}

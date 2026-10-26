@@ -296,6 +296,10 @@ Definition of done:
 
 ### Voucher/combo — giai đoạn A: nền tính tiền
 
+- B2 review fixes: customer ticket detail shows booking-level combo snapshot; cinema switch clears offer draft and confirmation includes scope/status; explicit null clears catalog image. Pending purchase stores immutable payload/key across ambiguous failures and subsequent 429/auth/timeout; unavailable menu selections can be removed and block new purchase. Browser regression now commits a hold then aborts its response, returns 429 on retry and checks identical third request recovers the booking; also checks null image persistence, cinema draft reset and post-payment ticket combo visibility. Unavailable-menu behavior still needs a dedicated browser regression.
+
+- B2 UI: admin combo/catalog and cinema price forms with explicit confirmation, MANAGE_COMBOS picker, optional customer combo quantities before immutable hold, snapshot summaries in checkout/admin detail. Preserved key/payload after ambiguous network/server failure. Mobile full-stack regression covers configuration → purchase → webhook → Mailpit combo email. Uses existing surface/border/text tokens and Inspo standardhotels-com composition; configured Stitch project returned not found (no reference screen created). Voucher and standalone orders remain out of scope.
+
 - Payment scope correction: removed combo-related checkout/refund row locks and their test mock; SepayService is unchanged from the pre-combo implementation. Booking computes the immutable total, payment consumes that total. Existing transactional payment audit and refund safeguards remain intact.
 
 - CI follow-up: GitHub Actions run #30 (`39427530868`) quality/integration passed but backup/restore drill failed. Reproduced locally: raw SQL fixture omitted required ticketSubtotal. Updated fixture and restore checksum to verify full booking price breakdown/version; isolated drill now passes. No remote rerun/push performed.

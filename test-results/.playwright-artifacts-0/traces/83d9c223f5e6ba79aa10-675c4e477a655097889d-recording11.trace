@@ -1,1 +1,0 @@
-{"version":10,"type":"context-options","origin":"library","browserName":"","playwrightVersion":"1.64.1","options":{},"platform":"linux","wallTime":1792581008198,"monotonicTime":139281.306,"sdkLanguage":"javascript","title":"admin-invitations.spec.ts:163 › invites admin through Mailpit, accepts, logs in and enforces permissions"}

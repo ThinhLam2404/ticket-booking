@@ -1227,13 +1227,13 @@ export interface components {
         CreateComboDto: {
             name: string;
             description: string;
-            imageUrl?: string;
+            imageUrl?: string | null;
             active?: boolean;
         };
         UpdateComboDto: {
             name?: string;
             description?: string;
-            imageUrl?: string;
+            imageUrl?: string | null;
             active?: boolean;
         };
         CinemaComboDto: {
