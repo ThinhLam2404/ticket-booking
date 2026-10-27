@@ -33,7 +33,7 @@ export const bookingStatusText: Record<string, string> = { PENDING: "Chờ thanh
 export const paymentStatusText: Record<string, string> = { PENDING: "Đang xử lý", SUCCEEDED: "Thành công", FAILED: "Thất bại", REFUNDED: "Đã hoàn tiền" };
 export const ticketStatusText: Record<string, string> = { ACTIVE: "Đang hoạt động", USED: "Đã dùng", CANCELLED: "Đã hủy" };
 export const roleText: Record<string, string> = { CUSTOMER: "Khách hàng", ADMIN: "Quản trị viên" };
-export const permissionText: Record<string, string> = { MANAGE_COMBOS: "Quản lý combo", MANAGE_MOVIES: "Quản lý phim", MANAGE_CINEMAS: "Quản lý cụm rạp", MANAGE_SHOWTIMES: "Quản lý suất chiếu", VIEW_BOOKINGS: "Xem đặt vé", MANAGE_PAYMENTS: "Quản lý thanh toán", VIEW_SYSTEM: "Xem hệ thống", MANAGE_USERS: "Quản lý người dùng", VIEW_AUDIT_LOGS: "Xem nhật ký thao tác" };
+export const permissionText: Record<string, string> = { MANAGE_COMBOS: "Quản lý combo", MANAGE_VOUCHERS: "Quản lý voucher", MANAGE_MOVIES: "Quản lý phim", MANAGE_CINEMAS: "Quản lý cụm rạp", MANAGE_SHOWTIMES: "Quản lý suất chiếu", VIEW_BOOKINGS: "Xem đặt vé", MANAGE_PAYMENTS: "Quản lý thanh toán", VIEW_SYSTEM: "Xem hệ thống", MANAGE_USERS: "Quản lý người dùng", VIEW_AUDIT_LOGS: "Xem nhật ký thao tác" };
 
 export function movieStatusText(status: MovieStatus) {
   return status === "DRAFT"

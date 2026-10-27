@@ -25,6 +25,7 @@ import {
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { RedisService } from '../redis/redis.service.js';
+import { VouchersService } from '../vouchers/vouchers.service.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
 import { SHOWTIME_BUFFER_SECONDS, computeHoldTtl } from './booking-policy.js';
 import { logOperationalEvent } from '../../common/logging/operational-logger.js';
@@ -41,6 +42,7 @@ export class BookingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    @Optional() private readonly vouchers?: VouchersService,
     @Optional() private readonly audit?: AuditService,
   ) {}
 
@@ -123,6 +125,8 @@ export class BookingsService {
         payment: true,
         tickets: true,
         refunds: true,
+        comboItems: true,
+        voucherRedemption: true,
         sepayIntent: { include: { transactions: true } },
       },
     });
@@ -131,21 +135,73 @@ export class BookingsService {
     return toPublicResponse(booking);
   }
 
-  async hold(userId: string, dto: CreateBookingDto, idempotencyKey?: string) {
-    const combos = dto.combos ?? [];
-    if (
-      combos.length > 10 ||
-      new Set(combos.map((item) => item.cinemaComboId)).size !==
-        combos.length ||
-      combos.some(
-        (item) =>
-          !Number.isInteger(item.quantity) ||
-          item.quantity < 1 ||
-          item.quantity > 10,
-      )
-    ) {
-      throw new ConflictException('Invalid combo selection');
+  async quote(userId: string, dto: CreateBookingDto) {
+    const showtime = await this.prisma.showtime.findUnique({
+      where: { id: dto.showtimeId },
+      include: { movie: true, room: true },
+    });
+    if (!showtime || showtime.movie.status !== MovieStatus.PUBLISHED) {
+      throw new NotFoundException('Showtime not found');
     }
+    const secondsUntilShowtime = Math.floor(
+      (showtime.startsAt.getTime() - Date.now()) / 1000,
+    );
+    if (secondsUntilShowtime <= 0)
+      throw new ConflictException('Showtime has already started');
+    if (secondsUntilShowtime <= SHOWTIME_BUFFER_SECONDS)
+      throw new ConflictException(
+        'Showtime is too close to start for a new booking',
+      );
+    const requestedSeatIds = [...new Set(dto.showtimeSeatIds)];
+    const seats = await this.prisma.showtimeSeat.findMany({
+      where: { showtimeId: dto.showtimeId },
+      include: { seat: true },
+    });
+    const { canonicalSeats } = this.canonicalizeSeats(
+      seats,
+      requestedSeatIds,
+      { requireAvailable: true },
+    );
+    const comboSelections = this.validateComboSelections(dto.combos);
+    const offers = await this.loadComboOffers(
+      this.prisma,
+      showtime.room.cinemaId,
+      comboSelections,
+    );
+    const combos = comboSelections.map((item) => {
+      const offer = offers.find(
+        (candidate) => candidate.id === item.cinemaComboId,
+      )!;
+      return { unitPrice: offer.price, quantity: item.quantity };
+    });
+    return this.vouchers && typeof this.vouchers.quote === 'function'
+      ? this.vouchers.quote({
+          code: dto.voucherCode,
+          userId,
+          cinemaId: showtime.room.cinemaId,
+          ticketPrices: [...canonicalSeats.values()].map((seat) => seat.price),
+          combos,
+        })
+      : (() => {
+          const pricing = calculateBookingPrice({
+            ticketPrices: [...canonicalSeats.values()].map(
+              (seat) => seat.price,
+            ),
+            combos,
+          });
+          return {
+            ticketSubtotal: pricing.ticketSubtotal.toFixed(2),
+            comboSubtotal: pricing.comboSubtotal.toFixed(2),
+            discountAmount: pricing.discountAmount.toFixed(2),
+            totalAmount: pricing.totalAmount.toFixed(2),
+            voucherCode: null,
+            voucherDiscount: null,
+          };
+        })();
+  }
+
+  async hold(userId: string, dto: CreateBookingDto, idempotencyKey?: string) {
+    const combos = this.validateComboSelections(dto.combos);
     const normalizedIdempotencyKey = idempotencyKey?.trim();
     if (
       normalizedIdempotencyKey &&
@@ -170,35 +226,10 @@ export class BookingsService {
       where: { showtimeId: dto.showtimeId },
       include: { seat: true },
     });
-    const seatsById = new Map(seats.map((seat) => [seat.id, seat]));
-    const seatsByCoordinate = new Map(
-      seats.map((seat) => [`${seat.seat.row}:${seat.seat.number}`, seat]),
+    const { canonicalSeats } = this.canonicalizeSeats(
+      seats,
+      requestedSeatIds,
     );
-    const canonicalSeats = new Map<string, (typeof seats)[number]>();
-
-    for (const seatId of requestedSeatIds) {
-      const seat = seatsById.get(seatId);
-      if (!seat) {
-        throw new NotFoundException(
-          'One or more showtime seats were not found',
-        );
-      }
-      canonicalSeats.set(seat.id, seat);
-      //NOTE - nếu chọn ghế couple thì tự động chọn ghế gần kề
-      if (seat.seat.type === 'COUPLE') {
-        const partnerNumber =
-          seat.seat.number % 2 === 1
-            ? seat.seat.number + 1
-            : seat.seat.number - 1;
-        const partner = seatsByCoordinate.get(
-          `${seat.seat.row}:${partnerNumber}`,
-        );
-        if (!partner || partner.seat.type !== 'COUPLE') {
-          throw new ConflictException('Couple seat must have a valid partner');
-        }
-        canonicalSeats.set(partner.id, partner);
-      }
-    }
     //NOTE - sắp xếp ghế theo thứ tự tăng dần
     const canonicalSeatIds = [...canonicalSeats.values()]
       .sort(
@@ -211,10 +242,15 @@ export class BookingsService {
     if (canonicalSeatIds.length > 10) {
       throw new ConflictException('A maximum of 10 physical seats can be held');
     }
+    const normalizedVoucherCode =
+      this.vouchers && typeof this.vouchers.normalizeCode === 'function'
+        ? this.vouchers.normalizeCode(dto.voucherCode)
+        : dto.voucherCode?.trim().toUpperCase() || null;
     const requestHash = this.createRequestHash(
       dto.showtimeId,
       canonicalSeatIds,
       combos,
+      normalizedVoucherCode,
     );
     if (normalizedIdempotencyKey) {
       const previousBooking = await this.findIdempotentBooking(
@@ -307,23 +343,16 @@ export class BookingsService {
           if (combos.length) {
             const room = await transaction.room.findUniqueOrThrow({
               where: { id: showtime.roomId },
+              select: { cinemaId: true },
             });
-            const offers = await transaction.cinemaCombo.findMany({
-              where: {
-                id: { in: combos.map((item) => item.cinemaComboId) },
-                cinemaId: room.cinemaId,
-                active: true,
-                combo: { active: true },
-              },
-              include: { combo: true },
-            });
-            if (offers.length !== combos.length)
-              throw new ConflictException(
-                'Combo is unavailable at this cinema',
-              );
+            const offers = await this.loadComboOffers(
+              transaction,
+              room.cinemaId,
+              combos,
+            );
             for (const item of combos) {
               const offer = offers.find(
-                (offer) => offer.id === item.cinemaComboId,
+                (candidate) => candidate.id === item.cinemaComboId,
               )!;
               comboItems.push({
                 cinemaComboId: offer.id,
@@ -334,15 +363,19 @@ export class BookingsService {
               });
             }
           }
-          const pricing = calculateBookingPrice({
+          const pricingInput = {
             ticketPrices: availableSeats.map((seat) => seat.price),
             combos: comboItems,
-          });
+          };
+          // A hold records voucher intent only. Eligibility, pricing and
+          // redemption are finalized atomically when checkout starts.
+          const pricing = calculateBookingPrice(pricingInput);
           const createdBooking = await transaction.booking.create({
             data: {
               userId,
               showtimeId: dto.showtimeId,
               ...pricing,
+              voucherCode: normalizedVoucherCode,
               ...(comboItems.length && { comboItems: { create: comboItems } }),
               expiresAt,
               holdToken,
@@ -376,6 +409,7 @@ export class BookingsService {
               'One or more seats are no longer available',
             );
           }
+
 
           await this.audit?.record(
             {
@@ -573,6 +607,8 @@ export class BookingsService {
         },
       });
 
+      if (this.vouchers && typeof this.vouchers.release === 'function')
+        await this.vouchers.release(transaction, id, 'BOOKING_CANCELLED');
       await this.audit?.record(
         {
           actor: { id: userId },
@@ -689,6 +725,8 @@ export class BookingsService {
           heldByBookingId: null,
         },
       });
+      if (this.vouchers && typeof this.vouchers.release === 'function')
+        await this.vouchers.release(transaction, id, 'BOOKING_EXPIRED');
       await this.audit?.record(
         {
           action: 'BOOKING_EXPIRED',
@@ -753,10 +791,105 @@ export class BookingsService {
     return null;
   }
 
+  private validateComboSelections(
+    combos: CreateBookingDto['combos'] = [],
+  ) {
+    if (
+      combos.length > 10 ||
+      new Set(combos.map((item) => item.cinemaComboId)).size !== combos.length ||
+      combos.some(
+        (item) =>
+          !Number.isInteger(item.quantity) ||
+          item.quantity < 1 ||
+          item.quantity > 10,
+      )
+    ) {
+      throw new ConflictException('Invalid combo selection');
+    }
+    return combos;
+  }
+
+  private canonicalizeSeats(
+    seats: Array<{
+      id: string;
+      status: ShowtimeSeatStatus;
+      price: Prisma.Decimal;
+      seat: { row: string; number: number; type: string };
+    }>,
+    requestedSeatIds: string[],
+    options: { requireAvailable?: boolean } = {},
+  ) {
+    const seatsById = new Map(seats.map((seat) => [seat.id, seat]));
+    const seatsByCoordinate = new Map(
+      seats.map((seat) => [`${seat.seat.row}:${seat.seat.number}`, seat]),
+    );
+    const canonicalSeats = new Map<string, (typeof seats)[number]>();
+
+    for (const id of requestedSeatIds) {
+      const seat = seatsById.get(id);
+      if (!seat) {
+        throw new NotFoundException(
+          'One or more showtime seats were not found',
+        );
+      }
+      if (options.requireAvailable && seat.status !== ShowtimeSeatStatus.AVAILABLE) {
+        throw new ConflictException(
+          'One or more seats are no longer available',
+        );
+      }
+      canonicalSeats.set(seat.id, seat);
+      if (seat.seat.type === 'COUPLE') {
+        const partnerNumber =
+          seat.seat.number % 2 === 1
+            ? seat.seat.number + 1
+            : seat.seat.number - 1;
+        const partner = seatsByCoordinate.get(
+          `${seat.seat.row}:${partnerNumber}`,
+        );
+        if (
+          !partner ||
+          partner.seat.type !== 'COUPLE' ||
+          (options.requireAvailable &&
+            partner.status !== ShowtimeSeatStatus.AVAILABLE)
+        ) {
+          throw new ConflictException('Couple seat must have a valid partner');
+        }
+        canonicalSeats.set(partner.id, partner);
+      }
+    }
+
+    if (canonicalSeats.size > 10) {
+      throw new ConflictException('A maximum of 10 physical seats can be held');
+    }
+    return { canonicalSeats };
+  }
+
+  private async loadComboOffers(
+    client: PrismaService | Prisma.TransactionClient,
+    cinemaId: string,
+    combos: NonNullable<CreateBookingDto['combos']>,
+  ) {
+    if (!combos.length) return [];
+    const offers = await client.cinemaCombo.findMany({
+      where: {
+        id: { in: combos.map((item) => item.cinemaComboId) },
+        cinemaId,
+        active: true,
+        combo: { active: true },
+      },
+      include: { combo: true },
+    });
+    if (offers.length !== combos.length) {
+      throw new ConflictException('Combo is unavailable at this cinema');
+    }
+    return offers;
+  }
+
   private createRequestHash(
     showtimeId: string,
     showtimeSeatIds: string[],
     combos: Array<{ cinemaComboId: string; quantity: number }> = [],
+    voucherCode?: string | null,
   ) {
     return createHash('sha256')
       .update(
@@ -771,6 +904,7 @@ export class BookingsService {
               }))
               .sort((a, b) => a.cinemaComboId.localeCompare(b.cinemaComboId)),
           }),
+          ...(voucherCode ? { voucherCode } : {}),
         }),
       )
       .digest('hex');
@@ -785,6 +919,7 @@ export class BookingsService {
     },
     payment: true,
     comboItems: true,
+    voucherRedemption: true,
     tickets: true,
   } satisfies Prisma.BookingInclude;
 

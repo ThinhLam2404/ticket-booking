@@ -63,6 +63,12 @@ Booking và ticket sort theo `createdAt DESC, id DESC`. SePay sort theo `transac
 
 ### Giai đoạn B2 — giao diện combo
 
+### Giai đoạn C1–C3 — backend voucher
+
+- Voucher được chuẩn hóa mã uppercase; hỗ trợ fixed/percent, scope vé/combo/toàn đơn, thời hạn, đơn tối thiểu, mức giảm tối đa và giới hạn theo rạp. Admin có quyền riêng `MANAGE_VOUCHERS`; mã không đổi sau khi tạo. Voucher campaign được phát qua `VoucherAssignment` cho từng customer, mỗi assignment có `usageLimit` riêng; không có quota tổng toàn hệ thống.
+- `POST /bookings/quote` chỉ báo giá, không giữ ghế, assignment hay redemption; quote chỉ kiểm tra voucher đã được phát cho customer và điều kiện chiến dịch, không kiểm tra quota sử dụng. `POST /bookings/hold` lưu `voucherCode` như ý định mua và giữ giá gốc; việc kiểm tra quota, điều kiện, tính giá tin cậy, snapshot giảm giá và tạo `VoucherRedemption` diễn ra atomically khi customer bắt đầu checkout SePay. Vì vậy người checkout thành công trước sẽ thắng lượt voucher, không phải người hold ghế trước.
+- Checkout khóa booking và assignment, cập nhật `booking.totalAmount` trước khi tạo payment intent; SePay chỉ dùng `booking.totalAmount`/`expectedAmount`, không tính voucher lần hai. Webhook chỉ consume redemption đã reserve; cancel/expiry release redemption chưa consume, còn refund không trả lại lượt đã consume. Migration `20261026100000_vouchers` cần `npm run prisma:generate` và `npm run prisma:deploy` khi rollout.
+
 - Review fixes: chi tiết vé tải snapshot combo của toàn booking và ghi rõ không phải combo cho từng vé. Đổi rạp reset draft giá; xác nhận giá hiển thị rạp và trạng thái. Xóa ảnh gửi `imageUrl: null` (contract nullable). Hold chưa rõ kết quả giữ snapshot request/key riêng và không bỏ khi retry gặp 429/auth/timeout; vẫn cho retry khi suất đã gần giờ chiếu. Combo đã chọn biến mất khỏi menu có nút bỏ lựa chọn, chặn tạo booking mới cho đến khi hợp lệ; không tự sửa payload đang retry.
 
 - `/admin/combos` quản lý danh mục và giá/trạng thái theo rạp, có bước xác nhận và lỗi API. Giao diện cấp quyền có `MANAGE_COMBOS`. Khách chọn số lượng combo trực tiếp tại trang chọn ghế, gửi toàn bộ lựa chọn trong request hold; không thêm route sửa booking hoặc fulfill, không sửa SePay.

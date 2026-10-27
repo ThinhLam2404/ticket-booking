@@ -258,9 +258,11 @@ export function BookingPage() {
           <section className="checkout-card order-summary-card">
             <p className="eyebrow">ORDER SUMMARY</p>
             <div className="summary-line">
-              <span>Tổng tiền vé</span>
-              <strong>{money(booking.totalAmount)}</strong>
+              <span>Tạm tính</span>
+              <strong>{money(Number(booking.ticketSubtotal) + Number(booking.comboSubtotal))}</strong>
             </div>
+            {Number(booking.discountAmount) > 0 && <div className="summary-voucher"><span>Voucher {booking.voucherCode ?? ''}</span><strong>-{money(booking.discountAmount)}</strong></div>}
+            {booking.voucherCode && booking.status === "PENDING" && !intent && <p className="success-inline">Voucher sẽ được giữ khi bạn bắt đầu thanh toán. Nếu hết lượt, bạn có thể chọn thanh toán lại hoặc dùng mã khác.</p>}
             <div className="summary-total-line">
               <span>Tổng thanh toán</span>
               <strong className="summary-total-amount">

@@ -43,7 +43,7 @@ describe('BookingsService Couple seat handling', () => {
       ),
     };
     return {
-      service: new BookingsService(prisma as never, redis as never),
+      service: new BookingsService(prisma as never, redis as never, {} as never),
       prisma,
       redis,
     };
@@ -138,7 +138,7 @@ describe('BookingsService Couple seat handling', () => {
     const prisma = {
       booking: { findMany },
     };
-    const service = new BookingsService(prisma as never, {} as never);
+    const service = new BookingsService(prisma as never, {} as never, {} as never);
     (service as unknown as { expireBooking: typeof expireBooking }).expireBooking = expireBooking;
 
     await expect(service.expireBookings()).resolves.toEqual({ processed: 51 });
@@ -178,7 +178,7 @@ describe('BookingsService Couple seat handling', () => {
       },
     };
     const redis = { setIfAbsent: vi.fn(), releaseIfOwned: vi.fn() };
-    const service = new BookingsService(prisma as never, redis as never);
+    const service = new BookingsService(prisma as never, redis as never, {} as never);
 
     await expect(service.hold('user-1', {
       showtimeId: 'showtime-1',

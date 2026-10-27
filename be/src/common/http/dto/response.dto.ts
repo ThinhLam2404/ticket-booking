@@ -447,6 +447,13 @@ export class TicketSummaryResponseDto {
   createdAt!: string;
 }
 
+export class TicketBookingComboResponseDto {
+  @ApiProperty() name!: string;
+  @ApiProperty() description!: string;
+  @ApiProperty() unitPrice!: string;
+  @ApiProperty() quantity!: number;
+}
+
 export class TicketBookingResponseDto {
   @ApiProperty({ example: 'clx-booking-id' })
   id!: string;
@@ -468,6 +475,15 @@ export class TicketBookingResponseDto {
 
   @ApiProperty({ type: ShowtimeResponseDto })
   showtime!: ShowtimeResponseDto;
+
+  @ApiProperty({ type: [TicketBookingComboResponseDto] })
+  comboItems!: TicketBookingComboResponseDto[];
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  voucherCode?: string | null;
+
+  @ApiProperty({ example: '0.00' })
+  discountAmount!: string;
 
   @ApiProperty({ example: '2026-09-07T10:00:00.000Z', format: 'date-time' })
   createdAt!: string;
@@ -530,6 +546,30 @@ export class BookingComboItemResponseDto {
   @ApiProperty() quantity!: number;
 }
 
+export class VoucherRedemptionResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() codeSnapshot!: string;
+  @ApiProperty() revisionSnapshot!: number;
+  @ApiProperty() discountAmount!: string;
+  @ApiProperty() status!: string;
+}
+
+export class BookingQuoteVoucherDto {
+  @ApiProperty() type!: string;
+  @ApiProperty() scope!: string;
+  @ApiProperty() value!: string;
+  @ApiProperty() revision!: number;
+}
+
+export class BookingQuoteResponseDto {
+  @ApiProperty() ticketSubtotal!: string;
+  @ApiProperty() comboSubtotal!: string;
+  @ApiProperty() discountAmount!: string;
+  @ApiProperty() totalAmount!: string;
+  @ApiPropertyOptional({ type: String, nullable: true }) voucherCode!: string | null;
+  @ApiPropertyOptional({ type: BookingQuoteVoucherDto, nullable: true }) voucherDiscount!: BookingQuoteVoucherDto | null;
+}
+
 export class BookingResponseDto {
   @ApiProperty({ example: 'clx-booking-id' })
   id!: string;
@@ -549,11 +589,17 @@ export class BookingResponseDto {
   @ApiProperty({ example: '0.00' })
   discountAmount!: string;
 
+  @ApiPropertyOptional({ type: String, nullable: true })
+  voucherCode?: string | null;
+
   @ApiProperty({ example: 1, minimum: 1 })
   pricingVersion!: number;
 
   @ApiProperty({ type: [BookingComboItemResponseDto] })
   comboItems!: BookingComboItemResponseDto[];
+
+  @ApiPropertyOptional({ type: VoucherRedemptionResponseDto, nullable: true })
+  voucherRedemption?: VoucherRedemptionResponseDto | null;
 
   @ApiProperty({ example: '2026-09-07T10:10:00.000Z', format: 'date-time' })
   expiresAt!: string;

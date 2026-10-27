@@ -23,6 +23,7 @@ enum AdminPermission {
   MANAGE_USERS
   VIEW_AUDIT_LOGS
   MANAGE_COMBOS
+  MANAGE_VOUCHERS
 }
 
 enum MovieStatus {
@@ -62,6 +63,23 @@ enum BookingStatus {
   CONFIRMED
   CANCELLED
   EXPIRED
+}
+
+enum VoucherDiscountType {
+  FIXED
+  PERCENT
+}
+
+enum VoucherScope {
+  TICKETS
+  COMBOS
+  ORDER
+}
+
+enum VoucherRedemptionStatus {
+  RESERVED
+  CONSUMED
+  RELEASED
 }
 
 enum PaymentStatus {
@@ -123,6 +141,8 @@ model User {
   adminInvitationsSent    AdminInvitation[]        @relation("AdminInvitationSender")
   adminInvitationAccepted AdminInvitation[]        @relation("AdminInvitationAcceptor")
   refunds                 Refund[]
+  voucherRedemptions      VoucherRedemption[]
+  voucherAssignments      VoucherAssignment[]
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
 }
@@ -176,6 +196,7 @@ model Movie {
 
 model Cinema {
   combos       CinemaCombo[]
+  voucherCinemas VoucherCinema[]
   id           String   @id @default(cuid())
   name         String
   address      String
@@ -356,8 +377,10 @@ model Booking {
   ticketSubtotal Decimal             @db.Decimal(10, 2)
   comboSubtotal  Decimal             @default(0) @db.Decimal(10, 2)
   discountAmount Decimal             @default(0) @db.Decimal(10, 2)
+  voucherCode    String?
   pricingVersion Int                 @default(1)
   comboItems     BookingComboItem[]
+  voucherRedemption VoucherRedemption?
   expiresAt      DateTime
   holdToken      String
   idempotencyKey String?
@@ -380,6 +403,77 @@ model Booking {
   @@index([userId, createdAt, id])
   @@index([status, createdAt, id])
   @@index([status, expiresAt])
+}
+
+model Voucher {
+  id                String                @id @default(cuid())
+  code              String                @unique @db.VarChar(64)
+  discountType      VoucherDiscountType
+  scope             VoucherScope
+  value             Decimal               @db.Decimal(10, 2)
+  minimumSpend      Decimal               @default(0) @db.Decimal(10, 2)
+  maximumDiscount   Decimal?              @db.Decimal(10, 2)
+  startsAt          DateTime
+  endsAt            DateTime
+  active            Boolean               @default(true)
+  defaultUsageLimit Int                   @default(1)
+  revision          Int                   @default(1)
+  cinemas           VoucherCinema[]
+  assignments       VoucherAssignment[]
+  redemptions       VoucherRedemption[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([active, startsAt, endsAt])
+}
+
+model VoucherCinema {
+  voucherId String
+  cinemaId  String
+  voucher   Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  cinema    Cinema  @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
+
+  @@id([voucherId, cinemaId])
+  @@index([cinemaId])
+}
+
+model VoucherAssignment {
+  id             String   @id @default(cuid())
+  voucherId      String
+  userId         String
+  usageLimit     Int      @default(1)
+  assignedAt     DateTime @default(now())
+  voucher        Voucher              @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redemptions    VoucherRedemption[]
+
+  @@unique([voucherId, userId])
+  @@index([userId, assignedAt])
+}
+
+model VoucherRedemption {
+  id              String                  @id @default(cuid())
+  voucherId       String
+  assignmentId    String
+  userId          String
+  bookingId       String                  @unique
+  status          VoucherRedemptionStatus @default(RESERVED)
+  codeSnapshot    String
+  revisionSnapshot Int
+  discountAmount  Decimal                 @db.Decimal(10, 2)
+  reservedAt      DateTime                @default(now())
+  consumedAt      DateTime?
+  releasedAt      DateTime?
+  releaseReason   String?
+  voucher         Voucher                 @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+  assignment      VoucherAssignment      @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  booking         Booking                 @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([voucherId, status])
+  @@index([assignmentId, status])
+  @@index([voucherId, userId, status])
+  @@index([userId, status])
 }
 
 model Combo {

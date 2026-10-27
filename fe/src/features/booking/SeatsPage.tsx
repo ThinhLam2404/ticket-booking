@@ -27,6 +27,14 @@ import {
 } from "./components";
 import { ComboPicker } from "./ComboPicker";
 
+type ComboSelection = { cinemaComboId: string; quantity: number };
+type AppliedVoucher = {
+  code: string;
+  quote: Awaited<ReturnType<typeof api.quote>>;
+  seatIds: string[];
+  combos: ComboSelection[];
+};
+
 const SHOWTIME_BUFFER_SECONDS = 5 * 60;
 
 export function SeatsPage() {
@@ -39,13 +47,15 @@ export function SeatsPage() {
   const [comboDraft, setComboDraft] = useState<
     Record<string, { quantity: number; price: number }>
   >({});
+  const [voucherDraft, setVoucherDraft] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
   const [retryLocked, setRetryLocked] = useState(false);
   const [holdExpiredNotice, setHoldExpiredNotice] = useState(false);
   const [holdConflict, setHoldConflict] = useState<
     "HELD" | "UNAVAILABLE" | null
   >(null);
   const holdKey = useRef(`hold-${crypto.randomUUID()}`);
-  const pendingPurchase = useRef<{ showtimeId: string; seats: string[]; key: string; combos: Array<{ cinemaComboId: string; quantity: number }> } | null>(null);
+  const pendingPurchase = useRef<{ showtimeId: string; seats: string[]; key: string; combos: Array<{ cinemaComboId: string; quantity: number }>; voucherCode: string | null } | null>(null);
   const showtimeQuery = useQuery({
     queryKey: ["showtime", showtimeId],
     queryFn: ({ signal }) => api.showtime(showtimeId!, signal),
@@ -60,11 +70,30 @@ export function SeatsPage() {
   const showtimeCountdown = useCountdown(showtimeQuery.data?.startsAt);
   const comboMenu = useQuery({ queryKey: ['combo-menu', showtimeQuery.data?.room?.cinema?.id], queryFn: () => api.comboMenu(showtimeQuery.data!.room!.cinema!.id), enabled: Boolean(showtimeQuery.data?.room?.cinema?.id) });
   const hasComboSelection = Object.values(comboDraft).some((item) => item.quantity > 0);
+  const comboSelections = Object.entries(comboDraft)
+    .filter(([, item]) => item.quantity > 0)
+    .map(([cinemaComboId, item]) => ({ cinemaComboId, quantity: item.quantity }));
+  const quoteMutation = useMutation({
+    mutationFn: () => api.quote({
+      showtimeId: showtimeId!,
+      showtimeSeatIds: selectedSeats,
+      combos: comboSelections,
+      voucherCode: voucherDraft.trim() || null,
+    }),
+    onSuccess: (quote) => {
+      setAppliedVoucher(voucherDraft.trim() ? {
+        code: voucherDraft.trim().toUpperCase(),
+        quote,
+        seatIds: [...selectedSeats],
+        combos: comboSelections.map((combo) => ({ ...combo })),
+      } : null);
+    },
+  });
   const invalidComboSelection = hasComboSelection && (!comboMenu.isSuccess || Object.entries(comboDraft).some(([id, item]) => item.quantity > 0 && !comboMenu.data.some((offer) => offer.id === id)));
   const holdMutation = useMutation({
     mutationFn: () => {
       const purchase = pendingPurchase.current!;
-      return api.hold(purchase.showtimeId, purchase.seats, purchase.key, purchase.combos);
+      return api.hold(purchase.showtimeId, purchase.seats, purchase.key, purchase.combos, purchase.voucherCode);
     },
     onSuccess: (booking) => {
       queryClient.setQueryData(["booking", booking.id], booking);
@@ -93,6 +122,8 @@ export function SeatsPage() {
     holdKey.current = `hold-${crypto.randomUUID()}`;
     setSelectedSeats([]);
     setComboDraft({});
+    setVoucherDraft('');
+    setAppliedVoucher(null);
     setRetryLocked(false);
     pendingPurchase.current = null;
   }, [showtimeId]);
@@ -135,6 +166,12 @@ export function SeatsPage() {
       return next.length === current.length ? current : next;
     });
   }, [seatsQuery.data, retryLocked, holdMutation.isPending]);
+  const voucherIsCurrent = Boolean(
+    appliedVoucher &&
+    appliedVoucher.seatIds.join(',') === selectedSeats.join(',') &&
+    JSON.stringify(appliedVoucher.combos) === JSON.stringify(comboSelections),
+  );
+  const quotedTotal = voucherIsCurrent ? appliedVoucher?.quote.totalAmount ?? null : null;
   const selectedTotal = useMemo(
     () =>
       (seatsQuery.data?.seats ?? []).reduce(
@@ -155,13 +192,26 @@ export function SeatsPage() {
       ),
     [seatsQuery.data?.seats],
   );
+  function applyVoucher() {
+    if (!selectedSeats.length) return;
+    quoteMutation.mutate();
+  }
+
   function submitHold() {
+    if (
+      appliedVoucher &&
+      (appliedVoucher.seatIds.join(',') !== selectedSeats.join(',') ||
+        JSON.stringify(appliedVoucher.combos) !== JSON.stringify(comboSelections))
+    ) {
+      setAppliedVoucher(null);
+      return;
+    }
     if (!user) {
       openAuth();
       return;
     }
     if (!pendingPurchase.current) {
-      pendingPurchase.current = { showtimeId: showtimeId!, seats: [...selectedSeats], key: holdKey.current, combos: Object.entries(comboDraft).filter(([, item]) => item.quantity > 0).map(([cinemaComboId, item]) => ({ cinemaComboId, quantity: item.quantity })) };
+      pendingPurchase.current = { showtimeId: showtimeId!, seats: [...selectedSeats], key: holdKey.current, combos: comboSelections, voucherCode: appliedVoucher?.code ?? null };
     }
     holdMutation.mutate();
   }
@@ -218,6 +268,7 @@ export function SeatsPage() {
         selectedIds.every((id) => selectedSeats.includes(id)))
     ) {
       holdKey.current = `hold-${crypto.randomUUID()}`;
+      setAppliedVoucher(null);
       setSelectedSeats((current) =>
         current.filter((id) => !selectedIds.includes(id)),
       );
@@ -229,6 +280,7 @@ export function SeatsPage() {
     )
       return;
     holdKey.current = `hold-${crypto.randomUUID()}`;
+    setAppliedVoucher(null);
     setSelectedSeats((current) =>
       [...new Set([...current, ...selectedIds])].slice(0, 10),
     );
@@ -380,15 +432,26 @@ export function SeatsPage() {
                 </div>
               ))}
               <div className="summary-total">
-                <span>Tổng cộng</span>
+                <span>Tạm tính</span>
                 <strong>{money(selectedTotal + Object.values(comboDraft).reduce((sum, item) => sum + item.price * item.quantity, 0))}</strong>
+              </div>
+              {appliedVoucher && <div className="summary-voucher"><span>Voucher {appliedVoucher.code}<small> · lượt dùng chỉ được giữ khi bắt đầu thanh toán</small></span><strong>-{money(appliedVoucher.quote.discountAmount)}</strong></div>}
+              <div className="summary-total">
+                <span>Thanh toán</span>
+                <strong>{money(quotedTotal ?? selectedTotal + Object.values(comboDraft).reduce((sum, item) => sum + item.price * item.quantity, 0))}</strong>
               </div>
             </div>
           ) : (
             <p className="summary-empty">Chưa chọn ghế nào.</p>
           )}
-          <ComboPicker cinemaId={showtime.room?.cinema?.id} quantities={Object.fromEntries(Object.entries(comboDraft).map(([id, item]) => [id, item.quantity]))} disabled={actionPending || retryLocked} onChange={(id, quantity, price) => { holdKey.current = `hold-${crypto.randomUUID()}`; setComboDraft((current) => ({ ...current, [id]: { quantity, price } })); }} />
-          {retryLocked && <p role="alert">Chưa xác định kết quả đặt vé. Lựa chọn được giữ nguyên; bấm lại để kiểm tra cùng yêu cầu, không tạo đơn mới.</p>}
+          <ComboPicker cinemaId={showtime.room?.cinema?.id} quantities={Object.fromEntries(Object.entries(comboDraft).map(([id, item]) => [id, item.quantity]))} disabled={actionPending || retryLocked} onChange={(id, quantity, price) => { holdKey.current = `hold-${crypto.randomUUID()}`; setAppliedVoucher(null); setComboDraft((current) => ({ ...current, [id]: { quantity, price } })); }} />
+          <section className="voucher-panel" aria-label="Voucher giảm giá">
+             <label htmlFor="voucher-code">Mã voucher <small>· lượt dùng được giữ khi bắt đầu thanh toán</small></label>
+             <div className="voucher-form"><input id="voucher-code" value={voucherDraft} disabled={actionPending || retryLocked || quoteMutation.isPending} onChange={(event) => { setVoucherDraft(event.target.value.toUpperCase()); setAppliedVoucher(null); }} placeholder="Nhập mã khuyến mãi" /> <button className="secondary" type="button" disabled={!selectedSeats.length || quoteMutation.isPending || actionPending || retryLocked} onClick={applyVoucher}>{quoteMutation.isPending ? "Đang kiểm tra…" : "Áp dụng"}</button></div>
+             {appliedVoucher && <p className="success-inline" role="status">Đã áp dụng {appliedVoucher.code}. Giá sẽ được xác nhận lại khi giữ ghế.</p>}
+             {quoteMutation.isError && <p className="error-inline" role="alert">{errorMessage(quoteMutation.error, "Không thể áp dụng voucher.")}</p>}
+           </section>
+           {retryLocked && <p role="alert">Chưa xác định kết quả đặt vé. Lựa chọn được giữ nguyên; bấm lại để kiểm tra cùng yêu cầu, không tạo đơn mới.</p>}
           <div className="summary-actions">
             {tooClose && !retryLocked ? (
               <p className="summary-warning">
@@ -397,7 +460,13 @@ export function SeatsPage() {
             ) : (
               <button
                 className="primary btn-full"
-                disabled={!selectedSeats.length || actionPending || (!retryLocked && invalidComboSelection)}
+                disabled={
+                  !selectedSeats.length ||
+                  actionPending ||
+                  quoteMutation.isPending ||
+                  (Boolean(voucherDraft.trim()) && !voucherIsCurrent) ||
+                  (!retryLocked && invalidComboSelection)
+                }
                 onClick={submitHold}
               >
                 {actionPending ? "Đang giữ ghế…" : "Giữ ghế & Thanh toán"}

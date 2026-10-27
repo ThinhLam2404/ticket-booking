@@ -76,6 +76,9 @@ export type AcceptAdminInvitationRequest = RequestBody<'/api/v1/auth/admin-invit
 export type AdminInvitationPreview = JsonResponse<'/api/v1/auth/admin-invitations/preview', 'post'>;
 export type AdminInvitationAccepted = JsonResponse<'/api/v1/auth/admin-invitations/accept', 'post'>;
 export type HoldRequest = RequestBody<'/api/v1/bookings/hold', 'post'>;
+export type QuoteRequest = RequestBody<'/api/v1/bookings/quote', 'post'>;
+export type QuoteResponse = JsonResponse<'/api/v1/bookings/quote', 'post'>;
+export type Voucher = components['schemas']['VoucherResponseDto'];
 
 export type MovieStatus = Movie['status'];
 export type SeatType = Seat['type'];

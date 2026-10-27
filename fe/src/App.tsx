@@ -24,6 +24,7 @@ const AdminLoginPage = lazy(() => import('./features/admin/AdminLoginPage').then
 const AdminDashboardPage = lazy(() => import('./features/admin/dashboard/AdminDashboardPage').then((module) => ({ default: module.AdminDashboardPage })));
 const AdminMoviesPage = lazy(() => import('./features/admin/movies/AdminMoviesPage').then((module) => ({ default: module.AdminMoviesPage })));
 const AdminCombosPage = lazy(() => import('./features/admin/combos/AdminCombosPage').then((module) => ({ default: module.AdminCombosPage })));
+const AdminVouchersPage = lazy(() => import('./features/admin/vouchers/AdminVouchersPage').then((module) => ({ default: module.AdminVouchersPage })));
 const AdminCinemasPage = lazy(() => import('./features/admin/cinemas/AdminCinemasPage').then((module) => ({ default: module.AdminCinemasPage })));
 const AdminRoomsPage = lazy(() => import('./features/admin/cinemas/AdminCinemasPage').then((module) => ({ default: module.AdminRoomsPage })));
 const AdminSeatsPage = lazy(() => import('./features/admin/cinemas/AdminCinemasPage').then((module) => ({ default: module.AdminSeatsPage })));
@@ -79,6 +80,7 @@ const router = createBrowserRouter([
           { path: 'admin', element: <AdminDashboardPage /> },
           { path: 'admin/movies', element: <AdminMoviesPage /> },
           { path: 'admin/combos', element: <AdminCombosPage /> },
+          { path: 'admin/vouchers', element: <AdminVouchersPage /> },
           { path: 'admin/cinemas', element: <AdminCinemasPage /> },
           { path: 'admin/cinemas/:cinemaId/rooms', element: <AdminRoomsPage /> },
           { path: 'admin/rooms/:roomId/seats', element: <AdminSeatsPage /> },

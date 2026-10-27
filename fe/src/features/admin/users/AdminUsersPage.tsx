@@ -7,7 +7,7 @@ import { EmptyState, ErrorState, LoadingState } from '../../../components/ui';
 import { errorMessage, formatDate } from '../../../utils/format';
 import { AdminPage, ConfirmDialog, permissionText, roleText, type ConfirmState } from '../shared';
 
-type Permission = 'MANAGE_MOVIES' | 'MANAGE_CINEMAS' | 'MANAGE_SHOWTIMES' | 'VIEW_BOOKINGS' | 'MANAGE_PAYMENTS' | 'VIEW_SYSTEM' | 'MANAGE_USERS' | 'VIEW_AUDIT_LOGS' | 'MANAGE_COMBOS';
+type Permission = 'MANAGE_MOVIES' | 'MANAGE_CINEMAS' | 'MANAGE_SHOWTIMES' | 'VIEW_BOOKINGS' | 'MANAGE_PAYMENTS' | 'VIEW_SYSTEM' | 'MANAGE_USERS' | 'VIEW_AUDIT_LOGS' | 'MANAGE_COMBOS' | 'MANAGE_VOUCHERS';
 
 type UserDraft = {
   disabled: boolean;
@@ -15,7 +15,7 @@ type UserDraft = {
   selected: Permission[];
 };
 
-const permissions: Permission[] = ['MANAGE_MOVIES', 'MANAGE_CINEMAS', 'MANAGE_SHOWTIMES', 'VIEW_BOOKINGS', 'MANAGE_PAYMENTS', 'VIEW_SYSTEM', 'MANAGE_USERS', 'VIEW_AUDIT_LOGS', 'MANAGE_COMBOS'];
+const permissions: Permission[] = ['MANAGE_MOVIES', 'MANAGE_CINEMAS', 'MANAGE_SHOWTIMES', 'VIEW_BOOKINGS', 'MANAGE_PAYMENTS', 'VIEW_SYSTEM', 'MANAGE_USERS', 'VIEW_AUDIT_LOGS', 'MANAGE_COMBOS', 'MANAGE_VOUCHERS'];
 
 export function AdminUsersPage() {
   const [search, setSearch] = useState('');

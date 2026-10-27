@@ -19,6 +19,7 @@ import {
 } from '../../common/http/swagger.decorators.js';
 import {
   BookingResponseDto,
+  BookingQuoteResponseDto,
   CursorPaginatedBookingsResponseDto,
 } from '../../common/http/dto/response.dto.js';
 import { ListBookingsDto } from './dto/list-bookings.dto.js';
@@ -40,6 +41,13 @@ import { BookingsService } from './bookings.service.js';
 @Controller('bookings')
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
+
+  @Post('quote')
+  @ApiResponse({ status: 201, type: BookingQuoteResponseDto })
+  @ApiErrorResponses(400, 401, 404, 409)
+  quote(@CurrentUser() user: AuthUser, @Body() dto: CreateBookingDto) {
+    return this.bookingsService.quote(user.id, dto);
+  }
 
   @Post('hold')
   @ApiResponse({ status: 201, type: BookingResponseDto })

@@ -1279,6 +1279,159 @@
         ]
       }
     },
+    "/api/v1/vouchers/admin": {
+      "get": {
+        "operationId": "Vouchers_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VoucherResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "vouchers"
+        ]
+      },
+      "post": {
+        "operationId": "Vouchers_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVoucherDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "vouchers"
+        ]
+      }
+    },
+    "/api/v1/vouchers/admin/{id}/assign": {
+      "post": {
+        "operationId": "Vouchers_assign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignVoucherDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignVoucherResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "vouchers"
+        ]
+      }
+    },
+    "/api/v1/vouchers/admin/{id}": {
+      "patch": {
+        "operationId": "Vouchers_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVoucherDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "vouchers"
+        ]
+      }
+    },
     "/api/v1/locations/provinces": {
       "get": {
         "operationId": "Locations_listProvinces",
@@ -4939,6 +5092,82 @@
         ]
       }
     },
+    "/api/v1/bookings/quote": {
+      "post": {
+        "operationId": "Bookings_quote",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingQuoteResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
     "/api/v1/bookings/hold": {
       "post": {
         "operationId": "Bookings_hold",
@@ -6290,7 +6519,8 @@
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
                 "VIEW_AUDIT_LOGS",
-                "MANAGE_COMBOS"
+                "MANAGE_COMBOS",
+                "MANAGE_VOUCHERS"
               ]
             }
           },
@@ -6702,7 +6932,8 @@
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
                 "VIEW_AUDIT_LOGS",
-                "MANAGE_COMBOS"
+                "MANAGE_COMBOS",
+                "MANAGE_VOUCHERS"
               ]
             }
           },
@@ -6796,7 +7027,8 @@
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
                 "VIEW_AUDIT_LOGS",
-                "MANAGE_COMBOS"
+                "MANAGE_COMBOS",
+                "MANAGE_VOUCHERS"
               ]
             }
           }
@@ -6829,7 +7061,8 @@
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
                 "VIEW_AUDIT_LOGS",
-                "MANAGE_COMBOS"
+                "MANAGE_COMBOS",
+                "MANAGE_VOUCHERS"
               ]
             }
           },
@@ -6900,6 +7133,256 @@
           "revokedAt",
           "createdAt"
         ]
+      },
+      "VoucherResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "discountType": {
+            "type": "string",
+            "enum": [
+              "FIXED",
+              "PERCENT"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "TICKETS",
+              "COMBOS",
+              "ORDER"
+            ]
+          },
+          "value": {
+            "type": "string"
+          },
+          "minimumSpend": {
+            "type": "string"
+          },
+          "maximumDiscount": {
+            "type": "string",
+            "nullable": true
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "usageLimit": {
+            "type": "number"
+          },
+          "assignedUserCount": {
+            "type": "number"
+          },
+          "revision": {
+            "type": "number"
+          },
+          "cinemaIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "discountType",
+          "scope",
+          "value",
+          "minimumSpend",
+          "maximumDiscount",
+          "startsAt",
+          "endsAt",
+          "active",
+          "usageLimit",
+          "assignedUserCount",
+          "revision",
+          "cinemaIds"
+        ]
+      },
+      "CreateVoucherDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "WELCOME10"
+          },
+          "discountType": {
+            "type": "string",
+            "enum": [
+              "FIXED",
+              "PERCENT"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "TICKETS",
+              "COMBOS",
+              "ORDER"
+            ]
+          },
+          "value": {
+            "type": "number",
+            "example": 10
+          },
+          "minimumSpend": {
+            "type": "number",
+            "example": 200000,
+            "default": 0
+          },
+          "maximumDiscount": {
+            "type": "number",
+            "example": 50000,
+            "nullable": true
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          },
+          "usageLimit": {
+            "type": "number",
+            "example": 1,
+            "default": 1
+          },
+          "cinemaIds": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "discountType",
+          "scope",
+          "value",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "AssignVoucherDto": {
+        "type": "object",
+        "properties": {
+          "userIds": {
+            "description": "Bỏ trống để phát cho toàn bộ khách hàng",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "usageLimit": {
+            "type": "number",
+            "example": 1,
+            "default": 1
+          }
+        }
+      },
+      "AssignVoucherResponseDto": {
+        "type": "object",
+        "properties": {
+          "voucherId": {
+            "type": "string"
+          },
+          "assignedCount": {
+            "type": "number"
+          },
+          "skippedCount": {
+            "type": "number"
+          },
+          "usageLimit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "voucherId",
+          "assignedCount",
+          "skippedCount",
+          "usageLimit"
+        ]
+      },
+      "UpdateVoucherDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "WELCOME10"
+          },
+          "discountType": {
+            "type": "string",
+            "enum": [
+              "FIXED",
+              "PERCENT"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "TICKETS",
+              "COMBOS",
+              "ORDER"
+            ]
+          },
+          "value": {
+            "type": "number",
+            "example": 10
+          },
+          "minimumSpend": {
+            "type": "number",
+            "example": 200000,
+            "default": 0
+          },
+          "maximumDiscount": {
+            "type": "number",
+            "example": 50000,
+            "nullable": true
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          },
+          "usageLimit": {
+            "type": "number",
+            "example": 1,
+            "default": 1
+          },
+          "cinemaIds": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "ProvinceResponseDto": {
         "type": "object",
@@ -6997,7 +7480,8 @@
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
                 "VIEW_AUDIT_LOGS",
-                "MANAGE_COMBOS"
+                "MANAGE_COMBOS",
+                "MANAGE_VOUCHERS"
               ]
             }
           },
@@ -7080,7 +7564,8 @@
                 "VIEW_SYSTEM",
                 "MANAGE_USERS",
                 "VIEW_AUDIT_LOGS",
-                "MANAGE_COMBOS"
+                "MANAGE_COMBOS",
+                "MANAGE_VOUCHERS"
               ]
             }
           }
@@ -9098,6 +9583,11 @@
       "CreateBookingDto": {
         "type": "object",
         "properties": {
+          "voucherCode": {
+            "type": "string",
+            "example": "WELCOME10",
+            "nullable": true
+          },
           "combos": {
             "maxItems": 10,
             "type": "array",
@@ -9125,6 +9615,65 @@
         "required": [
           "showtimeId",
           "showtimeSeatIds"
+        ]
+      },
+      "BookingQuoteVoucherDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "type",
+          "scope",
+          "value",
+          "revision"
+        ]
+      },
+      "BookingQuoteResponseDto": {
+        "type": "object",
+        "properties": {
+          "ticketSubtotal": {
+            "type": "string"
+          },
+          "comboSubtotal": {
+            "type": "string"
+          },
+          "discountAmount": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "string"
+          },
+          "voucherCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "voucherDiscount": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BookingQuoteVoucherDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ticketSubtotal",
+          "comboSubtotal",
+          "discountAmount",
+          "totalAmount"
         ]
       },
       "BookingComboItemResponseDto": {
@@ -9157,6 +9706,33 @@
           "description",
           "unitPrice",
           "quantity"
+        ]
+      },
+      "VoucherRedemptionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "codeSnapshot": {
+            "type": "string"
+          },
+          "revisionSnapshot": {
+            "type": "number"
+          },
+          "discountAmount": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "codeSnapshot",
+          "revisionSnapshot",
+          "discountAmount",
+          "status"
         ]
       },
       "TicketSummaryResponseDto": {
@@ -9329,6 +9905,10 @@
             "type": "string",
             "example": "0.00"
           },
+          "voucherCode": {
+            "type": "string",
+            "nullable": true
+          },
           "pricingVersion": {
             "type": "number",
             "example": 1,
@@ -9339,6 +9919,15 @@
             "items": {
               "$ref": "#/components/schemas/BookingComboItemResponseDto"
             }
+          },
+          "voucherRedemption": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VoucherRedemptionResponseDto"
+              }
+            ]
           },
           "expiresAt": {
             "type": "string",
@@ -9761,6 +10350,29 @@
           "status"
         ]
       },
+      "TicketBookingComboResponseDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "unitPrice",
+          "quantity"
+        ]
+      },
       "TicketBookingResponseDto": {
         "type": "object",
         "properties": {
@@ -9798,6 +10410,20 @@
           "showtime": {
             "$ref": "#/components/schemas/ShowtimeResponseDto"
           },
+          "comboItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketBookingComboResponseDto"
+            }
+          },
+          "voucherCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "string",
+            "example": "0.00"
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-09-07T10:00:00.000Z",
@@ -9817,6 +10443,8 @@
           "userId",
           "showtimeId",
           "showtime",
+          "comboItems",
+          "discountAmount",
           "createdAt",
           "updatedAt"
         ]

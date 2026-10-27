@@ -10,6 +10,9 @@ import type {
   CursorSepayTransactionsResponse,
   Cinema,
   HoldRequest,
+  QuoteRequest,
+  QuoteResponse,
+  Voucher,
   LoginRequest,
   SepayCheckoutResponse,
   SepayTransaction,
@@ -529,8 +532,14 @@ export const api = {
   saveCombo(id: string | null, body: import('./generated/openapi').components['schemas']['CreateComboDto']) { return request(`/combos/admin${id ? `/${id}` : ''}`, { method: id ? 'PATCH' : 'POST', body: JSON.stringify(body) }); },
   adminComboMenu(cinemaId: string) { return request<import('./generated/openapi').components['schemas']['CinemaComboResponseDto'][]>(`/combos/admin/cinemas/${cinemaId}`); },
   saveComboOffer(cinemaId: string, comboId: string, body: { price: number; active: boolean }) { return request(`/combos/admin/cinemas/${cinemaId}/${comboId}`, { method: 'PUT', body: JSON.stringify(body) }); },
-  hold(showtimeId: string, showtimeSeatIds: string[], idempotencyKey = `hold-${crypto.randomUUID()}`, combos: NonNullable<HoldRequest['combos']> = []) {
-    const body: HoldRequest = { showtimeId, showtimeSeatIds, combos };
+  quote(body: QuoteRequest) {
+    return request<QuoteResponse>('/bookings/quote', { method: 'POST', body: JSON.stringify(body) });
+  },
+  adminVouchers() { return request<Voucher[]>('/vouchers/admin'); },
+  saveVoucher(id: string | null, body: import('./generated/openapi').components['schemas']['CreateVoucherDto']) { return request<Voucher>(`/vouchers/admin${id ? `/${id}` : ''}`, { method: id ? 'PATCH' : 'POST', body: JSON.stringify(body) }); },
+  assignVoucher(id: string, body: Partial<import('./generated/openapi').components['schemas']['AssignVoucherDto']> = {}) { return request(`/vouchers/admin/${id}/assign`, { method: 'POST', body: JSON.stringify(body) }); },
+  hold(showtimeId: string, showtimeSeatIds: string[], idempotencyKey = `hold-${crypto.randomUUID()}`, combos: NonNullable<HoldRequest['combos']> = [], voucherCode?: string | null) {
+    const body: HoldRequest = { showtimeId, showtimeSeatIds, combos, voucherCode };
     return request<Booking>('/bookings/hold', {
       method: 'POST',
       headers: { 'Idempotency-Key': idempotencyKey },

@@ -76,6 +76,7 @@ describe('SepayService', () => {
       } as never,
       redis as never,
       { record: vi.fn() } as never,
+      {} as never,
     );
 
     return { service, prisma, bookingsService, config, redis };

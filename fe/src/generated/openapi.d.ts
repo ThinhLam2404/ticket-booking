@@ -404,6 +404,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/vouchers/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Vouchers_list"];
+        put?: never;
+        post: operations["Vouchers_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vouchers/admin/{id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Vouchers_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vouchers/admin/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Vouchers_update"];
+        trace?: never;
+    };
     "/api/v1/locations/provinces": {
         parameters: {
             query?: never;
@@ -948,6 +996,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bookings/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Bookings_quote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bookings/hold": {
         parameters: {
             query?: never;
@@ -1248,7 +1312,7 @@ export interface components {
         AdminInvitationPreviewResponseDto: {
             /** Format: email */
             email: string;
-            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS" | "MANAGE_VOUCHERS")[];
             /** Format: date-time */
             expiresAt: string;
         };
@@ -1428,7 +1492,7 @@ export interface components {
             id: string;
             /** Format: email */
             email: string;
-            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS" | "MANAGE_VOUCHERS")[];
             invitedById: string;
             invitedByEmail: string | null;
             invitedByName: string | null;
@@ -1452,13 +1516,13 @@ export interface components {
              * @example new-admin@example.com
              */
             email: string;
-            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS" | "MANAGE_VOUCHERS")[];
         };
         AdminInvitationMutationResponseDto: {
             id: string;
             /** Format: email */
             email: string;
-            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS" | "MANAGE_VOUCHERS")[];
             invitedById: string;
             invitedByEmail: string | null;
             invitedByName: string | null;
@@ -1475,6 +1539,101 @@ export interface components {
             revokedAt: string | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        VoucherResponseDto: {
+            id: string;
+            code: string;
+            /** @enum {string} */
+            discountType: "FIXED" | "PERCENT";
+            /** @enum {string} */
+            scope: "TICKETS" | "COMBOS" | "ORDER";
+            value: string;
+            minimumSpend: string;
+            maximumDiscount: string | null;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            active: boolean;
+            usageLimit: number;
+            assignedUserCount: number;
+            revision: number;
+            cinemaIds: string[];
+        };
+        CreateVoucherDto: {
+            /** @example WELCOME10 */
+            code: string;
+            /** @enum {string} */
+            discountType: "FIXED" | "PERCENT";
+            /** @enum {string} */
+            scope: "TICKETS" | "COMBOS" | "ORDER";
+            /** @example 10 */
+            value: number;
+            /**
+             * @default 0
+             * @example 200000
+             */
+            minimumSpend: number;
+            /** @example 50000 */
+            maximumDiscount?: number | null;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** @default true */
+            active: boolean;
+            /**
+             * @default 1
+             * @example 1
+             */
+            usageLimit: number;
+            /** @default [] */
+            cinemaIds: string[];
+        };
+        AssignVoucherDto: {
+            /** @description Bỏ trống để phát cho toàn bộ khách hàng */
+            userIds?: string[];
+            /**
+             * @default 1
+             * @example 1
+             */
+            usageLimit: number;
+        };
+        AssignVoucherResponseDto: {
+            voucherId: string;
+            assignedCount: number;
+            skippedCount: number;
+            usageLimit: number;
+        };
+        UpdateVoucherDto: {
+            /** @example WELCOME10 */
+            code?: string;
+            /** @enum {string} */
+            discountType?: "FIXED" | "PERCENT";
+            /** @enum {string} */
+            scope?: "TICKETS" | "COMBOS" | "ORDER";
+            /** @example 10 */
+            value?: number;
+            /**
+             * @default 0
+             * @example 200000
+             */
+            minimumSpend: number;
+            /** @example 50000 */
+            maximumDiscount?: number | null;
+            /** Format: date-time */
+            startsAt?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            /** @default true */
+            active: boolean;
+            /**
+             * @default 1
+             * @example 1
+             */
+            usageLimit: number;
+            /** @default [] */
+            cinemaIds: string[];
         };
         ProvinceResponseDto: {
             /** @example 79 */
@@ -1515,7 +1674,7 @@ export interface components {
             role: "CUSTOMER" | "ADMIN";
             /** Format: date-time */
             disabledAt: Record<string, never> | null;
-            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
+            permissions: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS" | "MANAGE_VOUCHERS")[];
             activeSessionCount: number;
             /** Format: date-time */
             createdAt: string;
@@ -1542,7 +1701,7 @@ export interface components {
             role?: "CUSTOMER" | "ADMIN";
             /** @example false */
             disabled?: boolean;
-            permissions?: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS")[];
+            permissions?: ("MANAGE_MOVIES" | "MANAGE_CINEMAS" | "MANAGE_SHOWTIMES" | "VIEW_BOOKINGS" | "MANAGE_PAYMENTS" | "VIEW_SYSTEM" | "MANAGE_USERS" | "VIEW_AUDIT_LOGS" | "MANAGE_COMBOS" | "MANAGE_VOUCHERS")[];
         };
         MovieResponseDto: {
             /** @example clx-movie-id */
@@ -2492,6 +2651,8 @@ export interface components {
             quantity: number;
         };
         CreateBookingDto: {
+            /** @example WELCOME10 */
+            voucherCode?: string | null;
             combos?: components["schemas"]["ComboSelectionDto"][];
             /** @example clx123showtime */
             showtimeId: string;
@@ -2503,6 +2664,20 @@ export interface components {
              */
             showtimeSeatIds: string[];
         };
+        BookingQuoteVoucherDto: {
+            type: string;
+            scope: string;
+            value: string;
+            revision: number;
+        };
+        BookingQuoteResponseDto: {
+            ticketSubtotal: string;
+            comboSubtotal: string;
+            discountAmount: string;
+            totalAmount: string;
+            voucherCode?: string | null;
+            voucherDiscount?: components["schemas"]["BookingQuoteVoucherDto"] | null;
+        };
         BookingComboItemResponseDto: {
             id: string;
             cinemaComboId: string;
@@ -2511,6 +2686,13 @@ export interface components {
             /** @example 99000.00 */
             unitPrice: string;
             quantity: number;
+        };
+        VoucherRedemptionResponseDto: {
+            id: string;
+            codeSnapshot: string;
+            revisionSnapshot: number;
+            discountAmount: string;
+            status: string;
         };
         TicketSummaryResponseDto: {
             /** @example clx-ticket-id */
@@ -2592,9 +2774,11 @@ export interface components {
             comboSubtotal: string;
             /** @example 0.00 */
             discountAmount: string;
+            voucherCode?: string | null;
             /** @example 1 */
             pricingVersion: number;
             comboItems: components["schemas"]["BookingComboItemResponseDto"][];
+            voucherRedemption?: components["schemas"]["VoucherRedemptionResponseDto"] | null;
             /**
              * Format: date-time
              * @example 2026-09-07T10:10:00.000Z
@@ -2713,6 +2897,12 @@ export interface components {
             status: "REVIEW_REQUIRED" | "REFUNDED" | "CONFIRMED";
             adminNote?: string;
         };
+        TicketBookingComboResponseDto: {
+            name: string;
+            description: string;
+            unitPrice: string;
+            quantity: number;
+        };
         TicketBookingResponseDto: {
             /** @example clx-booking-id */
             id: string;
@@ -2733,6 +2923,10 @@ export interface components {
             /** @example clx-showtime-id */
             showtimeId: string;
             showtime: components["schemas"]["ShowtimeResponseDto"];
+            comboItems: components["schemas"]["TicketBookingComboResponseDto"][];
+            voucherCode?: string | null;
+            /** @example 0.00 */
+            discountAmount: string;
             /**
              * Format: date-time
              * @example 2026-09-07T10:00:00.000Z
@@ -3761,6 +3955,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Vouchers_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherResponseDto"][];
+                };
+            };
+        };
+    };
+    Vouchers_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateVoucherDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherResponseDto"];
+                };
+            };
+        };
+    };
+    Vouchers_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignVoucherDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignVoucherResponseDto"];
+                };
+            };
+        };
+    };
+    Vouchers_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateVoucherDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherResponseDto"];
                 };
             };
         };
@@ -6067,6 +6353,61 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    Bookings_quote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBookingDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingQuoteResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

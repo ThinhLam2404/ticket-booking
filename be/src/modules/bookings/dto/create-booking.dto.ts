@@ -13,6 +13,12 @@ import {
 } from 'class-validator';
 
 export class CreateBookingDto {
+  @ApiPropertyOptional({ type: String, example: 'WELCOME10', nullable: true })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  voucherCode?: string | null;
+
   @ApiPropertyOptional({ type: [ComboSelectionDto], maxItems: 10 })
   @IsOptional()
   @IsArray()

@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -14,6 +15,7 @@ import {
   ShowtimeSeatStatus,
   PaymentStatus,
   TicketStatus,
+  VoucherRedemptionStatus,
 } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
@@ -21,6 +23,8 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../database/prisma.service.js';
 import { isUniqueConstraintError } from '../../common/database/prisma-errors.js';
 import { BookingsService } from '../bookings/bookings.service.js';
+import { calculateBookingPrice } from '../bookings/booking-pricing.js';
+import { VouchersService } from '../vouchers/vouchers.service.js';
 import { SepayWebhookDto } from './dto/sepay-webhook.dto.js';
 import { SHOWTIME_BUFFER_SECONDS } from '../bookings/booking-policy.js';
 import { MailService } from '../mail/mail.service.js';
@@ -49,6 +53,7 @@ export class SepayService {
     private readonly mailService: MailService,
     private readonly redis: RedisService,
     private readonly audit: AuditService,
+    @Optional() private readonly vouchers?: VouchersService,
   ) {}
 
   async checkout(userId: string, bookingId: string) {
@@ -58,7 +63,8 @@ export class SepayService {
       where: { id: bookingId, userId },
       include: {
         items: true,
-        showtime: true,
+        comboItems: true,
+        showtime: { include: { room: true } },
         sepayIntent: true,
       },
     });
@@ -107,18 +113,120 @@ export class SepayService {
     const expiresAt = booking.expiresAt;
 
     const intent = await this.prisma.$transaction(async (transaction) => {
+      // Serialize checkout attempts for this booking. Voucher quota is not
+      // touched during hold; the first successful checkout reserves it here.
+      if (typeof transaction.$queryRaw === 'function') {
+        await transaction.$queryRaw`SELECT "id" FROM "Booking" WHERE "id" = ${bookingId} FOR UPDATE`;
+      }
+      const canReprice = typeof transaction.booking.findUniqueOrThrow === 'function';
+      const current = canReprice
+        ? await transaction.booking.findUniqueOrThrow({
+            where: { id: bookingId },
+            include: { items: true, comboItems: true, sepayIntent: true, showtime: { include: { room: true } } },
+          })
+        : booking;
+      if (canReprice) {
+        const now = new Date();
+        if (
+          current.status !== BookingStatus.PENDING ||
+          current.expiresAt <= now
+        ) {
+          throw new ConflictException(
+            'Booking is no longer available for checkout',
+          );
+        }
+        const heldSeats = await transaction.showtimeSeat.count({
+          where: {
+            id: { in: current.items.map((item) => item.showtimeSeatId) },
+            heldByBookingId: bookingId,
+            status: ShowtimeSeatStatus.HELD,
+          },
+        });
+        if (heldSeats !== current.items.length) {
+          throw new ConflictException(
+            'Booking no longer owns all selected seats',
+          );
+        }
+      }
+      if (
+        current.sepayIntent &&
+        current.sepayIntent.status === SepayIntentStatus.PENDING &&
+        current.sepayIntent.expiresAt > new Date()
+      ) {
+        return current.sepayIntent;
+      }
+
+      const pricingInput = {
+        ticketPrices: current.items.map((item) => item.price),
+        combos: (current.comboItems ?? []).map((item) => ({
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+        })),
+      };
+      const normalizedVoucherCode =
+        this.vouchers && typeof this.vouchers.normalizeCode === 'function'
+          ? this.vouchers.normalizeCode(current.voucherCode)
+          : current.voucherCode ?? null;
+      const voucherPricing =
+        canReprice && this.vouchers && normalizedVoucherCode
+          ? await this.vouchers.priceForTransaction(transaction, {
+              code: normalizedVoucherCode,
+              userId,
+              cinemaId: current.showtime.room.cinemaId,
+              ...pricingInput,
+            })
+          : {
+              pricing: canReprice
+                ? calculateBookingPrice(pricingInput)
+                : {
+                    ticketSubtotal: booking.totalAmount,
+                    comboSubtotal: new Prisma.Decimal(0),
+                    discountAmount: new Prisma.Decimal(0),
+                    totalAmount: booking.totalAmount,
+                  },
+              voucher: null,
+            };
+
+      const pricing = voucherPricing.pricing;
+      if (canReprice && typeof transaction.booking.update === 'function') {
+        await transaction.booking.update({
+          where: { id: bookingId },
+          data: {
+            ...pricing,
+            voucherCode: normalizedVoucherCode,
+            pricingVersion: { increment: 1 },
+          },
+        });
+      }
+      if (voucherPricing.voucher) {
+        const existingRedemption = await transaction.voucherRedemption.findUnique({ where: { bookingId } });
+        if (!existingRedemption) {
+          await this.vouchers!.reserve(transaction, {
+            code: normalizedVoucherCode,
+            userId,
+            cinemaId: current.showtime.room.cinemaId,
+            ...pricingInput,
+            bookingId,
+            discountAmount: pricing.discountAmount,
+            voucher: voucherPricing.voucher,
+          });
+        } else if (existingRedemption.status !== VoucherRedemptionStatus.RESERVED) {
+          throw new ConflictException('Voucher redemption is no longer available');
+        }
+      }
+
       const intent = await transaction.sepayPaymentIntent.upsert({
         where: { bookingId },
         create: {
           paymentCode,
-          expectedAmount: booking.totalAmount,
+          expectedAmount: pricing.totalAmount,
           expiresAt,
           bookingId,
           userId,
         },
         update: {
           paymentCode,
-          expectedAmount: booking.totalAmount,
+          expectedAmount: pricing.totalAmount,
           expiresAt,
           status: SepayIntentStatus.PENDING,
         },
@@ -134,8 +242,9 @@ export class SepayService {
             bookingId,
             status: intent.status,
             expiresAt: intent.expiresAt,
+            expectedAmount: pricing.totalAmount,
           },
-          metadata: { source: 'CUSTOMER' },
+          metadata: { source: 'CUSTOMER', voucherCode: normalizedVoucherCode },
         },
         transaction,
       );
@@ -720,6 +829,7 @@ export class SepayService {
           where: { id: intent.id },
           data: { status: SepayIntentStatus.SUCCEEDED },
         });
+        if (this.vouchers && typeof this.vouchers.consume === 'function') await this.vouchers.consume(tx, booking.id);
 
         await tx.sepayTransaction.update({
           where: { sepayId },

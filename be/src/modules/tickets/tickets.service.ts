@@ -32,7 +32,7 @@ export class TicketsService {
     };
     const tickets = await this.prisma.ticket.findMany({
       where,
-      include: { booking: { include: { showtime: { include: { movie: true, room: { include: { cinema: true } } } } } }, bookingItem: { include: { showtimeSeat: { include: { seat: true } } } } },
+      include: { booking: { include: { showtime: { include: { movie: true, room: { include: { cinema: true } } } }, comboItems: true, voucherRedemption: true } }, bookingItem: { include: { showtimeSeat: { include: { seat: true } } } } },
       orderBy: direction === 'before' ? [{ createdAt: 'asc' }, { id: 'asc' }] : [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
     });
@@ -49,6 +49,8 @@ export class TicketsService {
             showtime: {
               include: { movie: true, room: { include: { cinema: true } } },
             },
+            comboItems: true,
+            voucherRedemption: true,
           },
         },
         bookingItem: {

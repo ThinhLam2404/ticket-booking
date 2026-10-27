@@ -228,6 +228,7 @@ async function renderOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
       },
       tickets: true,
       comboItems: true,
+      voucherRedemption: true,
     },
   });
   if (!booking || booking.status !== 'CONFIRMED')
@@ -252,6 +253,8 @@ async function renderOutbox(outbox: Prisma.MailOutboxGetPayload<{}>) {
     appUrl: data.publicAppUrl,
     bookingId: booking.id,
     totalAmount: booking.totalAmount.toString(),
+    discountAmount: booking.discountAmount.toString(),
+    voucherCode: booking.voucherRedemption?.codeSnapshot ?? null,
     combos: booking.comboItems.map((item) => ({ name: item.name, quantity: item.quantity, unitPrice: item.unitPrice.toString() })),
     movieTitle: booking.showtime.movie.title,
     cinemaName: booking.showtime.room.cinema.name,
