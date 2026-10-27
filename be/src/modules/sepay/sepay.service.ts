@@ -278,6 +278,10 @@ export class SepayService {
       });
       throw new BadRequestException(details);
     }
+    const transactionDate = new Date(dto.transactionDate);
+    if (Number.isNaN(transactionDate.getTime())) {
+      throw new BadRequestException('transactionDate is invalid');
+    }
     if (dto.transferType !== 'in') {
       return { success: true };
     }
@@ -330,7 +334,7 @@ export class SepayService {
               content: dto.content ?? '',
               referenceCode: dto.referenceCode ?? null,
               transferType: dto.transferType,
-              transactionDate: new Date(dto.transactionDate),
+              transactionDate,
               status: txStatus,
               paymentIntentId: intent?.id ?? null,
             },

@@ -12,6 +12,22 @@ const emptyDraft = {
 };
 type VoucherDraft = Omit<typeof emptyDraft, 'discountType' | 'scope'> & { discountType: 'FIXED' | 'PERCENT'; scope: 'TICKETS' | 'COMBOS' | 'ORDER' };
 
+function pad(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function isoToLocalDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function localDateTimeToIso(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error('Thời gian voucher không hợp lệ.');
+  return date.toISOString();
+}
+
 export function AdminVouchersPage() {
   const client = useQueryClient();
   const vouchers = useQuery({ queryKey: ['admin-vouchers'], queryFn: api.adminVouchers });
@@ -28,7 +44,7 @@ export function AdminVouchersPage() {
       code: draft.code.trim(), discountType: draft.discountType, scope: draft.scope,
       value: Number(draft.value), minimumSpend: Number(draft.minimumSpend || 0),
       maximumDiscount: draft.maximumDiscount ? Number(draft.maximumDiscount) : null,
-      startsAt: new Date(draft.startsAt).toISOString(), endsAt: new Date(draft.endsAt).toISOString(),
+      startsAt: localDateTimeToIso(draft.startsAt), endsAt: localDateTimeToIso(draft.endsAt),
       active: draft.active, usageLimit: Number(draft.usageLimit || 1), cinemaIds: draft.cinemaIds,
     }),
     onSuccess: () => { setConfirm(false); setDraft(emptyDraft); void client.invalidateQueries({ queryKey: ['admin-vouchers'] }); },
@@ -41,7 +57,7 @@ export function AdminVouchersPage() {
     <div className="combo-admin-grid">
       <section className="combo-panel"><h2>Danh sách voucher</h2>
         {!vouchers.data?.length && <EmptyState>Chưa có voucher.</EmptyState>}
-        {vouchers.data?.map((voucher) => <div className="combo-row" key={voucher.id}><div><strong>{voucher.code}</strong><p>{voucher.discountType === 'PERCENT' ? `${voucher.value}%` : money(voucher.value)} · {voucher.scope}</p><small>{voucher.active ? 'Đang hoạt động' : 'Đã tắt'} · {voucher.cinemaIds.length ? 'Giới hạn theo rạp' : 'Toàn hệ thống'}</small></div><div className="form-actions"><button className="secondary" onClick={() => setDraft({ ...emptyDraft, ...voucher, value: String(voucher.value), minimumSpend: String(voucher.minimumSpend), maximumDiscount: voucher.maximumDiscount ? String(voucher.maximumDiscount) : '', startsAt: voucher.startsAt.slice(0, 16), endsAt: voucher.endsAt.slice(0, 16), usageLimit: String(voucher.usageLimit ?? 1) })}>Chỉnh sửa</button><button className="secondary" type="button" onClick={() => setAssignConfirm({ id: voucher.id, code: voucher.code, usageLimit: voucher.usageLimit ?? 1 })}>Phát cho mọi khách</button></div></div>)}
+        {vouchers.data?.map((voucher) => <div className="combo-row" key={voucher.id}><div><strong>{voucher.code}</strong><p>{voucher.discountType === 'PERCENT' ? `${voucher.value}%` : money(voucher.value)} · {voucher.scope}</p><small>{voucher.active ? 'Đang hoạt động' : 'Đã tắt'} · {voucher.cinemaIds.length ? 'Giới hạn theo rạp' : 'Toàn hệ thống'}</small></div><div className="form-actions"><button className="secondary" onClick={() => setDraft({ ...emptyDraft, ...voucher, value: String(voucher.value), minimumSpend: String(voucher.minimumSpend), maximumDiscount: voucher.maximumDiscount ? String(voucher.maximumDiscount) : '', startsAt: isoToLocalDateTime(voucher.startsAt), endsAt: isoToLocalDateTime(voucher.endsAt), usageLimit: String(voucher.usageLimit ?? 1) })}>Chỉnh sửa</button><button className="secondary" type="button" onClick={() => setAssignConfirm({ id: voucher.id, code: voucher.code, usageLimit: voucher.usageLimit ?? 1 })}>Phát cho mọi khách</button></div></div>)}
       </section>
       <form className="combo-panel admin-form" onSubmit={(event) => { event.preventDefault(); setConfirm(true); }}>
         <h2>{draft.id ? 'Chỉnh sửa voucher' : 'Tạo voucher'}</h2>

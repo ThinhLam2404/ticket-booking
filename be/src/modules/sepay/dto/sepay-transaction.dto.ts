@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { SepayTransactionStatus, BookingStatus } from '@prisma/client';
 import { CursorPaginationMetaDto } from '../../../common/http/dto/cursor-response.dto.js';
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class AdminBookingSummaryDto {
   @ApiProperty()
@@ -79,8 +80,12 @@ export class CursorPaginatedTransactionsResponseDto {
 
 export class UpdateTransactionStatusDto {
   @ApiProperty({ enum: ['REVIEW_REQUIRED', 'REFUNDED', 'CONFIRMED'] })
+  @IsEnum(['REVIEW_REQUIRED', 'REFUNDED', 'CONFIRMED'])
   status!: 'REVIEW_REQUIRED' | 'REFUNDED' | 'CONFIRMED';
 
   @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
   adminNote?: string;
 }

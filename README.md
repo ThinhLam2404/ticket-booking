@@ -42,7 +42,7 @@ Các thao tác thêm/cập nhật/xóa trong Admin dùng trạng thái pending t
 ## Sprint 4 — Đối soát thủ công và quản trị hoàn tiền
 
 - Admin xác nhận giao dịch SePay cần rà soát tại `POST /api/v1/payments/admin/sepay/transactions/:id/confirm`. Nếu có lệch số tiền, booking hết hạn hoặc booking không còn chờ thanh toán, hệ thống trả cảnh báo; admin gửi lại `force: true` sau khi kiểm tra.
-- Refund booking: `POST /api/v1/payments/admin/bookings/:bookingId/refund`; flow cập nhật payment/booking/ticket, giải phóng ghế và queue email.
+- Refund booking: `POST /api/v1/payments/admin/bookings/:bookingId/refund`; đây là quy trình hoàn tiền thủ công: hệ thống ghi nhận refund idempotent, cập nhật payment/booking/ticket, giải phóng ghế và queue email. Không có tích hợp gọi API hoàn tiền tự động tới ngân hàng/SePay; admin phải thực hiện chuyển tiền hoàn ngoài hệ thống trước hoặc theo quy trình vận hành.
 
 ## Sprint 5 — Cursor pagination và query performance
 
@@ -67,7 +67,7 @@ Booking và ticket sort theo `createdAt DESC, id DESC`. SePay sort theo `transac
 
 - Voucher được chuẩn hóa mã uppercase; hỗ trợ fixed/percent, scope vé/combo/toàn đơn, thời hạn, đơn tối thiểu, mức giảm tối đa và giới hạn theo rạp. Admin có quyền riêng `MANAGE_VOUCHERS`; mã không đổi sau khi tạo. Voucher campaign được phát qua `VoucherAssignment` cho từng customer, mỗi assignment có `usageLimit` riêng; không có quota tổng toàn hệ thống.
 - `POST /bookings/quote` chỉ báo giá, không giữ ghế, assignment hay redemption; quote chỉ kiểm tra voucher đã được phát cho customer và điều kiện chiến dịch, không kiểm tra quota sử dụng. `POST /bookings/hold` lưu `voucherCode` như ý định mua và giữ giá gốc; việc kiểm tra quota, điều kiện, tính giá tin cậy, snapshot giảm giá và tạo `VoucherRedemption` diễn ra atomically khi customer bắt đầu checkout SePay. Vì vậy người checkout thành công trước sẽ thắng lượt voucher, không phải người hold ghế trước.
-- Checkout khóa booking và assignment, cập nhật `booking.totalAmount` trước khi tạo payment intent; SePay chỉ dùng `booking.totalAmount`/`expectedAmount`, không tính voucher lần hai. Webhook chỉ consume redemption đã reserve; cancel/expiry release redemption chưa consume, còn refund không trả lại lượt đã consume. Migration `20261026100000_vouchers` cần `npm run prisma:generate` và `npm run prisma:deploy` khi rollout.
+- Checkout khóa booking và assignment, cập nhật `booking.totalAmount` trước khi tạo payment intent; SePay chỉ dùng `booking.totalAmount`/`expectedAmount`, không tính voucher lần hai. Webhook chỉ consume redemption đã reserve; cancel/expiry release redemption chưa consume, còn refund không trả lại lượt đã consume. Refund hiện chỉ là quy trình ghi nhận hoàn tiền thủ công, chưa gọi provider API. Migration `20261026100000_vouchers` cần `npm run prisma:generate` và `npm run prisma:deploy` khi rollout.
 
 - Review fixes: chi tiết vé tải snapshot combo của toàn booking và ghi rõ không phải combo cho từng vé. Đổi rạp reset draft giá; xác nhận giá hiển thị rạp và trạng thái. Xóa ảnh gửi `imageUrl: null` (contract nullable). Hold chưa rõ kết quả giữ snapshot request/key riêng và không bỏ khi retry gặp 429/auth/timeout; vẫn cho retry khi suất đã gần giờ chiếu. Combo đã chọn biến mất khỏi menu có nút bỏ lựa chọn, chặn tạo booking mới cho đến khi hợp lệ; không tự sửa payload đang retry.
 

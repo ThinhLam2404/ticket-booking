@@ -254,7 +254,7 @@ export function BookingPage() {
             </div>
           </section>
         </div>
-        <aside className="checkout-sidebar">
+        <aside className="checkout-side">
           <section className="checkout-card order-summary-card">
             <p className="eyebrow">ORDER SUMMARY</p>
             <div className="summary-line">
@@ -338,6 +338,25 @@ export function BookingPage() {
               onCheckStatus={() => void refetchBooking()}
             />
           )}
+          {booking.status === "PENDING" &&
+            showtimeCountdown.isExpired &&
+            !countdown.isExpired && (
+              <section className="checkout-card">
+                <p className="checkout-expired">
+                  Suất chiếu đã bắt đầu, booking không thể tiếp tục thanh toán.
+                </p>
+              </section>
+            )}
+          {booking.status === "PENDING" &&
+            !showtimeCountdown.isExpired &&
+            showtimeCountdown.seconds <= SHOWTIME_BUFFER_SECONDS &&
+            !countdown.isExpired && (
+              <section className="checkout-card">
+                <p className="checkout-expired">
+                  Suất chiếu đã quá gần giờ bắt đầu, không thể thanh toán.
+                </p>
+              </section>
+            )}
           {!canPay && canCancel && (
             <section className="checkout-card">
               <button

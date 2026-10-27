@@ -455,8 +455,9 @@ export function AdminBookingDetailPage() {
             message: (
               <>
                 Đặt vé <strong>#{booking.id}</strong> —{" "}
-                {money(booking.totalAmount)}. Ghế sẽ được giải phóng, vé bị hủy
-                và email hoàn tiền sẽ gửi cho khách.
+                {money(booking.totalAmount)}. Hệ thống sẽ ghi nhận hoàn tiền
+                thủ công, giải phóng ghế, hủy vé và gửi email thông báo cho
+                khách.
               </>
             ),
             reasonLabel: "Lý do hoàn tiền",

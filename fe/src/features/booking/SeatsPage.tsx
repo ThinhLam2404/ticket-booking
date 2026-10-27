@@ -34,6 +34,11 @@ type AppliedVoucher = {
   seatIds: string[];
   combos: ComboSelection[];
 };
+type VoucherQuoteSelection = {
+  seatIds: string[];
+  combos: ComboSelection[];
+  code: string;
+};
 
 const SHOWTIME_BUFFER_SECONDS = 5 * 60;
 
@@ -49,6 +54,7 @@ export function SeatsPage() {
   >({});
   const [voucherDraft, setVoucherDraft] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
+  const voucherQuoteSelection = useRef<VoucherQuoteSelection | null>(null);
   const [retryLocked, setRetryLocked] = useState(false);
   const [holdExpiredNotice, setHoldExpiredNotice] = useState(false);
   const [holdConflict, setHoldConflict] = useState<
@@ -74,18 +80,30 @@ export function SeatsPage() {
     .filter(([, item]) => item.quantity > 0)
     .map(([cinemaComboId, item]) => ({ cinemaComboId, quantity: item.quantity }));
   const quoteMutation = useMutation({
-    mutationFn: () => api.quote({
-      showtimeId: showtimeId!,
-      showtimeSeatIds: selectedSeats,
-      combos: comboSelections,
-      voucherCode: voucherDraft.trim() || null,
-    }),
+    mutationFn: () => {
+      const code = voucherDraft.trim().toUpperCase();
+      const seats = [...selectedSeats];
+      const combos = comboSelections.map((combo) => ({ ...combo }));
+      voucherQuoteSelection.current = { seatIds: seats, combos, code };
+      return api.quote({
+        showtimeId: showtimeId!,
+        showtimeSeatIds: seats,
+        combos,
+        voucherCode: code || null,
+      });
+    },
     onSuccess: (quote) => {
-      setAppliedVoucher(voucherDraft.trim() ? {
-        code: voucherDraft.trim().toUpperCase(),
+      const request = voucherQuoteSelection.current;
+      if (!request || request.code !== voucherDraft.trim().toUpperCase()
+        || request.seatIds.join(',') !== selectedSeats.join(',')
+        || JSON.stringify(request.combos) !== JSON.stringify(comboSelections)) {
+        return;
+      }
+      setAppliedVoucher(request.code ? {
+        code: request.code,
         quote,
-        seatIds: [...selectedSeats],
-        combos: comboSelections.map((combo) => ({ ...combo })),
+        seatIds: request.seatIds,
+        combos: request.combos,
       } : null);
     },
   });
@@ -408,7 +426,7 @@ export function SeatsPage() {
             </span>
           </div>
         </section>
-        <aside className="booking-summary-panel">
+        <aside className="seat-summary-panel">
           <div className="summary-header">
             <p className="eyebrow">ORDER SUMMARY</p>
             <h2>Tóm tắt đặt vé</h2>

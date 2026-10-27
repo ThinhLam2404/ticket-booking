@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class ManualConfirmDto {
   @ApiProperty({ required: false, default: false })
@@ -9,5 +9,7 @@ export class ManualConfirmDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
+  @IsString()
+  @MaxLength(1000)
   adminNote?: string;
 }

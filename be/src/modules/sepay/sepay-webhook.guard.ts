@@ -14,8 +14,12 @@ export class SepayWebhookGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
     const apiKey = this.config.get<string>('SEPAY_WEBHOOK_API_KEY');
+    const nodeEnv = this.config.get<string>('NODE_ENV') ?? 'development';
 
     if (!apiKey) {
+      if (nodeEnv === 'production') {
+        throw new UnauthorizedException('Webhook signature is invalid');
+      }
       return true;
     }
 

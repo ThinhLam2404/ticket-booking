@@ -304,12 +304,28 @@ describe('SepayService', () => {
       expect(result).toEqual({ success: true });
     });
 
-    it('rejects payload missing required fields', async () => {
+    it('rejects malformed transaction dates', async () => {
       const { service } = createService();
 
       await expect(
         service.handleWebhook({
           id: 104,
+          gateway: 'Vietcombank',
+          transactionDate: 'not-a-date',
+          accountNumber: '0123456789',
+          transferType: 'in',
+          transferAmount: 200000,
+          content: 'CB123456',
+        }),
+      ).rejects.toThrow('transactionDate is invalid');
+    });
+
+    it('rejects payload missing required fields', async () => {
+      const { service } = createService();
+
+      await expect(
+        service.handleWebhook({
+          id: 105,
           transferType: 'in',
           transferAmount: 200000,
         }),
