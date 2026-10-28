@@ -30,6 +30,9 @@ const environment = {
   CORS_ORIGINS: 'http://127.0.0.1:4173',
   VITE_API_URL: `http://127.0.0.1:${apiPort}/api/v1`,
   ALLOW_INTEGRATION_DB_RESET: '1',
+  // Keep direct API logins in individual browser tests isolated from the shared
+  // localhost bucket used by page-level auth refreshes and other specs.
+  TRUST_PROXY: '1',
 };
 
 function run(command, args, env = environment) {
@@ -77,7 +80,10 @@ try {
   run('npm', ['run', 'build:fe'], environment);
   serverPid = startServer();
   run('node', ['scripts/wait-for-url.mjs', `http://127.0.0.1:${apiPort}/api/v1/health/ready`], environment);
-  run('npm', ['run', 'test:browser'], {
+  const browserArgs = process.env.PLAYWRIGHT_TEST_FILE
+    ? ['run', 'test:browser', process.env.PLAYWRIGHT_TEST_FILE]
+    : ['run', 'test:browser'];
+  run('npm', browserArgs, {
     ...environment,
     PLAYWRIGHT_BASE_URL: 'http://127.0.0.1:4173',
     PLAYWRIGHT_API_URL: `http://127.0.0.1:${apiPort}/api/v1`,
