@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AdminPermission } from '@prisma/client';
+import { CurrentUser } from '../../common/auth/current-user.decorator.js';
+import type { AuthUser } from '../../common/auth/auth-user.js';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
 import { PermissionsGuard } from '../../common/auth/permissions.guard.js';
@@ -11,9 +13,22 @@ import {
   AssignVoucherDto,
   AssignVoucherResponseDto,
   CreateVoucherDto,
+  CustomerVoucherResponseDto,
   UpdateVoucherDto,
   VoucherResponseDto,
 } from './voucher.dto.js';
+
+@ApiTags('vouchers')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('vouchers')
+export class CustomerVouchersController {
+  constructor(private readonly vouchers: VouchersService) {}
+
+  @Get('mine')
+  @ApiResponse({ status: 200, type: CustomerVoucherResponseDto, isArray: true })
+  listMine(@CurrentUser() user: AuthUser) { return this.vouchers.listMine(user.id); }
+}
 
 @ApiTags('vouchers')
 @ApiBearerAuth()
@@ -27,6 +42,7 @@ export class VouchersController {
   @Get()
   @ApiResponse({ status: 200, type: VoucherResponseDto, isArray: true })
   list() { return this.vouchers.list(); }
+
 
   @Post()
   @ApiResponse({ status: 201, type: VoucherResponseDto })

@@ -2198,6 +2198,57 @@
   border-left-color: var(--border-strong);
 }
 
+.app-shell .booking-seat-chips span {
+  border-color: var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.app-shell .booking-ticket-codes {
+  color: var(--text-muted);
+}
+
+.app-shell .booking-combo-summary span {
+  border-color: var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.app-shell .booking-combo-summary strong {
+  color: var(--text-primary);
+}
+
+.app-shell .ticket-booking-heading {
+  border-bottom-color: var(--border);
+}
+
+.app-shell .booking-tickets-combo > p {
+  color: var(--text-secondary);
+}
+
+.app-shell .booking-ticket-item {
+  border-color: var(--border);
+  background: var(--surface-1);
+}
+
+.app-shell .booking-ticket-item:hover {
+  border-color: var(--brand);
+  background: var(--surface-2);
+}
+
+.app-shell .booking-ticket-item > strong {
+  color: var(--text-primary);
+}
+
+.app-shell .booking-ticket-item > span,
+.app-shell .booking-ticket-item > small {
+  color: var(--text-muted);
+}
+
+.app-shell .booking-ticket-item > small {
+  color: var(--brand);
+}
+
 .app-shell .ticket-card-stub .qr-code {
   width: 96px;
   height: 96px;
@@ -2328,6 +2379,14 @@
 
   .app-shell .ticket-detail-layout {
     gap: 24px;
+  }
+
+  .app-shell .ticket-booking-heading {
+    align-items: flex-start;
+  }
+
+  .app-shell .booking-ticket-grid {
+    grid-template-columns: 1fr;
   }
 
   .app-shell .ticket-stub-large {

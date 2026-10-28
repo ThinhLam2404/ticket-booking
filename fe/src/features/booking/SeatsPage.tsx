@@ -18,7 +18,7 @@ import {
   money,
 } from "../../utils/format";
 import { couplePartnerNumber } from "../../utils/seat-layout";
-import type { ShowtimeSeat } from "../../types";
+import type { CustomerVoucher, ShowtimeSeat } from "../../types";
 import {
   BookingSteps,
   MiniPoster,
@@ -54,6 +54,7 @@ export function SeatsPage() {
   >({});
   const [voucherDraft, setVoucherDraft] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
+  const voucherDraftRef = useRef('');
   const voucherQuoteSelection = useRef<VoucherQuoteSelection | null>(null);
   const [retryLocked, setRetryLocked] = useState(false);
   const [holdExpiredNotice, setHoldExpiredNotice] = useState(false);
@@ -75,13 +76,22 @@ export function SeatsPage() {
   });
   const showtimeCountdown = useCountdown(showtimeQuery.data?.startsAt);
   const comboMenu = useQuery({ queryKey: ['combo-menu', showtimeQuery.data?.room?.cinema?.id], queryFn: () => api.comboMenu(showtimeQuery.data!.room!.cinema!.id), enabled: Boolean(showtimeQuery.data?.room?.cinema?.id) });
+  const vouchersQuery = useQuery({ queryKey: ['my-vouchers'], queryFn: ({ signal }) => api.myVouchers(signal), enabled: Boolean(user) });
+  const [now] = useState(() => Date.now());
+  const voucherStatus = (voucher: CustomerVoucher) => {
+    if (!voucher.active) return 'INACTIVE';
+    if (new Date(voucher.startsAt).getTime() > now) return 'UPCOMING';
+    if (new Date(voucher.endsAt).getTime() <= now) return 'EXPIRED';
+    if (voucher.remainingUses <= 0) return 'USED';
+    return 'AVAILABLE';
+  };
   const hasComboSelection = Object.values(comboDraft).some((item) => item.quantity > 0);
   const comboSelections = Object.entries(comboDraft)
     .filter(([, item]) => item.quantity > 0)
     .map(([cinemaComboId, item]) => ({ cinemaComboId, quantity: item.quantity }));
   const quoteMutation = useMutation({
-    mutationFn: () => {
-      const code = voucherDraft.trim().toUpperCase();
+    mutationFn: (selectedCode?: string) => {
+      const code = (selectedCode ?? voucherDraftRef.current).trim().toUpperCase();
       const seats = [...selectedSeats];
       const combos = comboSelections.map((combo) => ({ ...combo }));
       voucherQuoteSelection.current = { seatIds: seats, combos, code };
@@ -92,9 +102,9 @@ export function SeatsPage() {
         voucherCode: code || null,
       });
     },
-    onSuccess: (quote) => {
+    onSuccess: (quote, requestedCode) => {
       const request = voucherQuoteSelection.current;
-      if (!request || request.code !== voucherDraft.trim().toUpperCase()
+      if (!request || request.code !== requestedCode
         || request.seatIds.join(',') !== selectedSeats.join(',')
         || JSON.stringify(request.combos) !== JSON.stringify(comboSelections)) {
         return;
@@ -140,6 +150,7 @@ export function SeatsPage() {
     holdKey.current = `hold-${crypto.randomUUID()}`;
     setSelectedSeats([]);
     setComboDraft({});
+    voucherDraftRef.current = '';
     setVoucherDraft('');
     setAppliedVoucher(null);
     setRetryLocked(false);
@@ -210,9 +221,12 @@ export function SeatsPage() {
       ),
     [seatsQuery.data?.seats],
   );
-  function applyVoucher() {
+  function applyVoucher(code = voucherDraft) {
     if (!selectedSeats.length) return;
-    quoteMutation.mutate();
+    const normalizedCode = code.trim().toUpperCase();
+    voucherDraftRef.current = normalizedCode;
+    setVoucherDraft(normalizedCode);
+    quoteMutation.mutate(normalizedCode);
   }
 
   function submitHold() {
@@ -464,8 +478,14 @@ export function SeatsPage() {
           )}
           <ComboPicker cinemaId={showtime.room?.cinema?.id} quantities={Object.fromEntries(Object.entries(comboDraft).map(([id, item]) => [id, item.quantity]))} disabled={actionPending || retryLocked} onChange={(id, quantity, price) => { holdKey.current = `hold-${crypto.randomUUID()}`; setAppliedVoucher(null); setComboDraft((current) => ({ ...current, [id]: { quantity, price } })); }} />
           <section className="voucher-panel" aria-label="Voucher giảm giá">
-             <label htmlFor="voucher-code">Mã voucher <small>· lượt dùng được giữ khi bắt đầu thanh toán</small></label>
-             <div className="voucher-form"><input id="voucher-code" value={voucherDraft} disabled={actionPending || retryLocked || quoteMutation.isPending} onChange={(event) => { setVoucherDraft(event.target.value.toUpperCase()); setAppliedVoucher(null); }} placeholder="Nhập mã khuyến mãi" /> <button className="secondary" type="button" disabled={!selectedSeats.length || quoteMutation.isPending || actionPending || retryLocked} onClick={applyVoucher}>{quoteMutation.isPending ? "Đang kiểm tra…" : "Áp dụng"}</button></div>
+             <label>Voucher của bạn <small>· chọn voucher đã được phát cho tài khoản</small></label>
+              {!user && <p className="voucher-empty">Đăng nhập để xem voucher được tặng.</p>}
+              {user && vouchersQuery.isPending && <LoadingState label="Đang tải voucher của bạn…" />}
+              {user && vouchersQuery.isError && <ErrorState cause={vouchersQuery.error} fallback="Không thể tải voucher của bạn." onRetry={() => void vouchersQuery.refetch()} />}
+              {user && vouchersQuery.isSuccess && !vouchersQuery.data.length && <p className="voucher-empty">Bạn chưa có voucher khả dụng.</p>}
+              {user && vouchersQuery.isSuccess && vouchersQuery.data.length > 0 && <div className="voucher-list">{vouchersQuery.data.map((voucher) => { const status = voucherStatus(voucher); const selectable = status === 'AVAILABLE' && Boolean(selectedSeats.length); const statusText = status === 'AVAILABLE' ? (voucher.code === voucherDraft && quoteMutation.isPending ? 'Đang kiểm tra…' : voucher.code === voucherDraft ? 'Đã chọn' : 'Chọn') : status === 'UPCOMING' ? 'Chưa đến ngày' : status === 'EXPIRED' ? 'Đã hết hạn' : status === 'USED' ? 'Đã dùng hết' : 'Đã tắt'; return <button className={`voucher-option${voucherDraft === voucher.code ? ' selected' : ''}${selectable ? '' : ' unavailable'}`} key={voucher.id} type="button" disabled={!selectable || actionPending || retryLocked || quoteMutation.isPending} onClick={() => applyVoucher(voucher.code)}><span><strong>{voucher.code}</strong><small>{voucher.discountType === 'PERCENT' ? `Giảm ${voucher.value}%` : `Giảm ${money(voucher.value)}`} · {voucher.scope === 'ORDER' ? 'toàn đơn' : voucher.scope === 'TICKETS' ? 'vé' : 'combo'}</small><small>Đã dùng {voucher.usedCount}/{voucher.usageLimit} lượt · Còn {voucher.remainingUses} lượt</small><small>Bắt đầu {formatDate(voucher.startsAt)} · Hết hạn {formatDate(voucher.endsAt)}</small></span><b>{statusText}</b></button>; })}</div>}
+              <label className="voucher-manual-label" htmlFor="voucher-code">Hoặc nhập mã voucher</label>
+             <div className="voucher-form"><input id="voucher-code" value={voucherDraft} disabled={actionPending || retryLocked || quoteMutation.isPending} onChange={(event) => { const value = event.target.value.toUpperCase(); voucherDraftRef.current = value; setVoucherDraft(value); setAppliedVoucher(null); }} placeholder="Nhập mã khuyến mãi" /> <button className="secondary" type="button" disabled={!selectedSeats.length || quoteMutation.isPending || actionPending || retryLocked} onClick={() => applyVoucher()}>{quoteMutation.isPending ? "Đang kiểm tra…" : "Áp dụng"}</button></div>
              {appliedVoucher && <p className="success-inline" role="status">Đã áp dụng {appliedVoucher.code}. Giá sẽ được xác nhận lại khi giữ ghế.</p>}
              {quoteMutation.isError && <p className="error-inline" role="alert">{errorMessage(quoteMutation.error, "Không thể áp dụng voucher.")}</p>}
            </section>

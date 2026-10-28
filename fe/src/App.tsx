@@ -16,7 +16,9 @@ const SeatsPage = lazy(() => import('./features/booking/SeatsPage').then((module
 const BookingPage = lazy(() => import('./features/booking/BookingPage').then((module) => ({ default: module.BookingPage })));
 const BookingsPage = lazy(() => import('./features/account/BookingsPage').then((module) => ({ default: module.BookingsPage })));
 const SecurityPage = lazy(() => import('./features/account/SecurityPage').then((module) => ({ default: module.SecurityPage })));
+const ProfilePage = lazy(() => import('./features/account/ProfilePage').then((module) => ({ default: module.ProfilePage })));
 const TicketPage = lazy(() => import('./features/account/TicketPage').then((module) => ({ default: module.TicketPage })));
+const BookingTicketsPage = lazy(() => import('./features/account/BookingTicketsPage').then((module) => ({ default: module.BookingTicketsPage })));
 const TicketsPage = lazy(() => import('./features/account/TicketsPage').then((module) => ({ default: module.TicketsPage })));
 const ResetPasswordPage = lazy(() => import('./features/auth/ResetPasswordPage').then((module) => ({ default: module.ResetPasswordPage })));
 const VerifyEmailPage = lazy(() => import('./features/auth/VerifyEmailPage').then((module) => ({ default: module.VerifyEmailPage })));
@@ -60,10 +62,12 @@ const router = createBrowserRouter([
         element: <RequireAuth />,
         children: [
           { path: 'bookings', element: <BookingsPage /> },
+          { path: 'account/profile', element: <ProfilePage /> },
           { path: 'account/security', element: <SecurityPage /> },
           { path: 'bookings/:bookingId', element: <BookingPage /> },
           { path: 'tickets', element: <TicketsPage /> },
           { path: 'tickets/:ticketId', element: <TicketPage /> },
+          { path: 'bookings/:bookingId/tickets', element: <BookingTicketsPage /> },
         ],
       },
       { path: '*', element: <Navigate to="/" replace /> },

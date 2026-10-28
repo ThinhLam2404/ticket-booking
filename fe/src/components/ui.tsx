@@ -131,6 +131,12 @@ export function NoticeDialog({ title, message, onClose }: { title: string; messa
 }
 
 function navClass(pathname: string, target: string) {
+  if (target === '/tickets') {
+    return pathname === '/tickets' || pathname.startsWith('/tickets/') || /^\/bookings\/[^/]+\/tickets(?:\/|$)/.test(pathname) ? 'active' : '';
+  }
+  if (target === '/bookings') {
+    return pathname === '/bookings' || /^\/bookings\/[^/]+$/.test(pathname) ? 'active' : '';
+  }
   return pathname === target || (target !== '/' && pathname.startsWith(target)) ? 'active' : '';
 }
 
@@ -138,8 +144,10 @@ export function Layout() {
   const { user, authMode, closeAuth, logout, openAuth } = useAuth();
   const location = useLocation();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [headerState, setHeaderState] = useState<'expanded' | 'compact' | 'hidden'>('expanded');
   const lastScroll = useRef(0);
+  const accountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function updateHeader() {
@@ -158,10 +166,27 @@ export function Layout() {
     setLoggingOut(true);
     try {
       await logout();
+      setAccountOpen(false);
     } finally {
       setLoggingOut(false);
     }
   }
+
+  useEffect(() => {
+    if (!accountOpen) return undefined;
+    function closeOnOutside(event: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) setAccountOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setAccountOpen(false);
+    }
+    document.addEventListener('mousedown', closeOnOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [accountOpen]);
 
   const isBookingSurface = /^(\/showtimes|\/bookings|\/tickets)(\/|$)/.test(location.pathname);
 
@@ -179,7 +204,7 @@ export function Layout() {
           <LocationPicker />
           <span className="customer-header-theme"><ThemeSwitch compact /></span>
           <Link className="search-button" aria-label="Tìm kiếm phim" to="/#now-showing">⌕</Link>
-          {user ? <div className="account-menu"><span className="account-avatar">{user.fullName.slice(0, 2).toUpperCase()}</span><span className="account-name">{user.fullName}</span><button className="ghost" disabled={loggingOut} onClick={() => void handleLogout()}>{loggingOut ? 'Đang thoát…' : 'Đăng xuất'}</button></div> : <button className="primary login-button" onClick={() => openAuth()}>Đăng nhập</button>}
+          {user ? <div className="account-menu" ref={accountRef}><button className="account-trigger" type="button" aria-expanded={accountOpen} aria-haspopup="menu" onClick={() => setAccountOpen((open) => !open)}><span className="account-avatar">{user.fullName.slice(0, 2).toUpperCase()}</span><span className="account-name">{user.fullName}</span><span className={`account-chevron${accountOpen ? ' open' : ''}`} aria-hidden="true" /></button>{accountOpen && <div className="account-dropdown" role="menu"><div className="account-dropdown-heading"><strong>{user.fullName}</strong><small>{user.email}</small></div><Link role="menuitem" to="/account/profile" onClick={() => setAccountOpen(false)}>Thông tin người dùng</Link><Link role="menuitem" to="/account/security" onClick={() => setAccountOpen(false)}>Đổi mật khẩu</Link><button className="account-logout" role="menuitem" type="button" disabled={loggingOut} onClick={() => void handleLogout()}>{loggingOut ? 'Đang thoát…' : 'Đăng xuất'}</button></div>}</div> : <button className="primary login-button" onClick={() => openAuth()}>Đăng nhập</button>}
         </div>
       </div>
     </header>

@@ -1279,6 +1279,35 @@
         ]
       }
     },
+    "/api/v1/vouchers/mine": {
+      "get": {
+        "operationId": "CustomerVouchers_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerVoucherResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "vouchers"
+        ]
+      }
+    },
     "/api/v1/vouchers/admin": {
       "get": {
         "operationId": "Vouchers_list",
@@ -7132,6 +7161,84 @@
           "acceptedAt",
           "revokedAt",
           "createdAt"
+        ]
+      },
+      "CustomerVoucherResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "discountType": {
+            "type": "string",
+            "enum": [
+              "FIXED",
+              "PERCENT"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "TICKETS",
+              "COMBOS",
+              "ORDER"
+            ]
+          },
+          "value": {
+            "type": "string"
+          },
+          "minimumSpend": {
+            "type": "string"
+          },
+          "maximumDiscount": {
+            "type": "string",
+            "nullable": true
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "usageLimit": {
+            "type": "number"
+          },
+          "usedCount": {
+            "type": "number"
+          },
+          "remainingUses": {
+            "type": "number"
+          },
+          "cinemaIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "discountType",
+          "scope",
+          "value",
+          "minimumSpend",
+          "maximumDiscount",
+          "startsAt",
+          "endsAt",
+          "active",
+          "usageLimit",
+          "usedCount",
+          "remainingUses",
+          "cinemaIds"
         ]
       },
       "VoucherResponseDto": {

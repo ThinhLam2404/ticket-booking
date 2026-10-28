@@ -48,6 +48,7 @@ export class CreateVoucherDto {
 
   @ApiPropertyOptional({ type: Number, example: 50000, nullable: true })
   @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   maximumDiscount?: number | null;
 
@@ -108,6 +109,36 @@ export class VoucherCodeDto {
   @IsString()
   @MaxLength(64)
   code?: string | null;
+}
+
+export class CustomerVoucherResponseDto {
+  @ApiProperty() id!: string;
+
+  @ApiProperty() code!: string;
+
+  @ApiProperty({ enum: VoucherDiscountType }) discountType!: VoucherDiscountType;
+
+  @ApiProperty({ enum: VoucherScope }) scope!: VoucherScope;
+
+  @ApiProperty() value!: string;
+
+  @ApiProperty() minimumSpend!: string;
+
+  @ApiProperty({ type: String, nullable: true }) maximumDiscount!: string | null;
+
+  @ApiProperty({ format: 'date-time' }) startsAt!: string;
+
+  @ApiProperty({ format: 'date-time' }) endsAt!: string;
+
+  @ApiProperty() active!: boolean;
+
+  @ApiProperty({ type: Number }) usageLimit!: number;
+
+  @ApiProperty({ type: Number }) usedCount!: number;
+
+  @ApiProperty({ type: Number }) remainingUses!: number;
+
+  @ApiProperty({ type: [String] }) cinemaIds!: string[];
 }
 
 export class VoucherResponseDto {

@@ -1,4 +1,4 @@
-import { Prisma, VoucherDiscountType, VoucherScope } from '@prisma/client';
+import { Prisma, VoucherDiscountType, VoucherRedemptionStatus, VoucherScope } from '@prisma/client';
 import { VouchersService } from './vouchers.service.js';
 
 describe('VouchersService', () => {
@@ -22,6 +22,7 @@ describe('VouchersService', () => {
   function createService() {
     const client = {
       voucher: { findUnique: vi.fn().mockResolvedValue(voucher) },
+      voucherAssignment: { findMany: vi.fn() },
       voucherRedemption: { count: vi.fn().mockResolvedValue(0), create: vi.fn(), updateMany: vi.fn() },
       $queryRaw: vi.fn(),
     };
@@ -34,6 +35,17 @@ describe('VouchersService', () => {
     const { service } = createService();
     expect(service.normalizeCode(' welcome10 ')).toBe('WELCOME10');
     expect(() => service.normalizeCode('WELCOME 10')).toThrow();
+  });
+
+  it('does not list assigned vouchers when all assigned uses are consumed', async () => {
+    const { service, client } = createService();
+    client.voucherAssignment.findMany.mockResolvedValue([{
+      usageLimit: 1,
+      voucher: { ...voucher, active: true },
+      redemptions: [{ status: VoucherRedemptionStatus.CONSUMED }],
+    }]);
+    const result = await service.listMine('user-1');
+    expect(result).toHaveLength(0);
   });
 
   it('calculates a quote without creating a redemption', async () => {

@@ -404,6 +404,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/vouchers/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerVouchers_listMine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/vouchers/admin": {
         parameters: {
             query?: never;
@@ -1539,6 +1555,26 @@ export interface components {
             revokedAt: string | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        CustomerVoucherResponseDto: {
+            id: string;
+            code: string;
+            /** @enum {string} */
+            discountType: "FIXED" | "PERCENT";
+            /** @enum {string} */
+            scope: "TICKETS" | "COMBOS" | "ORDER";
+            value: string;
+            minimumSpend: string;
+            maximumDiscount: string | null;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            active: boolean;
+            usageLimit: number;
+            usedCount: number;
+            remainingUses: number;
+            cinemaIds: string[];
         };
         VoucherResponseDto: {
             id: string;
@@ -3955,6 +3991,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorResponseDto"];
+                };
+            };
+        };
+    };
+    CustomerVouchers_listMine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerVoucherResponseDto"][];
                 };
             };
         };

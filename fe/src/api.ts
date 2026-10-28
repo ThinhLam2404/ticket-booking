@@ -13,6 +13,7 @@ import type {
   QuoteRequest,
   QuoteResponse,
   Voucher,
+  CustomerVoucher,
   LoginRequest,
   SepayCheckoutResponse,
   SepayTransaction,
@@ -281,6 +282,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     });
+  },
+  currentUser(signal?: AbortSignal) {
+    return request<User>('/users/me', { signal });
+  },
+  myVouchers(signal?: AbortSignal) {
+    return request<CustomerVoucher[]>('/vouchers/mine', { signal });
   },
   sessions() {
     return request<AuthSession[]>('/auth/sessions');

@@ -79,6 +79,7 @@ export type HoldRequest = RequestBody<'/api/v1/bookings/hold', 'post'>;
 export type QuoteRequest = RequestBody<'/api/v1/bookings/quote', 'post'>;
 export type QuoteResponse = JsonResponse<'/api/v1/bookings/quote', 'post'>;
 export type Voucher = components['schemas']['VoucherResponseDto'];
+export type CustomerVoucher = components['schemas']['CustomerVoucherResponseDto'];
 
 export type MovieStatus = Movie['status'];
 export type SeatType = Seat['type'];

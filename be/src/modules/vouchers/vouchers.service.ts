@@ -20,7 +20,7 @@ import {
   UpdateVoucherDto,
 } from './voucher.dto.js';
 
-const ACTIVE_REDEMPTION_STATUSES = [
+const ACTIVE_REDEMPTION_STATUSES: VoucherRedemptionStatus[] = [
   VoucherRedemptionStatus.RESERVED,
   VoucherRedemptionStatus.CONSUMED,
 ];
@@ -64,6 +64,46 @@ export class VouchersService {
     });
     return toPublicResponse(
       vouchers.map((voucher) => this.publicVoucher(voucher)),
+    );
+  }
+
+  async listMine(userId: string) {
+    const assignments = await this.prisma.voucherAssignment.findMany({
+      where: { userId },
+      include: {
+        voucher: {
+          include: { cinemas: { select: { cinemaId: true } } },
+        },
+        redemptions: {
+          select: { status: true },
+        },
+      },
+      orderBy: { assignedAt: 'desc' },
+    });
+
+    return toPublicResponse(
+      assignments.flatMap((assignment) => {
+        const usedCount = assignment.redemptions.filter((redemption) => ACTIVE_REDEMPTION_STATUSES.includes(redemption.status)).length;
+        const remainingUses = Math.max(assignment.usageLimit - usedCount, 0);
+        if (remainingUses <= 0) return [];
+        const voucher = assignment.voucher;
+        return [{
+          id: voucher.id,
+          code: voucher.code,
+          discountType: voucher.discountType,
+          scope: voucher.scope,
+          value: voucher.value,
+          minimumSpend: voucher.minimumSpend,
+          maximumDiscount: voucher.maximumDiscount,
+          startsAt: voucher.startsAt,
+          endsAt: voucher.endsAt,
+          active: voucher.active,
+          usageLimit: assignment.usageLimit,
+          usedCount,
+          remainingUses,
+          cinemaIds: voucher.cinemas.map((cinema) => cinema.cinemaId),
+        }];
+      }),
     );
   }
 
