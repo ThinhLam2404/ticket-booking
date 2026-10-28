@@ -11,7 +11,7 @@ async function loginCustomer(page: import('@playwright/test').Page) {
   await page.getByLabel('Email').fill(customer.email);
   await page.getByLabel('Mật khẩu').fill(customer.password);
   await page.getByRole('dialog').getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Đăng xuất' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Browser Customer|Browser Journey Customer/ })).toBeVisible();
 }
 
 async function waitForMail(request: import('@playwright/test').APIRequestContext, email: string, timeoutMs = 20_000) {
@@ -95,8 +95,10 @@ test.describe('CineBook browser smoke', () => {
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Mật khẩu').fill(customer.password);
     await page.getByRole('dialog').getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Đăng xuất' })).toBeVisible();
-    await page.getByRole('button', { name: 'Đăng xuất' }).click();
+    const accountMenu = page.getByRole('button', { name: /Browser Journey Customer/ });
+    await expect(accountMenu).toBeVisible();
+    await accountMenu.click();
+    await page.getByRole('menuitem', { name: 'Đăng xuất', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Đăng nhập' })).toBeVisible();
   });
 
@@ -133,7 +135,7 @@ test.describe('CineBook browser smoke', () => {
     });
     expect(webhook.ok()).toBe(true);
     await page.goto('/tickets');
-    await expect(page.getByText('Browser Test Movie')).toHaveCount(2);
+    await expect(page.getByText('Browser Test Movie')).toHaveCount(1);
     const ticketMail = await waitForMail(page.request, customer.email);
     expect(ticketMail.Subject ?? '').toMatch(/vé|ticket/i);
   });

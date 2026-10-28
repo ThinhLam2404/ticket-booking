@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test';
 
 test('admin configures a combo and customer purchases it with immutable tickets @mobile', async ({ page, request }) => {
   test.skip(!process.env.PLAYWRIGHT_FULL_STACK, 'Requires isolated API');
-  test.setTimeout(120000);
+  // The first step intentionally waits for the production invitation rate-limit window
+  // to expire, so leave enough headroom for the actual combo journey on CI runners.
+  test.setTimeout(180000);
   const started = Date.now();
   await expect.poll(() => Date.now() - started, { timeout: 70000, intervals: [1000] }).toBeGreaterThan(61000);
   const api = process.env.PLAYWRIGHT_API_URL!;

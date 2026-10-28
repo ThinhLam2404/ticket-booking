@@ -9,7 +9,8 @@ test.describe('shared browser authentication', () => {
     await page.getByLabel('Email', { exact: true }).fill('browser.customer@example.com');
     await page.getByLabel('Mật khẩu', { exact: true }).fill('Password123!');
     await page.getByRole('dialog').getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Đăng xuất', exact: true })).toBeVisible();
+    const accountMenu = page.getByRole('button', { name: /Browser Customer/ });
+    await expect(accountMenu).toBeVisible();
 
     expect(await page.evaluate(() => document.cookie)).not.toContain('cinebook_refresh');
     expect(await page.evaluate(() => localStorage.getItem('ticket_booking_refresh_token'))).toBeTruthy();
@@ -21,10 +22,11 @@ test.describe('shared browser authentication', () => {
     await expect(other.getByRole('heading', { name: 'Booking của tôi', exact: true })).toBeVisible();
 
     await Promise.all([page.reload(), other.reload()]);
-    await expect(page.getByRole('button', { name: 'Đăng xuất', exact: true })).toBeVisible();
-    await expect(other.getByRole('button', { name: 'Đăng xuất', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Browser Customer/ })).toBeVisible();
+    await expect(other.getByRole('button', { name: /Browser Customer/ })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click();
+    await page.getByRole('button', { name: /Browser Customer/ }).click();
+    await page.getByRole('menuitem', { name: 'Đăng xuất', exact: true }).click();
     await expect(other.getByRole('banner').getByRole('button', { name: 'Đăng nhập', exact: true })).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('ticket_booking_refresh_token'))).toBeNull();
   });
