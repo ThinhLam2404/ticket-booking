@@ -2,11 +2,9 @@ import { expect, test } from '@playwright/test';
 
 test('admin configures a combo and customer purchases it with immutable tickets @mobile', async ({ page, request }) => {
   test.skip(!process.env.PLAYWRIGHT_FULL_STACK, 'Requires isolated API');
-  // The first step intentionally waits for the production invitation rate-limit window
-  // to expire, so leave enough headroom for the actual combo journey on CI runners.
+  // Keep this journey independent from the preceding invitation tests. The browser
+  // runner starts with a fresh database/Redis stack, so no rate-limit sleep is needed.
   test.setTimeout(180000);
-  const started = Date.now();
-  await expect.poll(() => Date.now() - started, { timeout: 70000, intervals: [1000] }).toBeGreaterThan(61000);
   const comboName = `Combo browser ${Date.now()}`;
   const api = process.env.PLAYWRIGHT_API_URL!;
   const login = await request.post(`${api}/auth/login`, { data: { email: 'browser.admin@example.com', password: 'Password123!' } });
@@ -82,10 +80,8 @@ test('admin configures a combo and customer purchases it with immutable tickets 
     const webhook = await request.post(`${api}/payments/sepay/webhook`, { headers: { Authorization: `Apikey ${process.env.PLAYWRIGHT_SEPAY_WEBHOOK_API_KEY}` }, data: { id: Math.floor(Date.now() / 1000), gateway: 'BrowserBank', transactionDate: new Date().toISOString(), accountNumber: 'browser-account', transferType: 'in', transferAmount: Number(booking.totalAmount), content: paymentCode } });
     expect(webhook.ok()).toBe(true);
     await expect.poll(async () => (await (await request.get(`${api}/bookings/${booking.id}`, { headers: { Authorization: `Bearer ${customer.accessToken}` } })).json()).status).toBe('CONFIRMED');
-    const tickets = await (await request.get(`${api}/tickets`, { headers: { Authorization: `Bearer ${customer.accessToken}` } })).json();
-    const ticket = tickets.data.find((item: { bookingId: string }) => item.bookingId === booking.id);
     await expect(shopper).toHaveURL(/\/tickets$/, { timeout: 15000 });
-    await shopper.locator(`a[href="/tickets/${ticket.id}"]`).first().click();
+    await shopper.locator(`a[href="/bookings/${booking.id}/tickets"]`).first().click();
     await expect(shopper.getByText('Combo dưới đây thuộc toàn bộ booking', { exact: false })).toBeVisible();
     await expect(shopper.getByRole('region', { name: 'Combo đã mua' })).toContainText(`${comboName} × 2`);
     await expect.poll(async () => {
@@ -96,5 +92,7 @@ test('admin configures a combo and customer purchases it with immutable tickets 
       }
       return false;
     }, { timeout: 20000 }).toBe(true);
-  } finally { await context.close(); }
+  } finally {
+    await context.close().catch(() => undefined);
+  }
 });
