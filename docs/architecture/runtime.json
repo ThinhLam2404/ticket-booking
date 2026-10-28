@@ -1,0 +1,815 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "CineBook Ticket Booking — High-Level Runtime Architecture",
+    "subtitle": "React/Vite SPA → NestJS modular monolith → capability modules → PostgreSQL + Redis, with payment, voucher, audit, and email integrations",
+    "output": "docs/architecture/runtime.html",
+    "quality_profile": "showcase",
+    "visual_preset": "signal-flow",
+    "repository": {
+      "url": "git@github.com:ThinhLam2404/ticket-booking.git",
+      "link_mode": "local-only",
+      "revision": "e32066ae8d995a6bcc2d3148d89590ca074f25f8"
+    },
+    "views": [
+      {
+        "id": "booking-path",
+        "label": "Booking path",
+        "focus": [
+          "browser",
+          "spa",
+          "api",
+          "booking",
+          "pricing",
+          "redis",
+          "postgres"
+        ],
+        "note": "Seat selection, combo pricing, voucher intent, temporary holds, and durable booking state"
+      },
+      {
+        "id": "payment-refund",
+        "label": "Payment + refund",
+        "focus": [
+          "payment",
+          "sepay",
+          "postgres",
+          "audit",
+          "operations"
+        ],
+        "note": "Checkout repricing, webhook reconciliation, manual confirmation, and idempotent refund"
+      },
+      {
+        "id": "admin-capabilities",
+        "label": "Admin capabilities",
+        "focus": [
+          "api",
+          "auth",
+          "catalog",
+          "pricing",
+          "payment",
+          "audit",
+          "operations"
+        ],
+        "note": "RBAC permissions, catalog/combo/voucher administration, audit, and operations status"
+      },
+      {
+        "id": "mail-runtime",
+        "label": "Email runtime",
+        "focus": [
+          "payment",
+          "auth",
+          "mailworker",
+          "postgres",
+          "smtp"
+        ],
+        "note": "Transactional outbox, supervised Worker Thread, polling fallback, and SMTP retry"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Customer / Admin",
+      "sublabel": "Web browser",
+      "icon": "person",
+      "pos": [
+        28,
+        380
+      ],
+      "size": [
+        150,
+        68
+      ],
+      "sources": [
+        {
+          "path": "fe/src/App.tsx",
+          "line": 17,
+          "end_line": 78,
+          "label": "SPA routes and providers"
+        }
+      ]
+    },
+    {
+      "id": "spa",
+      "type": "frontend",
+      "label": "React SPA",
+      "sublabel": "Vite · React 19 · Fetch",
+      "tag": "access memory · refresh localStorage",
+      "icon": "frontend",
+      "pos": [
+        238,
+        380
+      ],
+      "size": [
+        190,
+        82
+      ],
+      "sources": [
+        {
+          "path": "fe/src/api.ts",
+          "line": 95,
+          "end_line": 124,
+          "label": "token storage"
+        },
+        {
+          "path": "fe/src/api.ts",
+          "line": 187,
+          "end_line": 205,
+          "label": "HTTP client"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "NestJS API",
+      "sublabel": "Express · /api/v1 · modular monolith",
+      "tag": "CORS · Helmet · validation · rate limit",
+      "icon": "backend",
+      "pos": [
+        504,
+        380
+      ],
+      "size": [
+        220,
+        100
+      ],
+      "sources": [
+        {
+          "path": "be/src/main.ts",
+          "line": 6,
+          "end_line": 18,
+          "label": "runtime bootstrap"
+        },
+        {
+          "path": "be/src/config/app.config.ts",
+          "line": 32,
+          "end_line": 80,
+          "label": "HTTP configuration"
+        },
+        {
+          "path": "be/src/app.module.ts",
+          "line": 30,
+          "end_line": 66,
+          "label": "module composition"
+        }
+      ]
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Auth + Sessions + RBAC",
+      "sublabel": "JWT · refresh rotation · permissions",
+      "tag": "email verify · reset · invitations",
+      "icon": "security",
+      "pos": [
+        779,
+        60
+      ],
+      "size": [
+        220,
+        82
+      ],
+      "sources": [
+        {
+          "path": "be/src/common/auth/jwt-auth.guard.ts",
+          "line": 19,
+          "end_line": 65,
+          "label": "user/session guard"
+        },
+        {
+          "path": "be/src/common/auth/permissions.guard.ts",
+          "line": 12,
+          "end_line": 20,
+          "label": "permission guard"
+        },
+        {
+          "path": "be/src/app.module.ts",
+          "line": 8,
+          "end_line": 10,
+          "label": "Auth and users modules"
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "type": "backend",
+      "label": "Catalog + Scheduling",
+      "sublabel": "Movies · cinemas · rooms · seats · showtimes",
+      "tag": "TMDB import / bulk scheduling",
+      "icon": "backend",
+      "pos": [
+        779,
+        180
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "sources": [
+        {
+          "path": "be/src/app.module.ts",
+          "line": 43,
+          "end_line": 50,
+          "label": "catalog modules"
+        },
+        {
+          "path": "be/src/modules/movies/movies.service.ts",
+          "line": 71,
+          "end_line": 81,
+          "label": "TMDB lookup and import"
+        }
+      ]
+    },
+    {
+      "id": "booking",
+      "type": "backend",
+      "label": "Booking orchestration",
+      "sublabel": "hold · cancel · expire · cursor lists",
+      "tag": "idempotency key · seat ownership",
+      "icon": "active",
+      "pos": [
+        779,
+        300
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/bookings/bookings.service.ts",
+          "line": 281,
+          "end_line": 339,
+          "label": "hold transaction"
+        },
+        {
+          "path": "be/src/app.module.ts",
+          "line": 14,
+          "end_line": 16,
+          "label": "Bookings module"
+        }
+      ]
+    },
+    {
+      "id": "pricing",
+      "type": "backend",
+      "label": "Pricing + Combos + Vouchers",
+      "sublabel": "price breakdown · offers · assignments",
+      "tag": "snapshot at hold · reserve at checkout",
+      "icon": "active",
+      "pos": [
+        779,
+        420
+      ],
+      "size": [
+        220,
+        92
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/bookings/bookings.service.ts",
+          "line": 342,
+          "end_line": 380,
+          "label": "combo snapshot and pricing"
+        },
+        {
+          "path": "be/src/modules/sepay/sepay.service.ts",
+          "line": 159,
+          "end_line": 215,
+          "label": "checkout repricing and reserve"
+        },
+        {
+          "path": "be/src/app.module.ts",
+          "line": 2,
+          "end_line": 3,
+          "label": "combo and voucher modules"
+        }
+      ]
+    },
+    {
+      "id": "payment",
+      "type": "backend",
+      "label": "Payment + Ticket Issuance",
+      "sublabel": "SePay intent · webhook · tickets",
+      "tag": "matched / review-required",
+      "icon": "success",
+      "pos": [
+        779,
+        540
+      ],
+      "size": [
+        220,
+        86
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/sepay/sepay.controller.ts",
+          "line": 46,
+          "end_line": 102,
+          "label": "checkout, webhook, admin"
+        },
+        {
+          "path": "be/src/modules/sepay/sepay.service.ts",
+          "line": 756,
+          "end_line": 865,
+          "label": "confirmation transaction"
+        }
+      ]
+    },
+    {
+      "id": "refund",
+      "type": "backend",
+      "label": "Reconciliation + Refunds",
+      "sublabel": "manual confirm · full booking refund",
+      "tag": "MANAGE_PAYMENTS · idempotent",
+      "icon": "security",
+      "pos": [
+        1026,
+        540
+      ],
+      "size": [
+        220,
+        86
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/sepay/sepay.controller.ts",
+          "line": 78,
+          "end_line": 115,
+          "label": "refund and transaction admin routes"
+        },
+        {
+          "path": "be/src/modules/sepay/sepay.service.ts",
+          "line": 626,
+          "end_line": 715,
+          "label": "refund transaction"
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "type": "backend",
+      "label": "Audit Log",
+      "sublabel": "allowlisted before/after summaries",
+      "tag": "transactional mutation audit",
+      "icon": "security",
+      "pos": [
+        1026,
+        420
+      ],
+      "size": [
+        220,
+        82
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/audit/audit.service.ts",
+          "line": 9,
+          "end_line": 27,
+          "label": "audit allowlist"
+        },
+        {
+          "path": "be/src/modules/sepay/sepay.service.ts",
+          "line": 851,
+          "end_line": 865,
+          "label": "payment audit in transaction"
+        }
+      ]
+    },
+    {
+      "id": "operations",
+      "type": "backend",
+      "label": "Operations + Observability",
+      "sublabel": "health · metrics · status · Discord alerts",
+      "tag": "VIEW_SYSTEM · scheduled monitor",
+      "icon": "clock",
+      "pos": [
+        1026,
+        300
+      ],
+      "size": [
+        220,
+        82
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/observability/operational-monitor.scheduler.ts",
+          "line": 18,
+          "end_line": 40,
+          "label": "monitor and metrics"
+        },
+        {
+          "path": "be/src/app.module.ts",
+          "line": 25,
+          "end_line": 28,
+          "label": "maintenance and observability modules"
+        }
+      ]
+    },
+    {
+      "id": "scheduler",
+      "type": "backend",
+      "label": "Schedulers",
+      "sublabel": "expiry every minute · retention daily",
+      "tag": "same API process",
+      "icon": "clock",
+      "pos": [
+        504,
+        600
+      ],
+      "size": [
+        220,
+        76
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/bookings/booking-expiry.scheduler.ts",
+          "line": 6,
+          "end_line": 19,
+          "label": "booking expiry"
+        },
+        {
+          "path": "be/src/modules/maintenance/maintenance.scheduler.ts",
+          "line": 14,
+          "end_line": 57,
+          "label": "retention cleanup"
+        }
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Prisma · durable system of record",
+      "tag": "transactions · constraints · outbox",
+      "icon": "database",
+      "pos": [
+        1273,
+        300
+      ],
+      "size": [
+        220,
+        88
+      ],
+      "sources": [
+        {
+          "path": "be/prisma/schema.prisma",
+          "line": 160,
+          "end_line": 176,
+          "label": "audit log"
+        },
+        {
+          "path": "be/prisma/schema.prisma",
+          "line": 355,
+          "end_line": 405,
+          "label": "mail outbox and booking"
+        },
+        {
+          "path": "be/src/modules/sepay/sepay.service.ts",
+          "line": 780,
+          "end_line": 865,
+          "label": "payment / ticket / audit writes"
+        }
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis",
+      "sublabel": "seat locks · TTL · rate-limit counters",
+      "tag": "atomic NX + release-if-owned",
+      "icon": "database",
+      "pos": [
+        1273,
+        120
+      ],
+      "size": [
+        220,
+        78
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/redis/redis.service.ts",
+          "line": 43,
+          "end_line": 70,
+          "label": "atomic lock operations"
+        },
+        {
+          "path": "be/src/modules/bookings/bookings.service.ts",
+          "line": 281,
+          "end_line": 307,
+          "label": "seat lock"
+        }
+      ]
+    },
+    {
+      "id": "tmdb",
+      "type": "external",
+      "label": "TMDB API",
+      "sublabel": "Admin-side movie metadata source",
+      "icon": "cloud",
+      "pos": [
+        1026,
+        60
+      ],
+      "size": [
+        210,
+        68
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/movies/tmdb.client.ts",
+          "line": 160,
+          "end_line": 180,
+          "label": "backend fetch"
+        }
+      ]
+    },
+    {
+      "id": "sepay",
+      "type": "external",
+      "label": "SePay",
+      "sublabel": "Bank transfer gateway + webhook",
+      "tag": "Apikey webhook guard",
+      "icon": "cloud",
+      "pos": [
+        1273,
+        540
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/sepay/sepay.controller.ts",
+          "line": 58,
+          "end_line": 64,
+          "label": "webhook entrypoint"
+        },
+        {
+          "path": "be/src/modules/sepay/sepay-webhook.guard.ts",
+          "line": 14,
+          "end_line": 34,
+          "label": "webhook authentication"
+        }
+      ]
+    },
+    {
+      "id": "mailworker",
+      "type": "backend",
+      "label": "Mail Worker",
+      "sublabel": "Worker Thread · MailOutbox polling",
+      "tag": "SMTP retry · restart supervision",
+      "icon": "clock",
+      "pos": [
+        1273,
+        700
+      ],
+      "size": [
+        220,
+        82
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/mail/mail-worker.supervisor.ts",
+          "line": 49,
+          "end_line": 69,
+          "label": "wake and status"
+        },
+        {
+          "path": "be/src/modules/mail/mail-worker.supervisor.ts",
+          "line": 112,
+          "end_line": 158,
+          "label": "worker lifecycle"
+        },
+        {
+          "path": "be/src/modules/mail/mail.worker.ts",
+          "line": 116,
+          "end_line": 177,
+          "label": "claim and send"
+        }
+      ]
+    },
+    {
+      "id": "smtp",
+      "type": "external",
+      "label": "SMTP provider",
+      "sublabel": "Verification · ticket · refund email",
+      "icon": "cloud",
+      "pos": [
+        1530,
+        700
+      ],
+      "size": [
+        210,
+        72
+      ],
+      "sources": [
+        {
+          "path": "be/src/modules/mail/mail.worker.ts",
+          "line": 142,
+          "end_line": 163,
+          "label": "SMTP delivery"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Browser runtime",
+      "wraps": [
+        "spa"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "NestJS 12 application runtime — modules in one process, not microservices",
+      "wraps": [
+        "api",
+        "auth",
+        "catalog",
+        "booking",
+        "pricing",
+        "payment",
+        "refund",
+        "audit",
+        "operations",
+        "scheduler",
+        "mailworker"
+      ],
+      "pad": 30
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser-spa",
+      "from": "browser",
+      "to": "spa",
+      "label": "HTTP",
+      "variant": "emphasis"
+    },
+    {
+      "id": "spa-api",
+      "from": "spa",
+      "to": "api",
+      "label": "JSON API",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-auth",
+      "from": "api",
+      "to": "auth",
+      "label": "JWT / RBAC",
+      "variant": "security"
+    },
+    {
+      "id": "api-catalog",
+      "from": "api",
+      "to": "catalog",
+      "label": "catalog"
+    },
+    {
+      "id": "api-booking",
+      "from": "api",
+      "to": "booking",
+      "label": "booking"
+    },
+    {
+      "id": "api-pricing",
+      "from": "api",
+      "to": "pricing",
+      "label": "pricing / offers"
+    },
+    {
+      "id": "api-payment",
+      "from": "api",
+      "to": "payment",
+      "label": "payment"
+    },
+    {
+      "id": "api-admin",
+      "from": "api",
+      "to": "refund",
+      "label": "admin payments",
+      "variant": "security"
+    },
+    {
+      "id": "api-audit",
+      "from": "api",
+      "to": "audit",
+      "label": "audit",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-operations",
+      "from": "api",
+      "to": "operations",
+      "label": "health / metrics"
+    },
+    {
+      "id": "catalog-tmdb",
+      "from": "catalog",
+      "to": "tmdb",
+      "label": "TMDB",
+      "variant": "dashed"
+    },
+    {
+      "id": "booking-redis",
+      "from": "booking",
+      "to": "redis",
+      "label": "seat lock TTL",
+      "variant": "security"
+    },
+    {
+      "id": "payment-sepay",
+      "from": "payment",
+      "to": "sepay",
+      "label": "payment intent / QR"
+    },
+    {
+      "id": "sepay-webhook",
+      "from": "sepay",
+      "to": "payment",
+      "label": "webhook",
+      "variant": "security"
+    },
+    {
+      "id": "operations-redis",
+      "from": "operations",
+      "to": "redis",
+      "label": "cooldown / state",
+      "variant": "dashed"
+    },
+    {
+      "id": "scheduler-booking",
+      "from": "scheduler",
+      "to": "booking",
+      "label": "expire cron",
+      "variant": "dashed"
+    },
+    {
+      "id": "mailworker-postgres",
+      "from": "mailworker",
+      "to": "postgres",
+      "label": "outbox poll",
+      "variant": "dashed"
+    },
+    {
+      "id": "mailworker-smtp",
+      "from": "mailworker",
+      "to": "smtp",
+      "label": "SMTP"
+    },
+    {
+      "id": "payment-mail",
+      "from": "payment",
+      "to": "mailworker",
+      "label": "wake after commit",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Primary request path",
+      "items": [
+        "Customer and Admin browsers use the same React SPA and API client. Access tokens stay in memory; refresh tokens and current user are stored in localStorage for multi-tab refresh.",
+        "NestJS exposes /api/v1 and applies CORS, Helmet, validation, rate limiting, JWT/session guards, role checks, and permission checks.",
+        "Catalog, booking, pricing, payment, audit, operations, and mail capabilities remain modules in one API process; PostgreSQL is the durable system of record."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Seat, combo, and voucher consistency",
+      "items": [
+        "Redis NX locks with TTL reduce concurrent seat contention; PostgreSQL transactions authoritatively create bookings and seat holds.",
+        "Combo selections are snapshotted at hold. Voucher code is an intent at hold; checkout serializes the booking, reprices, validates assignment/cinema/scope, and reserves redemption atomically.",
+        "Idempotency keys, cursor-scoped list queries, database constraints, and expiry release paths protect retries and abandoned holds."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Payment, reconciliation, and refund",
+      "items": [
+        "Checkout creates or reuses a SePay payment intent and QR using the server-confirmed total. SePay webhook matching is idempotent by gateway transaction ID.",
+        "Matched payment confirms booking, sells seats, issues tickets, consumes voucher redemption, writes audit and MailOutbox in one transaction. Mismatches become REVIEW_REQUIRED for Admin reconciliation.",
+        "Admin manual confirm and full booking refund are permission-protected and idempotent. Money transfer is outside the application; there is no automatic provider refund API."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Async delivery and operations",
+      "items": [
+        "MailOutbox is durable PostgreSQL state, not a Redis queue. A supervised Worker Thread claims rows, polls as fallback, retries SMTP failures, and is woken after commit.",
+        "Booking expiry runs every minute, retention cleanup daily, and operational monitoring every minute in the API process. Health, Prometheus metrics, operations status, and optional Discord alerts expose runtime signals.",
+        "The diagram reflects source commit e32066a. Worktree documentation and architecture artifacts are uncommitted; source references point to committed code at the pinned revision."
+      ]
+    }
+  ]
+}

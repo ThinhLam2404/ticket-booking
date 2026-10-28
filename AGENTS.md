@@ -5,8 +5,8 @@
 - This is an npm monorepo: `be/` is a NestJS 12 modular monolith; `fe/` is a React 19/Vite SPA. Each package has its own lockfile and scripts; root scripts orchestrate both.
 - Backend bootstrap/configuration lives in `be/src/main.ts` and `be/src/config/app.config.ts`; API modules are under `be/src/modules/`, persistence is Prisma/PostgreSQL, and seat locking uses Redis.
 - Frontend entrypoints are `fe/src/main.tsx` and `fe/src/App.tsx`; HTTP/auth behavior is centralized in `fe/src/api.ts` and generated API types are in `fe/src/generated/openapi.d.ts`.
-- `README.md` is the canonical detailed source for domain flows, database invariants, API behavior, and runtime architecture.
-- Whenever a new feature changes system behavior, architecture, API, database, runtime configuration, infrastructure, testing, or operational flows, update `README.md` in the same change. Keep the documentation aligned with the current source and include any new setup, migration, API, or verification requirements.
+- `README.md` is the concise project introduction and quick-start guide. `TECHNICAL.md` is the canonical detailed source for domain flows, database invariants, API behavior, and runtime architecture.
+- Whenever a new feature changes system behavior, architecture, API, database, runtime configuration, infrastructure, testing, or operational flows, update `TECHNICAL.md` in the same change. Update `README.md` when the introduction or quick start changes. Keep documentation aligned with source and include new setup, migration, API, or verification requirements.
 
 ## Setup and runtime
 

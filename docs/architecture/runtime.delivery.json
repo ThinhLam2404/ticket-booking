@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "6eed3fd5-9dfc-4960-beed-ff547132975e",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/mnt/Data/Workspace/CODE/nestjs/ticket-booking/docs/architecture/runtime.json",
+  "output": "/mnt/Data/Workspace/CODE/nestjs/ticket-booking/docs/architecture/runtime.html",
+  "specification": {
+    "sha256": "143a6829565ce90f05bad327d0d2ba1ce305cc866a84977532051efe82409f37",
+    "bytes": 20152
+  },
+  "artifact": {
+    "sha256": "5d6ebdb4792f9d60bf8fc57530c208f26ad978ecf258d2b9dd25eedcd47a69c6",
+    "bytes": 799611
+  }
+}
